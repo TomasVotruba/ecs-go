@@ -12,6 +12,8 @@ var (
 	trailingAtEnd         = regexp.MustCompile(`[ \t]+$`)
 )
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Whitespace/NoTrailingWhitespaceFixer.php
+//
 // NoTrailingWhitespace removes spaces and tabs at the end of a line.
 type NoTrailingWhitespace struct{}
 

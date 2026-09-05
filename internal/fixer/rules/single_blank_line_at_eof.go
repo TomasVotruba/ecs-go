@@ -7,6 +7,8 @@ import (
 	"ecs-go/internal/tokens"
 )
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Whitespace/SingleBlankLineAtEofFixer.php
+//
 // SingleBlankLineAtEndOfFile ensures the file ends with exactly one newline.
 type SingleBlankLineAtEndOfFile struct{}
 

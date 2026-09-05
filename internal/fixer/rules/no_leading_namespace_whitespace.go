@@ -7,6 +7,8 @@ import (
 	"ecs-go/internal/tokens"
 )
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/NamespaceNotation/NoLeadingNamespaceWhitespaceFixer.php
+//
 // NoLeadingNamespaceWhitespace removes indentation before a "namespace"
 // declaration: "  namespace App;" becomes "namespace App;".
 type NoLeadingNamespaceWhitespace struct{}

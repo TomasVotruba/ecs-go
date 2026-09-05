@@ -7,6 +7,8 @@ import (
 	"ecs-go/internal/tokens"
 )
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/PhpTag/BlankLineAfterOpeningTagFixer.php
+//
 // BlankLineAfterOpeningTag ensures one blank line after the opening "<?php" tag
 // when code starts on a following line: "<?php\n$x" becomes "<?php\n\n$x". Code
 // on the same line as the tag is left untouched.

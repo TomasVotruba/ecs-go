@@ -5,6 +5,8 @@ import (
 	"ecs-go/internal/tokens"
 )
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Semicolon/SpaceAfterSemicolonFixer.php
+//
 // SpaceAfterSemicolon inserts a single space after a semicolon when it is
 // directly followed by code on the same line: "$a=1;$b=2;" becomes
 // "$a=1; $b=2;". A ";" before ")" (empty for loop) or a newline is left alone.

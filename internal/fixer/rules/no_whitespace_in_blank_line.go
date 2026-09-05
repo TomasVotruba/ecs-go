@@ -7,6 +7,8 @@ import (
 	"ecs-go/internal/tokens"
 )
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Whitespace/NoWhitespaceInBlankLineFixer.php
+//
 // NoWhitespaceInBlankLine removes spaces and tabs from otherwise-empty lines.
 // It only clears interior blank lines inside a whitespace run; the last segment
 // (indentation of the next code line) and the first segment (trailing

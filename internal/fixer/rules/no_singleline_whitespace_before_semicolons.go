@@ -7,6 +7,8 @@ import (
 	"ecs-go/internal/tokens"
 )
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Semicolon/NoSinglelineWhitespaceBeforeSemicolonsFixer.php
+//
 // NoSinglelineWhitespaceBeforeSemicolons removes single-line whitespace before
 // a semicolon: "$x = 1 ;" becomes "$x = 1;".
 type NoSinglelineWhitespaceBeforeSemicolons struct{}
