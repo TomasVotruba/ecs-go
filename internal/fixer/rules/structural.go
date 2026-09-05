@@ -40,6 +40,56 @@ func (BlankLinesBeforeNamespace) Fix(s *tokens.Stream) bool {
 	return changed
 }
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/NamespaceNotation/BlankLineAfterNamespaceFixer.php
+//
+// BlankLineAfterNamespace ensures one blank line after a "namespace X;"
+// declaration. Bracketed namespaces ("namespace X { }") are left alone.
+type BlankLineAfterNamespace struct{}
+
+func (BlankLineAfterNamespace) Name() string {
+	return `PhpCsFixer\Fixer\NamespaceNotation\BlankLineAfterNamespaceFixer`
+}
+
+func (BlankLineAfterNamespace) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/NamespaceNotation/BlankLineAfterNamespaceFixer.php"
+}
+
+func (BlankLineAfterNamespace) Fix(s *tokens.Stream) bool {
+	changed := false
+	for i := range s.Len() {
+		t := s.At(i)
+		if t.Kind != token.Keyword || strings.ToLower(t.Value) != "namespace" || memberPrev(s, i) {
+			continue
+		}
+		semi := -1
+		for j := i + 1; j < s.Len(); j++ {
+			if s.At(j).Kind != token.Punct {
+				continue
+			}
+			if s.At(j).Value == "{" {
+				break // bracketed namespace
+			}
+			if s.At(j).Value == ";" {
+				semi = j
+				break
+			}
+		}
+		if semi < 0 || semi+1 >= s.Len() {
+			continue
+		}
+		if s.At(semi+1).Kind == token.Whitespace {
+			if hasNewline(s.At(semi+1).Value) && s.At(semi+1).Value != "\n\n" {
+				s.SetValue(semi+1, "\n\n")
+				changed = true
+			}
+		} else {
+			s.InsertAt(semi+1, token.Token{Kind: token.Whitespace, Value: "\n\n"})
+			changed = true
+		}
+	}
+	return changed
+}
+
 var classLikeKeywords = map[string]bool{
 	"class": true, "interface": true, "trait": true, "enum": true,
 }

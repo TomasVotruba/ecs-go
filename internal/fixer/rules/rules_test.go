@@ -279,6 +279,48 @@ func TestIndentationType(t *testing.T) {
 	}
 }
 
+func TestFullOpeningTag(t *testing.T) {
+	got, changed := apply(t, FullOpeningTag{}, "<? echo 1;")
+	if want := "<?php echo 1;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	got, changed = apply(t, FullOpeningTag{}, "<?$x;")
+	if want := "<?php $x;"; !changed || got != want {
+		t.Fatalf("separator: changed=%v got=%q want=%q", changed, got, want)
+	}
+	if _, changed := apply(t, FullOpeningTag{}, "<?= $x;"); changed {
+		t.Fatal("short echo tag must be left alone")
+	}
+}
+
+func TestNoClosingTag(t *testing.T) {
+	got, changed := apply(t, NoClosingTag{}, "<?php echo 1;\n?>\n")
+	if want := "<?php echo 1;\n"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	// templating file (inline HTML) keeps the closing tag
+	if _, changed := apply(t, NoClosingTag{}, "<?php if ($a): ?>\n<div></div>\n<?php endif; ?>\n"); changed {
+		t.Fatal("file with inline HTML must keep closing tags")
+	}
+}
+
+func TestBlankLineAfterNamespace(t *testing.T) {
+	got, changed := apply(t, BlankLineAfterNamespace{}, "<?php\nnamespace App;\nclass A {}")
+	if want := "<?php\nnamespace App;\n\nclass A {}"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	if _, changed := apply(t, BlankLineAfterNamespace{}, "<?php\nnamespace App { }"); changed {
+		t.Fatal("bracketed namespace must be left alone")
+	}
+}
+
+func TestSingleLineAfterImports(t *testing.T) {
+	got, changed := apply(t, SingleLineAfterImports{}, "<?php\nuse A;\nuse B;\nclass C {}")
+	if want := "<?php\nuse A;\nuse B;\n\nclass C {}"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
 func TestNoTrailingWhitespace(t *testing.T) {
 	got, changed := apply(t, NoTrailingWhitespace{}, "<?php $x = 1;   \n$y = 2;\t\n")
 	if want := "<?php $x = 1;\n$y = 2;\n"; !changed || got != want {
