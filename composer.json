@@ -1,0 +1,16 @@
+{
+    "name": "tomasvotruba/ecs-go",
+    "description": "Token-based PHP coding standard checker and fixer, written in Go - a lean, ECS-style tool.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["coding-standard", "static-analysis", "php-cs-fixer", "ecs", "go", "fixer"],
+    "require": {
+        "php": "*"
+    },
+    "bin": ["bin/ecs-go"],
+    "scripts": {
+        "build": "go build -o ecs-go .",
+        "post-install-cmd": "@build",
+        "post-update-cmd": "@build"
+    }
+}

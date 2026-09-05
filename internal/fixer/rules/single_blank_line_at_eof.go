@@ -1,0 +1,36 @@
+package rules
+
+import (
+	"strings"
+
+	"ecs-go/internal/token"
+	"ecs-go/internal/tokens"
+)
+
+// SingleBlankLineAtEndOfFile ensures the file ends with exactly one newline.
+type SingleBlankLineAtEndOfFile struct{}
+
+func (SingleBlankLineAtEndOfFile) Name() string { return "single_blank_line_at_eof" }
+
+func (SingleBlankLineAtEndOfFile) Fix(s *tokens.Stream) bool {
+	if s.Len() == 0 {
+		return false
+	}
+	last := s.Len() - 1
+	t := s.At(last)
+	if t.Kind == token.Whitespace {
+		// the final whitespace token is entirely trailing; collapse to one \n
+		if t.Value != "\n" {
+			s.SetValue(last, "\n")
+			return true
+		}
+		return false
+	}
+	// file does not end in whitespace: append a single newline, unless the last
+	// token already carries a trailing newline (e.g. a comment)
+	if strings.HasSuffix(t.Value, "\n") {
+		return false
+	}
+	s.InsertAt(s.Len(), token.Token{Kind: token.Whitespace, Value: "\n"})
+	return true
+}

@@ -1,0 +1,4 @@
+/ecs-go
+/vendor/
+*.test
+*.out
