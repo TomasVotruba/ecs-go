@@ -183,8 +183,14 @@ Applied checkers:
 ### Structural
 
 `single_import_per_statement` (`use A, B;` -> `use A;` / `use B;`),
-`blank_lines_before_namespace`, `no_blank_lines_after_class_opening`,
+`single_line_after_imports`, `blank_lines_before_namespace`,
+`blank_line_after_namespace`, `no_blank_lines_after_class_opening`,
 `indentation_type` (leading tabs -> four spaces).
+
+### PHP tags
+
+`full_opening_tag` (`<?` -> `<?php`), `no_closing_tag` (strips a trailing `?>`
+from a pure-PHP file).
 
 ## License
 

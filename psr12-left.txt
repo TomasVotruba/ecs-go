@@ -34,21 +34,17 @@ new_with_parentheses            "new Foo" -> "new Foo()" (needs class-name ctx)
 NEEDS LEXER WORK
 ----------------
 (heredoc / nowdoc are now lexed as opaque string tokens - fixers leave them
- alone.)
-no_closing_tag                  strip trailing "?>" (safe once tag handling solid)
+ alone. no_closing_tag and full_opening_tag are implemented.)
 no_trailing_whitespace_in_comment   trim inside comment tokens
-short_open_tag / full_opening_tag    "<?" -> "<?php"
 
 
 TOKEN-DOABLE NEXT (bounded)
 ---------------------------
-blank_line_after_namespace      one blank line after "namespace X;"
-single_line_after_imports       one blank line after the import block
 blank_line_between_import_groups blank line between class/function/const groups
 no_extra_blank_lines            collapse 2+ blank lines (PSR12 scopes to "use")
 no_multiple_statements_per_line one statement per line
-switch_case_semicolon_to_colon  "case 1;" -> "case 1:"
-switch_case_space               "case 1 :" -> "case 1:"
+switch_case_semicolon_to_colon  "case 1;" -> "case 1:"  (colon disambiguation)
+switch_case_space               "case 1 :" -> "case 1:"  (colon disambiguation)
 no_break_comment                add "// no break" on fallthrough (heuristic)
 binary_operator_spaces          remaining operators: arithmetic (+ - * / %),
                                 bitwise (& | ^), which are unary-ambiguous and
@@ -67,5 +63,7 @@ spacing:     no_leading_namespace_whitespace, no_singleline_whitespace_before_se
 constructs:  single_space_around_construct, no_spaces_after_function_name,
              spaces_inside_parentheses, unary_operator_spaces, elseif,
              no_leading_import_slash, declare_equal_normalize
-structural:  single_import_per_statement, blank_lines_before_namespace,
+structural:  single_import_per_statement, single_line_after_imports,
+             blank_lines_before_namespace, blank_line_after_namespace,
              no_blank_lines_after_class_opening, indentation_type
+php tag:     full_opening_tag, no_closing_tag

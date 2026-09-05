@@ -48,18 +48,23 @@ func ConstructFixers() []fixer.Fixer {
 func StructuralFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		BlankLinesBeforeNamespace{},
+		BlankLineAfterNamespace{},
 		SingleImportPerStatement{},
+		SingleLineAfterImports{},
 		NoBlankLinesAfterClassOpening{},
 		IndentationType{},
 	}
 }
 
-// All returns every built-in fixer in execution order.
+// All returns every built-in fixer in execution order. FullOpeningTag runs first
+// (normalize the tag) and NoClosingTag last (trailing tag/EOF cleanup).
 func All() []fixer.Fixer {
-	all := CasingFixers()
+	all := []fixer.Fixer{FullOpeningTag{}}
+	all = append(all, CasingFixers()...)
 	all = append(all, SpacingFixers()...)
 	all = append(all, ConstructFixers()...)
 	all = append(all, StructuralFixers()...)
+	all = append(all, NoClosingTag{})
 	return all
 }
 

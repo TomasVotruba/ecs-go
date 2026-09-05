@@ -46,19 +46,39 @@ func (l *lexer) run() {
 
 func (l *lexer) lexHTML() {
 	start := l.pos
-	idx := strings.Index(l.src[l.pos:], "<?")
-	if idx < 0 {
-		l.pos = len(l.src)
-		l.emit(token.InlineHTML, start)
-		return
+	for {
+		idx := strings.Index(l.src[l.pos:], "<?")
+		if idx < 0 {
+			l.pos = len(l.src)
+			break
+		}
+		l.pos += idx
+		if l.isOpenTagHere() {
+			break
+		}
+		l.pos += 2 // a "<?" that is not a PHP tag (e.g. "<?xml") stays inline HTML
 	}
-	l.pos += idx
 	if l.pos > start {
-		// emit the HTML preceding the tag
 		l.toks = append(l.toks, token.Token{Kind: token.InlineHTML, Value: l.src[start:l.pos], Pos: start})
 	}
-	l.lexOpenTag()
-	l.inPHP = true
+	if l.pos < len(l.src) {
+		l.lexOpenTag()
+		l.inPHP = true
+	}
+}
+
+// isOpenTagHere reports whether l.pos starts a real PHP open tag. "<?php" and
+// "<?=" always are; a bare "<?" short open tag is too, except "<?xml" which is
+// an XML declaration and stays inline HTML.
+func (l *lexer) isOpenTagHere() bool {
+	if l.hasPrefix("<?php") || l.hasPrefix("<?=") {
+		return true
+	}
+	rest := l.src[l.pos+2:]
+	if len(rest) >= 3 && strings.EqualFold(rest[:3], "xml") {
+		return false
+	}
+	return true
 }
 
 func (l *lexer) lexOpenTag() {

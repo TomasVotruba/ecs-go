@@ -136,6 +136,65 @@ func (SingleImportPerStatement) Fix(s *tokens.Stream) bool {
 	return changed
 }
 
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Import/SingleLineAfterImportsFixer.php
+//
+// SingleLineAfterImports ensures one blank line after the last import in a block
+// of consecutive top-level use statements.
+type SingleLineAfterImports struct{}
+
+func (SingleLineAfterImports) Name() string {
+	return `PhpCsFixer\Fixer\Import\SingleLineAfterImportsFixer`
+}
+
+func (SingleLineAfterImports) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Import/SingleLineAfterImportsFixer.php"
+}
+
+func (SingleLineAfterImports) Fix(s *tokens.Stream) bool {
+	changed := false
+	for i := 0; i < s.Len(); i++ {
+		t := s.At(i)
+		if t.Kind != token.Keyword || strings.ToLower(t.Value) != "use" {
+			continue
+		}
+		if inClassLikeBody(s, i) {
+			continue // trait use
+		}
+		j := skipWhitespace(s, i+1)
+		if j < s.Len() && s.At(j).Kind == token.Punct && s.At(j).Value == "(" {
+			continue // closure use
+		}
+		semi := -1
+		for k := i + 1; k < s.Len(); k++ {
+			if s.At(k).Kind == token.Punct && s.At(k).Value == ";" {
+				semi = k
+				break
+			}
+		}
+		if semi < 0 || semi+1 >= s.Len() {
+			continue
+		}
+		nx := skipWhitespace(s, semi+1)
+		if nx >= s.Len() {
+			continue
+		}
+		next := s.At(nx)
+		// only the last import in a block, and only when code follows
+		if next.Kind == token.Keyword && strings.ToLower(next.Value) == "use" {
+			continue
+		}
+		if next.Kind == token.Punct && next.Value == "}" {
+			continue
+		}
+		if s.At(semi+1).Kind == token.Whitespace &&
+			hasNewline(s.At(semi+1).Value) && s.At(semi+1).Value != "\n\n" {
+			s.SetValue(semi+1, "\n\n")
+			changed = true
+		}
+	}
+	return changed
+}
+
 // indentBefore returns the indentation (spaces/tabs after the last newline) of
 // the token preceding index i.
 func indentBefore(s *tokens.Stream, i int) string {
