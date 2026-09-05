@@ -70,6 +70,33 @@ func TestDocCommentVsComment(t *testing.T) {
 	}
 }
 
+func TestLexHeredocNowdocOpaque(t *testing.T) {
+	cases := []string{
+		"<?php $x = <<<EOT\nbody $a<$b if($c)\nEOT;\n",
+		"<?php $x = <<<'EOT'\nraw $a<$b\nEOT;\n",
+		"<?php $x = <<<EOT\n    indented close is allowed\n    EOT;\n",
+	}
+	for _, src := range cases {
+		var heredoc string
+		for _, tk := range Lex(src) {
+			if tk.Kind == token.String && len(tk.Value) > 3 && tk.Value[:3] == "<<<" {
+				heredoc = tk.Value
+			}
+		}
+		if heredoc == "" {
+			t.Errorf("heredoc not captured as a single String token in %q", src)
+		}
+		// lossless
+		var got strings.Builder
+		for _, tk := range Lex(src) {
+			got.WriteString(tk.Value)
+		}
+		if got.String() != src {
+			t.Errorf("not lossless\n src: %q\n got: %q", src, got.String())
+		}
+	}
+}
+
 func TestLexKeywordsVsIdent(t *testing.T) {
 	toks := Lex("<?php function foo() { return bar; }")
 	kind := map[string]token.Kind{}

@@ -86,6 +86,10 @@ func (SingleImportPerStatement) Fix(s *tokens.Stream) bool {
 			i++ // closure "use (...)"
 			continue
 		}
+		if inClassLikeBody(s, i) {
+			i++ // trait use inside a class - single_trait_insert_per_statement's job
+			continue
+		}
 
 		semi, group := -1, false
 		var commas []int
@@ -159,6 +163,43 @@ func splitImportParts(s *tokens.Stream, j, semi int, commas []int) [][]token.Tok
 		parts = append(parts, trimWhitespace(part))
 	}
 	return parts
+}
+
+// inClassLikeBody reports whether index i is directly inside a class, interface,
+// trait or enum body (as opposed to file scope or a bracketed namespace).
+func inClassLikeBody(s *tokens.Stream, i int) bool {
+	depth := 0
+	for j := i - 1; j >= 0; j-- {
+		t := s.At(j)
+		if t.Kind != token.Punct {
+			continue
+		}
+		switch t.Value {
+		case "}":
+			depth++
+		case "{":
+			if depth == 0 {
+				return braceOpensClassLike(s, j)
+			}
+			depth--
+		}
+	}
+	return false
+}
+
+// braceOpensClassLike reports whether the "{" at index brace opens a class-like
+// body, by finding a class/interface/trait/enum keyword in its header.
+func braceOpensClassLike(s *tokens.Stream, brace int) bool {
+	for j := brace - 1; j >= 0; j-- {
+		t := s.At(j)
+		if t.Kind == token.Punct && (t.Value == ";" || t.Value == "{" || t.Value == "}") {
+			return false
+		}
+		if t.Kind == token.Keyword && classLikeKeywords[strings.ToLower(t.Value)] {
+			return true
+		}
+	}
+	return false
 }
 
 func trimWhitespace(toks []token.Token) []token.Token {

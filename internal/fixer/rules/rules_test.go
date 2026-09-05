@@ -208,6 +208,32 @@ func TestDeclareEqualNormalize(t *testing.T) {
 	}
 }
 
+// TestAllFixersIdempotent guarantees a second --fix pass is a no-op: running
+// every fixer twice must equal running it once.
+func TestAllFixersIdempotent(t *testing.T) {
+	corpus := []string{
+		"<?php\ndeclare(strict_types = 1);\nnamespace App;\nuse A\\B, C\\D;\nCLASS Demo\n{\n\n\tpublic function run( $a )\n\t{\n\t\tif($a===TRUE){\n\t\t\treturn SELF::make ( $a );\n\t\t} else if($a) {\n\t\t\t$i ++;\n\t\t}\n\t\t$x=(INTEGER)$a;\n\t\treturn $a.'x';\n\t}\n}\n",
+		"<?php $x = <<<EOT\nline $a<$b if($c)\nEOT;\n",
+		"<?php $m=['a'=>1,'b'  =>  2];\n",
+		"<?php class A { use TraitB, TraitC; }\n",
+	}
+	for _, src := range corpus {
+		once := runAll(src)
+		twice := runAll(once)
+		if once != twice {
+			t.Errorf("not idempotent\n src:  %q\n once: %q\n twice:%q", src, once, twice)
+		}
+	}
+}
+
+func runAll(src string) string {
+	s := tokens.New(lexer.Lex(src))
+	for _, f := range All() {
+		f.Fix(s)
+	}
+	return s.Render()
+}
+
 func TestBinaryOperatorSpacesComparison(t *testing.T) {
 	got, changed := apply(t, BinaryOperatorSpaces{}, "<?php $x = $a===$b || $c<$d ?? $e;")
 	if want := "<?php $x = $a === $b || $c < $d ?? $e;"; !changed || got != want {
