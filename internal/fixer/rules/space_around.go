@@ -30,6 +30,84 @@ func prevSignificant(s *tokens.Stream, i int) (token.Token, bool) {
 	return token.Token{}, false
 }
 
+// memberPrev reports whether the token before index i is an object/static
+// access operator, meaning the token at i is a property or method name.
+func memberPrev(s *tokens.Stream, i int) bool {
+	if prev, ok := prevSignificant(s, i); ok {
+		return prev.Value == "->" || prev.Value == "?->" || prev.Value == "::"
+	}
+	return false
+}
+
+// isOperand reports whether a token can be the operand of ++/-- (a variable,
+// name, or a closing ) or ]).
+func isOperand(t token.Token) bool {
+	if t.Kind == token.Variable || t.Kind == token.Ident {
+		return true
+	}
+	return t.Kind == token.Punct && (t.Value == ")" || t.Value == "]")
+}
+
+// castAt detects a cast at an opening "(" and returns the type token index and
+// the closing ")" index. It reuses CastSpaces' guard so grouping, calls and
+// index accesses are not mistaken for casts.
+func castAt(s *tokens.Stream, open int) (typeIdx, closeIdx int, ok bool) {
+	if s.At(open).Kind != token.Punct || s.At(open).Value != "(" {
+		return 0, 0, false
+	}
+	j := open + 1
+	if j < s.Len() && s.At(j).Kind == token.Whitespace {
+		j++
+	}
+	if j >= s.Len() || !isCastType(s.At(j)) {
+		return 0, 0, false
+	}
+	typeIdx = j
+	j++
+	if j < s.Len() && s.At(j).Kind == token.Whitespace {
+		j++
+	}
+	if j >= s.Len() || s.At(j).Kind != token.Punct || s.At(j).Value != ")" {
+		return 0, 0, false
+	}
+	if prev, ok := prevSignificant(s, open); ok {
+		if prev.Kind == token.Ident || prev.Kind == token.Variable ||
+			prev.Value == ")" || prev.Value == "]" {
+			return 0, 0, false
+		}
+	}
+	return typeIdx, j, true
+}
+
+// insideDeclareArgs reports whether index i sits inside a declare( ... ) header,
+// so binary-operator spacing leaves declare_equal_normalize to handle its "=".
+func insideDeclareArgs(s *tokens.Stream, i int) bool {
+	depth := 0
+	for j := i - 1; j >= 0; j-- {
+		t := s.At(j)
+		if t.Kind != token.Punct {
+			continue
+		}
+		switch t.Value {
+		case ")":
+			depth++
+		case "(":
+			if depth == 0 {
+				if prev, ok := prevSignificant(s, j); ok {
+					return prev.Kind == token.Keyword && strings.EqualFold(prev.Value, "declare")
+				}
+				return false
+			}
+			depth--
+		case ";":
+			if depth == 0 {
+				return false
+			}
+		}
+	}
+	return false
+}
+
 // normalizeSpaceAround forces exactly one space on both sides of every token the
 // target predicate selects. Whitespace spanning a newline is left alone so
 // intentional alignment survives.

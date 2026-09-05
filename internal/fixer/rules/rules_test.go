@@ -117,6 +117,97 @@ func TestCastSpaces(t *testing.T) {
 	}
 }
 
+func TestLowercaseKeywords(t *testing.T) {
+	got, changed := apply(t, LowercaseKeywords{}, "<?php FUNCTION foo() { RETURN 1; }")
+	if want := "<?php function foo() { return 1; }"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestConstantCase(t *testing.T) {
+	got, changed := apply(t, ConstantCase{}, "<?php $a = TRUE; $b = NULL; $c = False;")
+	if want := "<?php $a = true; $b = null; $c = false;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	if _, changed := apply(t, ConstantCase{}, "<?php $x->TRUE;"); changed {
+		t.Fatal("member named TRUE should not be touched")
+	}
+}
+
+func TestLowercaseStaticReference(t *testing.T) {
+	got, changed := apply(t, LowercaseStaticReference{}, "<?php SELF::x(); PARENT::y(); Static::z();")
+	if want := "<?php self::x(); parent::y(); static::z();"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestLowercaseAndShortCast(t *testing.T) {
+	got, changed := apply(t, LowercaseCast{}, "<?php $x = (INT)$y;")
+	if want := "<?php $x = (int)$y;"; !changed || got != want {
+		t.Fatalf("lowercase: changed=%v got=%q want=%q", changed, got, want)
+	}
+	got, changed = apply(t, ShortScalarCast{}, "<?php $x = (integer)$y; $z = (boolean)$w;")
+	if want := "<?php $x = (int)$y; $z = (bool)$w;"; !changed || got != want {
+		t.Fatalf("short: changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestSingleSpaceAroundConstruct(t *testing.T) {
+	got, changed := apply(t, SingleSpaceAroundConstruct{}, "<?php if($a){} else{}")
+	if want := "<?php if ($a){} else {}"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	// static:: is a reference, not a construct body
+	if _, changed := apply(t, SingleSpaceAroundConstruct{}, "<?php static::foo();"); changed {
+		t.Fatal("static:: should not gain a space")
+	}
+}
+
+func TestNoSpacesAfterFunctionName(t *testing.T) {
+	got, changed := apply(t, NoSpacesAfterFunctionName{}, "<?php foo (1); $o->bar ();")
+	if want := "<?php foo(1); $o->bar();"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	if _, changed := apply(t, NoSpacesAfterFunctionName{}, "<?php if ($a) {}"); changed {
+		t.Fatal("control keyword is not a function name")
+	}
+}
+
+func TestNoSpacesInsideParenthesis(t *testing.T) {
+	got, changed := apply(t, NoSpacesInsideParenthesis{}, "<?php foo( $a, $b );")
+	if want := "<?php foo($a, $b);"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestUnaryOperatorSpaces(t *testing.T) {
+	got, changed := apply(t, UnaryOperatorSpaces{}, "<?php $i ++; -- $j;")
+	if want := "<?php $i++; --$j;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestElseif(t *testing.T) {
+	got, changed := apply(t, Elseif{}, "<?php if ($a) {} else if ($b) {}")
+	if want := "<?php if ($a) {} elseif ($b) {}"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestNoLeadingImportSlash(t *testing.T) {
+	got, changed := apply(t, NoLeadingImportSlash{}, "<?php use \\Foo\\Bar; use function \\ns\\f;")
+	if want := "<?php use Foo\\Bar; use function ns\\f;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestDeclareEqualNormalize(t *testing.T) {
+	got, changed := apply(t, DeclareEqualNormalize{}, "<?php declare(strict_types = 1);")
+	if want := "<?php declare(strict_types=1);"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
 func TestNoTrailingWhitespace(t *testing.T) {
 	got, changed := apply(t, NoTrailingWhitespace{}, "<?php $x = 1;   \n$y = 2;\t\n")
 	if want := "<?php $x = 1;\n$y = 2;\n"; !changed || got != want {
