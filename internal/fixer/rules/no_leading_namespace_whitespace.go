@@ -25,7 +25,7 @@ func (NoLeadingNamespaceWhitespace) Fix(s *tokens.Stream) bool {
 	changed := false
 	for i := 1; i < s.Len(); i++ {
 		t := s.At(i)
-		if t.Kind != token.Ident || t.Value != "namespace" {
+		if t.Kind != token.Keyword || t.Value != "namespace" {
 			continue
 		}
 		prev := s.At(i - 1)

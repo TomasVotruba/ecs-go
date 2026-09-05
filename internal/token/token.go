@@ -12,7 +12,8 @@ const (
 	Comment         // // # /* */
 	DocComment      // /** */
 	Variable        // $foo
-	Ident           // keywords and names
+	Ident           // names (T_STRING): function/class names, constants, types
+	Keyword         // reserved words: function, class, return, namespace, ...
 	Number
 	String // '...' "..."
 	Punct  // operators, braces, ; , etc.
@@ -29,6 +30,7 @@ var kindNames = map[Kind]string{
 	DocComment: "DocComment",
 	Variable:   "Variable",
 	Ident:      "Ident",
+	Keyword:    "Keyword",
 	Number:     "Number",
 	String:     "String",
 	Punct:      "Punct",

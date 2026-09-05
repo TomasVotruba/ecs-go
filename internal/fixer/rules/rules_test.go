@@ -66,6 +66,20 @@ func TestNoLeadingNamespaceWhitespace(t *testing.T) {
 	}
 }
 
+func TestBinaryOperatorSpaces(t *testing.T) {
+	got, changed := apply(t, BinaryOperatorSpaces{}, "<?php $a = ['x'=>1, 'y'  =>  2];")
+	if want := "<?php $a = ['x' => 1, 'y' => 2];"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	if _, changed := apply(t, BinaryOperatorSpaces{}, "<?php $a = ['x' => 1];"); changed {
+		t.Fatal("already-normalized arrow should not change")
+	}
+	// arrow spanning a newline is left alone (alignment)
+	if _, changed := apply(t, BinaryOperatorSpaces{}, "<?php $a = [\n    'x' =>\n    1,\n];"); changed {
+		t.Fatal("multi-line arrow should be kept")
+	}
+}
+
 func TestNoTrailingWhitespace(t *testing.T) {
 	got, changed := apply(t, NoTrailingWhitespace{}, "<?php $x = 1;   \n$y = 2;\t\n")
 	if want := "<?php $x = 1;\n$y = 2;\n"; !changed || got != want {

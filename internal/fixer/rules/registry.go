@@ -10,6 +10,7 @@ func All() []fixer.Fixer {
 		NoSinglelineWhitespaceBeforeSemicolons{},
 		NoWhitespaceInBlankLine{},
 		SpaceAfterSemicolon{},
+		BinaryOperatorSpaces{},
 		BlankLineAfterOpeningTag{},
 		NoTrailingWhitespace{},
 		SingleBlankLineAtEndOfFile{},
