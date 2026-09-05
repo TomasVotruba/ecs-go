@@ -2,19 +2,9 @@ package rules
 
 import "ecs-go/internal/fixer"
 
-// ByName returns the fixer whose Name matches, if any.
-func ByName(name string) (fixer.Fixer, bool) {
-	for _, f := range All() {
-		if f.Name() == name {
-			return f, true
-		}
-	}
-	return nil, false
-}
-
-// All returns every built-in fixer, safest first, echoing the ordering of
-// ECS's SpacesLevel set.
-func All() []fixer.Fixer {
+// SpacingFixers are the whitespace/operator spacing rules, safest first. This is
+// the ordered "spaces" set that gradual levels slice.
+func SpacingFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		NoLeadingNamespaceWhitespace{},
 		NoSinglelineWhitespaceBeforeSemicolons{},
@@ -27,4 +17,47 @@ func All() []fixer.Fixer {
 		NoTrailingWhitespace{},
 		SingleBlankLineAtEndOfFile{},
 	}
+}
+
+// CasingFixers normalize keyword, constant and cast casing.
+func CasingFixers() []fixer.Fixer {
+	return []fixer.Fixer{
+		LowercaseKeywords{},
+		ConstantCase{},
+		LowercaseStaticReference{},
+		LowercaseCast{},
+		ShortScalarCast{},
+	}
+}
+
+// ConstructFixers cover keyword/parenthesis/operator spacing and import cleanups
+// from the PSR-12 set.
+func ConstructFixers() []fixer.Fixer {
+	return []fixer.Fixer{
+		DeclareEqualNormalize{},
+		SingleSpaceAroundConstruct{},
+		NoSpacesAfterFunctionName{},
+		NoSpacesInsideParenthesis{},
+		UnaryOperatorSpaces{},
+		NoLeadingImportSlash{},
+		Elseif{},
+	}
+}
+
+// All returns every built-in fixer in execution order.
+func All() []fixer.Fixer {
+	all := CasingFixers()
+	all = append(all, SpacingFixers()...)
+	all = append(all, ConstructFixers()...)
+	return all
+}
+
+// ByName returns the fixer whose Name matches, if any.
+func ByName(name string) (fixer.Fixer, bool) {
+	for _, f := range All() {
+		if f.Name() == name {
+			return f, true
+		}
+	}
+	return nil, false
 }

@@ -10,11 +10,18 @@ import (
 )
 
 // Spaces is the ordered spaces set (safest first), matching ECS SpacesLevel.
-func Spaces() []fixer.Fixer { return rules.All() }
+func Spaces() []fixer.Fixer { return rules.SpacingFixers() }
+
+// PSR12 is the token-safe portion of the @PSR-12 rule set (casing, spacing and
+// language-construct fixers). Structural rules (braces, indentation, import
+// ordering, ...) are not yet implemented on the flat token stream.
+func PSR12() []fixer.Fixer { return rules.All() }
 
 var byName = map[string]func() []fixer.Fixer{
 	"spaces": Spaces,
-	"common": Spaces,
+	"casing": rules.CasingFixers,
+	"psr12":  PSR12,
+	"common": rules.All,
 }
 
 // Get returns the fixers of a named set.

@@ -31,8 +31,8 @@ func (BinaryOperatorSpaces) Fix(s *tokens.Stream) bool {
 		case "=>":
 			return true
 		case "=":
-			// leave reference assignment ("=& $x") untouched
-			return nextSignificantValue(s, i) != "&"
+			// leave reference assignment ("=& $x") and declare(...) headers alone
+			return nextSignificantValue(s, i) != "&" && !insideDeclareArgs(s, i)
 		default:
 			return false
 		}

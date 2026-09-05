@@ -53,13 +53,27 @@ Drop an `ecs-go.json` in your project root (auto-loaded, or point at one with
 }
 ```
 
-- `sets` - enable a prepared set (`spaces`).
+- `sets` - enable a prepared set: `spaces`, `casing`, `psr12`, `common`.
 - `level` - gradual adoption: `{"spaces": N}` enables the first N rules of the
   spaces set (safest first), so you can raise coverage one step at a time.
 - `rules` - enable individual fixers by name.
 - `paths` / `skip` - files to scan and glob patterns to ignore.
 
 With no config file, every fixer runs. CLI path arguments override `paths`.
+
+## PSR-12
+
+The `psr12` set implements the token-safe part of PHP-CS-Fixer's `@PSR-12`:
+casing (keywords, constants, static references, casts), operator and
+parenthesis spacing, language-construct spacing, `else if` -> `elseif`,
+`declare` normalization and leading import slash removal.
+
+Rules that need structural analysis (brace matching, indentation, line
+layout) are not implemented yet - they require the next tokenizer step:
+`braces_position`, `indentation_type`, `method_argument_space`,
+`ordered_imports`, `single_import_per_statement`, class element ordering and
+visibility, `blank_lines_before_namespace`, and full binary-operator spacing
+(beyond `=` and `=>`).
 
 ## What it looks like
 
@@ -152,6 +166,19 @@ Applied checkers:
 ```
 
 **Single blank line at end of file** (collapses trailing blank lines to exactly one newline)
+
+### Casing
+
+`lowercase_keywords`, `constant_case` (`TRUE` -> `true`), `lowercase_static_reference`
+(`SELF` -> `self`), `lowercase_cast`, `short_scalar_cast` (`(integer)` -> `(int)`).
+
+### Language constructs
+
+`single_space_around_construct` (`if(` -> `if (`), `no_spaces_after_function_name`
+(`foo ()` -> `foo()`), `spaces_inside_parentheses` (`( $a )` -> `($a)`),
+`unary_operator_spaces` (`$i ++` -> `$i++`), `elseif` (`else if` -> `elseif`),
+`no_leading_import_slash` (`use \Foo` -> `use Foo`), `declare_equal_normalize`
+(`strict_types = 1` -> `strict_types=1`).
 
 ## License
 

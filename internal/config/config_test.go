@@ -35,8 +35,8 @@ func TestLoadSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Rules) != len(rules.All()) {
-		t.Fatalf("spaces set should enable all rules, got %d", len(c.Rules))
+	if len(c.Rules) != len(rules.SpacingFixers()) {
+		t.Fatalf("spaces set should enable the spacing rules, got %d", len(c.Rules))
 	}
 	if len(c.Paths) != 1 || c.Paths[0] != "src" {
 		t.Fatalf("paths not read: %v", c.Paths)
@@ -54,9 +54,13 @@ func TestLoadLevelIsPrefix(t *testing.T) {
 	if len(c.Rules) != 3 {
 		t.Fatalf("level 3 should give 3 rules, got %d", len(c.Rules))
 	}
-	for i := range 3 {
-		if c.Rules[i].Name() != rules.All()[i].Name() {
-			t.Fatalf("level should be the first 3 rules in order")
+	// resolve keeps canonical (All) order; the 3 chosen must be the first 3
+	// spacing rules, appearing in All in the same relative order
+	spacing := rules.SpacingFixers()
+	wantNames := map[string]bool{spacing[0].Name(): true, spacing[1].Name(): true, spacing[2].Name(): true}
+	for _, f := range c.Rules {
+		if !wantNames[f.Name()] {
+			t.Fatalf("level 3 selected unexpected rule %s", f.Name())
 		}
 	}
 }
