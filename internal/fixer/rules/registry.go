@@ -44,11 +44,22 @@ func ConstructFixers() []fixer.Fixer {
 	}
 }
 
+// StructuralFixers reflow imports, namespace/class blank lines and indentation.
+func StructuralFixers() []fixer.Fixer {
+	return []fixer.Fixer{
+		BlankLinesBeforeNamespace{},
+		SingleImportPerStatement{},
+		NoBlankLinesAfterClassOpening{},
+		IndentationType{},
+	}
+}
+
 // All returns every built-in fixer in execution order.
 func All() []fixer.Fixer {
 	all := CasingFixers()
 	all = append(all, SpacingFixers()...)
 	all = append(all, ConstructFixers()...)
+	all = append(all, StructuralFixers()...)
 	return all
 }
 

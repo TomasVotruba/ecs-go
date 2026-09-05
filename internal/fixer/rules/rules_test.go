@@ -208,6 +208,51 @@ func TestDeclareEqualNormalize(t *testing.T) {
 	}
 }
 
+func TestBinaryOperatorSpacesComparison(t *testing.T) {
+	got, changed := apply(t, BinaryOperatorSpaces{}, "<?php $x = $a===$b || $c<$d ?? $e;")
+	if want := "<?php $x = $a === $b || $c < $d ?? $e;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestBlankLinesBeforeNamespace(t *testing.T) {
+	got, changed := apply(t, BlankLinesBeforeNamespace{}, "<?php declare(strict_types=1);\nnamespace App;")
+	if want := "<?php declare(strict_types=1);\n\nnamespace App;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestSingleImportPerStatement(t *testing.T) {
+	got, changed := apply(t, SingleImportPerStatement{}, "<?php\nuse A\\B, C\\D;")
+	if want := "<?php\nuse A\\B;\nuse D;"; got == want {
+		t.Fatalf("unexpected: %q", got) // guard against accidental truncation
+	}
+	if want := "<?php\nuse A\\B;\nuse C\\D;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	// closure use and group import are left alone
+	if _, changed := apply(t, SingleImportPerStatement{}, "<?php $f = function () use ($a, $b) {};"); changed {
+		t.Fatal("closure use must not be split")
+	}
+	if _, changed := apply(t, SingleImportPerStatement{}, "<?php use A\\{B, C};"); changed {
+		t.Fatal("group import must not be split")
+	}
+}
+
+func TestNoBlankLinesAfterClassOpening(t *testing.T) {
+	got, changed := apply(t, NoBlankLinesAfterClassOpening{}, "<?php class A\n{\n\n\n    public $x;\n}")
+	if want := "<?php class A\n{\n    public $x;\n}"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestIndentationType(t *testing.T) {
+	got, changed := apply(t, IndentationType{}, "<?php\n\t$a = 1;\n\t\t$b = 2;\n")
+	if want := "<?php\n    $a = 1;\n        $b = 2;\n"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
 func TestNoTrailingWhitespace(t *testing.T) {
 	got, changed := apply(t, NoTrailingWhitespace{}, "<?php $x = 1;   \n$y = 2;\t\n")
 	if want := "<?php $x = 1;\n$y = 2;\n"; !changed || got != want {

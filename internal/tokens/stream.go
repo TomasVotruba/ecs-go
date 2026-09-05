@@ -36,6 +36,50 @@ func (s *Stream) InsertAt(i int, t token.Token) {
 	s.toks[i] = t
 }
 
+// MatchForward returns the index of the delimiter matching the opener at i
+// ("(", "{" or "["), or -1 if there is none. Strings and comments are single
+// tokens, so scanning punctuation is safe.
+func (s *Stream) MatchForward(i int) int {
+	if i < 0 || i >= len(s.toks) || s.toks[i].Kind != token.Punct {
+		return -1
+	}
+	open := s.toks[i].Value
+	var closer string
+	switch open {
+	case "(":
+		closer = ")"
+	case "{":
+		closer = "}"
+	case "[":
+		closer = "]"
+	default:
+		return -1
+	}
+	depth := 0
+	for j := i; j < len(s.toks); j++ {
+		if s.toks[j].Kind != token.Punct {
+			continue
+		}
+		switch s.toks[j].Value {
+		case open:
+			depth++
+		case closer:
+			depth--
+			if depth == 0 {
+				return j
+			}
+		}
+	}
+	return -1
+}
+
+// ReplaceRange swaps tokens [start, end] (inclusive) for repl.
+func (s *Stream) ReplaceRange(start, end int, repl []token.Token) {
+	tail := append([]token.Token(nil), s.toks[end+1:]...)
+	s.toks = append(s.toks[:start], repl...)
+	s.toks = append(s.toks, tail...)
+}
+
 // Render concatenates every token value back into source.
 func (s *Stream) Render() string {
 	var b strings.Builder
