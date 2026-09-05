@@ -1,0 +1,6 @@
+{
+    "paths": ["src", "tests"],
+    "skip": ["*/Fixture/*", "*/Source/*"],
+    "sets": ["spaces"],
+    "level": {"spaces": 6}
+}

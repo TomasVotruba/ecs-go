@@ -18,24 +18,38 @@ func main() {
 
 func run(args []string) int {
 	fix := false
+	configPath := ""
 	var paths []string
 
-	for _, a := range args {
-		switch a {
-		case "--fix":
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--fix":
 			fix = true
-		case "list-checkers":
+		case a == "list-checkers":
 			return listCheckers()
-		case "-h", "--help":
+		case a == "-h" || a == "--help":
 			usage()
 			return 0
+		case a == "--config":
+			if i+1 < len(args) {
+				configPath = args[i+1]
+				i++
+			}
+		case len(a) > 9 && a[:9] == "--config=":
+			configPath = a[9:]
 		default:
 			paths = append(paths, a)
 		}
 	}
 
-	// runs across all CPU cores by default
-	cfg := config.Configure().WithPaths(paths...)
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 2
+	}
+	// CLI paths override the config; runs across all CPU cores by default
+	cfg.WithPaths(paths...)
 
 	results, err := runner.Run(cfg, fix)
 	if err != nil {
@@ -44,6 +58,18 @@ func run(args []string) int {
 	}
 
 	return reporter.Report(os.Stdout, results, fix)
+}
+
+// loadConfig uses an explicit --config path, else an ecs-go.json in the working
+// directory, else the built-in defaults (all rules).
+func loadConfig(configPath string) (*config.Config, error) {
+	if configPath != "" {
+		return config.Load(configPath)
+	}
+	if _, err := os.Stat("ecs-go.json"); err == nil {
+		return config.Load("ecs-go.json")
+	}
+	return config.Configure(), nil
 }
 
 func listCheckers() int {
@@ -60,8 +86,10 @@ func usage() {
 Usage:
   ecs-go [paths...]            check paths (default: .)
   ecs-go --fix [paths...]      fix paths in place
+  ecs-go --config FILE ...     use an ecs-go.json config
   ecs-go list-checkers         list registered fixers
 
+Loads ecs-go.json from the working directory when present.
 Runs across all CPU cores by default.
 `)
 }
