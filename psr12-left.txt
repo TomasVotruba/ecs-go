@@ -12,10 +12,13 @@ Legend:
   [LEX]   blocked on a lexer gap (heredoc/nowdoc, casts as tokens, ...).
 
 
+A small statement/scope layer now exists (Stream.MatchForward/MatchBackward +
+classifyBrace, which labels each "{" as class-like / function / closure /
+control / other). braces_position is implemented on it; the rules below become
+reachable next by extending the same layer (member iteration, statement spans).
+
 NEEDS AST / STATEMENT MODEL
 ---------------------------
-braces_position                 opening brace placement (class/fn next line,
-                                control same line) - needs construct + brace scope
 class_definition                spacing in class/interface/trait headers
 function_declaration            "function" signature spacing, closures
 method_argument_space           multi-line argument layout, one-per-line
@@ -67,3 +70,4 @@ structural:  single_import_per_statement, single_line_after_imports,
              blank_lines_before_namespace, blank_line_after_namespace,
              no_blank_lines_after_class_opening, indentation_type
 php tag:     full_opening_tag, no_closing_tag
+braces:      braces_position (opening brace; via the statement/scope layer)

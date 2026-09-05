@@ -73,6 +73,42 @@ func (s *Stream) MatchForward(i int) int {
 	return -1
 }
 
+// MatchBackward returns the index of the delimiter matching the closer at i
+// (")", "}" or "]"), or -1 if there is none.
+func (s *Stream) MatchBackward(i int) int {
+	if i < 0 || i >= len(s.toks) || s.toks[i].Kind != token.Punct {
+		return -1
+	}
+	closer := s.toks[i].Value
+	var opener string
+	switch closer {
+	case ")":
+		opener = "("
+	case "}":
+		opener = "{"
+	case "]":
+		opener = "["
+	default:
+		return -1
+	}
+	depth := 0
+	for j := i; j >= 0; j-- {
+		if s.toks[j].Kind != token.Punct {
+			continue
+		}
+		switch s.toks[j].Value {
+		case closer:
+			depth++
+		case opener:
+			depth--
+			if depth == 0 {
+				return j
+			}
+		}
+	}
+	return -1
+}
+
 // ReplaceRange swaps tokens [start, end] (inclusive) for repl.
 func (s *Stream) ReplaceRange(start, end int, repl []token.Token) {
 	tail := append([]token.Token(nil), s.toks[end+1:]...)

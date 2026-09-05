@@ -192,6 +192,13 @@ Applied checkers:
 `full_opening_tag` (`<?` -> `<?php`), `no_closing_tag` (strips a trailing `?>`
 from a pure-PHP file).
 
+### Braces
+
+`braces_position` - PSR-12 brace placement: classes and named functions get
+their opening brace on the next line; control structures keep it on the same
+line after one space. Built on a small statement/scope layer that classifies
+each brace by its construct.
+
 ## License
 
 MIT
