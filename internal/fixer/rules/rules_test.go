@@ -78,6 +78,43 @@ func TestBinaryOperatorSpaces(t *testing.T) {
 	if _, changed := apply(t, BinaryOperatorSpaces{}, "<?php $a = [\n    'x' =>\n    1,\n];"); changed {
 		t.Fatal("multi-line arrow should be kept")
 	}
+	// assignment "=" is normalized too
+	got, changed = apply(t, BinaryOperatorSpaces{}, "<?php $a=1; $b  =  2;")
+	if want := "<?php $a = 1; $b = 2;"; !changed || got != want {
+		t.Fatalf("assign: changed=%v got=%q want=%q", changed, got, want)
+	}
+	// reference assignment is left alone
+	if _, changed := apply(t, BinaryOperatorSpaces{}, "<?php $a = &$b;"); changed {
+		t.Fatal("reference assignment should be kept")
+	}
+}
+
+func TestConcatSpace(t *testing.T) {
+	got, changed := apply(t, ConcatSpace{}, "<?php $s = 'a'.'b'. $c;")
+	if want := "<?php $s = 'a' . 'b' . $c;"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+}
+
+func TestCastSpaces(t *testing.T) {
+	got, changed := apply(t, CastSpaces{}, "<?php $x = (int)$y;")
+	if want := "<?php $x = (int) $y;"; !changed || got != want {
+		t.Fatalf("simple: changed=%v got=%q want=%q", changed, got, want)
+	}
+	got, changed = apply(t, CastSpaces{}, "<?php $x = ( string )$y;")
+	if want := "<?php $x = (string) $y;"; !changed || got != want {
+		t.Fatalf("inner: changed=%v got=%q want=%q", changed, got, want)
+	}
+	if _, changed := apply(t, CastSpaces{}, "<?php $x = (int) $y;"); changed {
+		t.Fatal("already-normalized cast should not change")
+	}
+	// not a cast: function signature and grouping must be untouched
+	if _, changed := apply(t, CastSpaces{}, "<?php function f(int $x) {}"); changed {
+		t.Fatal("type hint in signature is not a cast")
+	}
+	if _, changed := apply(t, CastSpaces{}, "<?php $x = ($y);"); changed {
+		t.Fatal("grouping parens are not a cast")
+	}
 }
 
 func TestNoTrailingWhitespace(t *testing.T) {

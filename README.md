@@ -39,6 +39,28 @@ List the active fixers:
 vendor/bin/ecs-go list-checkers
 ```
 
+## Configuration
+
+Drop an `ecs-go.json` in your project root (auto-loaded, or point at one with
+`--config`):
+
+```json
+{
+    "paths": ["src", "tests"],
+    "skip": ["*/Fixture/*"],
+    "sets": ["spaces"],
+    "level": {"spaces": 6}
+}
+```
+
+- `sets` - enable a prepared set (`spaces`).
+- `level` - gradual adoption: `{"spaces": N}` enables the first N rules of the
+  spaces set (safest first), so you can raise coverage one step at a time.
+- `rules` - enable individual fixers by name.
+- `paths` / `skip` - files to scan and glob patterns to ignore.
+
+With no config file, every fixer runs. CLI path arguments override `paths`.
+
 ## What it looks like
 
 ```
@@ -92,11 +114,25 @@ Applied checkers:
 +$a = 1; $b = 2;
 ```
 
-**Binary operator spaces** (single space around the `=>` arrow)
+**Binary operator spaces** (single space around `=` and the `=>` arrow)
 
 ```diff
 -$map = ['a'=>1, 'b'=>2];
 +$map = ['a' => 1, 'b' => 2];
+```
+
+**Concat space** (single space around `.`)
+
+```diff
+-$name = $first.' '.$last;
++$name = $first . ' ' . $last;
+```
+
+**Cast spaces** (no inner space, single space after a cast)
+
+```diff
+-$id = (int)$value;
++$id = (int) $value;
 ```
 
 **No whitespace in blank line** (a blank line full of spaces becomes truly empty)

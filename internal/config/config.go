@@ -1,11 +1,16 @@
 // Package config mirrors ECSConfig: paths to scan, skip patterns, active rules.
+// A config can be built fluently in Go or loaded from an ecs-go.json file.
 package config
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"runtime"
 
 	"ecs-go/internal/fixer"
 	"ecs-go/internal/fixer/rules"
+	"ecs-go/internal/set"
 )
 
 type Config struct {
@@ -42,9 +47,76 @@ func (c *Config) WithRules(rs ...fixer.Fixer) *Config {
 	return c
 }
 
-func (c *Config) WithJobs(n int) *Config {
-	if n > 0 {
-		c.Jobs = n
+// file is the on-disk ecs-go.json shape.
+type file struct {
+	Paths []string       `json:"paths"`
+	Skip  []string       `json:"skip"`
+	Sets  []string       `json:"sets"`
+	Level map[string]int `json:"level"`
+	Rules []string       `json:"rules"`
+}
+
+// Load reads and resolves an ecs-go.json config file.
+func Load(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
-	return c
+	var f file
+	if err := json.Unmarshal(data, &f); err != nil {
+		return nil, fmt.Errorf("config %s: %w", path, err)
+	}
+	return resolve(f)
+}
+
+// resolve turns a config file into a Config, collecting rules from sets, levels
+// and explicit names, de-duplicated and kept in canonical (safest-first) order.
+func resolve(f file) (*Config, error) {
+	c := &Config{Paths: f.Paths, Skip: f.Skip, Jobs: runtime.NumCPU()}
+	if len(c.Paths) == 0 {
+		c.Paths = []string{"."}
+	}
+
+	wanted := map[string]bool{}
+	selective := false
+
+	for _, name := range f.Sets {
+		fixers, ok := set.Get(name)
+		if !ok {
+			return nil, fmt.Errorf("unknown set %q", name)
+		}
+		selective = true
+		for _, fx := range fixers {
+			wanted[fx.Name()] = true
+		}
+	}
+
+	for name, n := range f.Level {
+		if name != "spaces" {
+			return nil, fmt.Errorf("unknown level %q (only \"spaces\" is supported)", name)
+		}
+		selective = true
+		for _, fx := range set.SpacesLevel(n) {
+			wanted[fx.Name()] = true
+		}
+	}
+
+	for _, name := range f.Rules {
+		if _, ok := rules.ByName(name); !ok {
+			return nil, fmt.Errorf("unknown rule %q", name)
+		}
+		selective = true
+		wanted[name] = true
+	}
+
+	if !selective {
+		c.Rules = rules.All()
+		return c, nil
+	}
+	for _, fx := range rules.All() {
+		if wanted[fx.Name()] {
+			c.Rules = append(c.Rules, fx)
+		}
+	}
+	return c, nil
 }
