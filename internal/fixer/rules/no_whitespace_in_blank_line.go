@@ -19,6 +19,10 @@ func (NoWhitespaceInBlankLine) Name() string {
 	return `PhpCsFixer\Fixer\Whitespace\NoWhitespaceInBlankLineFixer`
 }
 
+func (NoWhitespaceInBlankLine) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Whitespace/NoWhitespaceInBlankLineFixer.php"
+}
+
 func (NoWhitespaceInBlankLine) Fix(s *tokens.Stream) bool {
 	changed := false
 	for i := 0; i < s.Len(); i++ {

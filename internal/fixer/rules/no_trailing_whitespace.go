@@ -21,6 +21,10 @@ func (NoTrailingWhitespace) Name() string {
 	return `PhpCsFixer\Fixer\Whitespace\NoTrailingWhitespaceFixer`
 }
 
+func (NoTrailingWhitespace) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Whitespace/NoTrailingWhitespaceFixer.php"
+}
+
 func (NoTrailingWhitespace) Fix(s *tokens.Stream) bool {
 	changed := false
 	last := s.Len() - 1

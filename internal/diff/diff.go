@@ -121,10 +121,7 @@ func hunks(ops []op) [][]op {
 		if !c {
 			continue
 		}
-		lo := i - context
-		if lo < 0 {
-			lo = 0
-		}
+		lo := max(i-context, 0)
 		hi := i + context
 		if hi >= len(ops) {
 			hi = len(ops) - 1

@@ -18,6 +18,10 @@ func (BlankLineAfterOpeningTag) Name() string {
 	return `PhpCsFixer\Fixer\PhpTag\BlankLineAfterOpeningTagFixer`
 }
 
+func (BlankLineAfterOpeningTag) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/PhpTag/BlankLineAfterOpeningTagFixer.php"
+}
+
 func (BlankLineAfterOpeningTag) Fix(s *tokens.Stream) bool {
 	if s.Len() < 3 {
 		return false

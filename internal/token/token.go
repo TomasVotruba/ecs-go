@@ -4,15 +4,15 @@ package token
 type Kind int
 
 const (
-	Unknown Kind = iota
-	OpenTag      // <?php <?= <?
-	CloseTag     // ?>
-	InlineHTML   // text outside PHP tags
-	Whitespace   // spaces, tabs, newlines
-	Comment      // // # /* */
-	DocComment   // /** */
-	Variable     // $foo
-	Ident        // keywords and names
+	Unknown    Kind = iota
+	OpenTag         // <?php <?= <?
+	CloseTag        // ?>
+	InlineHTML      // text outside PHP tags
+	Whitespace      // spaces, tabs, newlines
+	Comment         // // # /* */
+	DocComment      // /** */
+	Variable        // $foo
+	Ident           // keywords and names
 	Number
 	String // '...' "..."
 	Punct  // operators, braces, ; , etc.

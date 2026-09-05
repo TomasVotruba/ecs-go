@@ -16,6 +16,10 @@ func (SpaceAfterSemicolon) Name() string {
 	return `PhpCsFixer\Fixer\Semicolon\SpaceAfterSemicolonFixer`
 }
 
+func (SpaceAfterSemicolon) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Semicolon/SpaceAfterSemicolonFixer.php"
+}
+
 func (SpaceAfterSemicolon) Fix(s *tokens.Stream) bool {
 	changed := false
 	for i := 0; i < s.Len(); i++ {

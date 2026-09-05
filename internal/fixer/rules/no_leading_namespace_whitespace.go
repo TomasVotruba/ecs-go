@@ -17,6 +17,10 @@ func (NoLeadingNamespaceWhitespace) Name() string {
 	return `PhpCsFixer\Fixer\NamespaceNotation\NoLeadingNamespaceWhitespaceFixer`
 }
 
+func (NoLeadingNamespaceWhitespace) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/NamespaceNotation/NoLeadingNamespaceWhitespaceFixer.php"
+}
+
 func (NoLeadingNamespaceWhitespace) Fix(s *tokens.Stream) bool {
 	changed := false
 	for i := 1; i < s.Len(); i++ {

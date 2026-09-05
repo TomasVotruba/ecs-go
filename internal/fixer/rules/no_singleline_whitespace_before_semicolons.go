@@ -17,6 +17,10 @@ func (NoSinglelineWhitespaceBeforeSemicolons) Name() string {
 	return `PhpCsFixer\Fixer\Semicolon\NoSinglelineWhitespaceBeforeSemicolonsFixer`
 }
 
+func (NoSinglelineWhitespaceBeforeSemicolons) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Semicolon/NoSinglelineWhitespaceBeforeSemicolonsFixer.php"
+}
+
 func (NoSinglelineWhitespaceBeforeSemicolons) Fix(s *tokens.Stream) bool {
 	changed := false
 	for i := s.Len() - 1; i >= 1; i-- {

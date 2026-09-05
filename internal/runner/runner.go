@@ -33,10 +33,7 @@ func Run(cfg *config.Config, write bool) ([]FileResult, error) {
 		return nil, err
 	}
 
-	jobs := cfg.Jobs
-	if jobs < 1 {
-		jobs = 1
-	}
+	jobs := max(cfg.Jobs, 1)
 
 	paths := make(chan string)
 	results := make(chan FileResult)
@@ -44,10 +41,8 @@ func Run(cfg *config.Config, write bool) ([]FileResult, error) {
 	var errOnce sync.Once
 
 	var wg sync.WaitGroup
-	for w := 0; w < jobs; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range jobs {
+		wg.Go(func() {
 			for path := range paths {
 				res, err := fixFile(cfg, path, write)
 				if err != nil {
@@ -58,7 +53,7 @@ func Run(cfg *config.Config, write bool) ([]FileResult, error) {
 					results <- res
 				}
 			}
-		}()
+		})
 	}
 
 	go func() {

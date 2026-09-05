@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"strings"
 	"testing"
 
 	"ecs-go/internal/token"
@@ -18,12 +19,12 @@ func TestLexLossless(t *testing.T) {
 		"text <?= $v ?> more",
 	}
 	for _, src := range cases {
-		var got string
+		var got strings.Builder
 		for _, tk := range Lex(src) {
-			got += tk.Value
+			got.WriteString(tk.Value)
 		}
-		if got != src {
-			t.Errorf("not lossless\n src: %q\n got: %q", src, got)
+		if got.String() != src {
+			t.Errorf("not lossless\n src: %q\n got: %q", src, got.String())
 		}
 	}
 }

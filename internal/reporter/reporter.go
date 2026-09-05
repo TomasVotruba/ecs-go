@@ -99,7 +99,7 @@ func (f formatter) reportFileDiffs(results []runner.FileResult) {
 // lines, matching ECS's ColorConsoleDiffFormatter.
 func (f formatter) formatDiff(diff string) string {
 	var colored []string
-	for _, line := range strings.Split(strings.TrimRight(diff, "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(diff, "\n"), "\n") {
 		switch {
 		case line == "--- Original", line == "+++ New":
 			continue
@@ -146,12 +146,12 @@ func (f formatter) block(tag, msg string, fg, bg int) {
 }
 
 func (f formatter) newLine(n int) {
-	for i := 0; i < n; i++ {
-		fmt.Fprint(f.w, "\n")
+	for range n {
+		_, _ = io.WriteString(f.w, "\n")
 	}
 }
 
-func (f formatter) writeln(s string) { fmt.Fprintln(f.w, s) }
+func (f formatter) writeln(s string) { _, _ = fmt.Fprintln(f.w, s) }
 
 // ANSI helpers, no-ops when color is disabled.
 func (f formatter) fg(s string, code int) string {
@@ -168,7 +168,7 @@ func (f formatter) bg(s string, fg, bg int) string {
 	return fmt.Sprintf("\x1b[%d;%dm%s\x1b[39;49m", fg, bg, s)
 }
 
-func (f formatter) comment(s string) string   { return f.fg(s, 33) } // yellow
+func (f formatter) comment(s string) string { return f.fg(s, 33) } // yellow
 func (f formatter) bold(s string) string {
 	if !f.color {
 		return s

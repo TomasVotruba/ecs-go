@@ -16,6 +16,10 @@ func (SingleBlankLineAtEndOfFile) Name() string {
 	return `PhpCsFixer\Fixer\Whitespace\SingleBlankLineAtEofFixer`
 }
 
+func (SingleBlankLineAtEndOfFile) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Whitespace/SingleBlankLineAtEofFixer.php"
+}
+
 func (SingleBlankLineAtEndOfFile) Fix(s *tokens.Stream) bool {
 	if s.Len() == 0 {
 		return false
