@@ -69,3 +69,52 @@ func TestDocCommentVsComment(t *testing.T) {
 		}
 	}
 }
+
+func TestLexKeywordsVsIdent(t *testing.T) {
+	toks := Lex("<?php function foo() { return bar; }")
+	kind := map[string]token.Kind{}
+	for _, tk := range toks {
+		if tk.Kind == token.Keyword || tk.Kind == token.Ident {
+			kind[tk.Value] = tk.Kind
+		}
+	}
+	if kind["function"] != token.Keyword || kind["return"] != token.Keyword {
+		t.Errorf("keywords misclassified: %v", kind)
+	}
+	if kind["foo"] != token.Ident || kind["bar"] != token.Ident {
+		t.Errorf("names misclassified: %v", kind)
+	}
+}
+
+func TestKeywordAfterObjectOperatorIsIdent(t *testing.T) {
+	// `list` is a keyword, but as a property name it is a plain identifier
+	toks := Lex("<?php $this->list;")
+	for _, tk := range toks {
+		if tk.Value == "list" && tk.Kind != token.Ident {
+			t.Errorf("property `list` after -> should be Ident, got %s", tk.Kind)
+		}
+	}
+}
+
+func TestLexMultiCharOperators(t *testing.T) {
+	cases := map[string]string{
+		"<?php $a === $b;": "===",
+		"<?php $a=>$b;":    "=>",
+		"<?php $a->b;":     "->",
+		"<?php A::B;":      "::",
+		"<?php $a ?? $b;":  "??",
+		"<?php $a <=> $b;": "<=>",
+		"<?php $a ??= $b;": "??=",
+	}
+	for src, op := range cases {
+		found := false
+		for _, tk := range Lex(src) {
+			if tk.Kind == token.Punct && tk.Value == op {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("operator %q not tokenized as a single Punct in %q", op, src)
+		}
+	}
+}

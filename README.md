@@ -92,6 +92,13 @@ Applied checkers:
 +$a = 1; $b = 2;
 ```
 
+**Binary operator spaces** (single space around the `=>` arrow)
+
+```diff
+-$map = ['a'=>1, 'b'=>2];
++$map = ['a' => 1, 'b' => 2];
+```
+
 **No whitespace in blank line** (a blank line full of spaces becomes truly empty)
 
 ```diff

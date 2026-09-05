@@ -2,12 +2,14 @@
 // lossless token stream. It mirrors the shape of PHP's token_get_all rather
 // than building an AST, so fixers can walk and mutate tokens by index.
 //
-// It is a pragmatic subset, not a full PHP grammar: string interpolation is
-// not split, heredoc/nowdoc are treated as generic content, and operators are
-// emitted as single-char Punct tokens. Enough for coding-standard fixers.
+// It classifies keywords vs names and emits multi-char operators (=> -> :: ===
+// ...) as single Punct tokens. It is a pragmatic subset, not a full PHP grammar:
+// string interpolation is not split, heredoc/nowdoc are treated as generic
+// content, and casts are not recognized. Enough for coding-standard fixers.
 package lexer
 
 import (
+	"slices"
 	"strings"
 
 	"ecs-go/internal/token"
@@ -109,11 +111,52 @@ func (l *lexer) lexPHP() {
 		for l.pos < len(l.src) && isIdent(l.src[l.pos]) {
 			l.pos++
 		}
-		l.emit(token.Ident, start)
+		l.emit(l.identKind(l.src[start:l.pos]), start)
 	default:
-		l.pos++
+		if op := l.matchOperator(); op > 0 {
+			l.pos += op
+		} else {
+			l.pos++
+		}
 		l.emit(token.Punct, start)
 	}
+}
+
+// identKind classifies an identifier run as Keyword or Ident. A name that
+// directly follows an object/static access operator (-> ?-> ::) is always a
+// property or method name, never a keyword.
+func (l *lexer) identKind(word string) token.Kind {
+	if prev := l.lastSignificant(); prev == "->" || prev == "?->" || prev == "::" {
+		return token.Ident
+	}
+	if keywords[strings.ToLower(word)] {
+		return token.Keyword
+	}
+	return token.Ident
+}
+
+// lastSignificant returns the value of the last non-trivia token emitted so far.
+func (l *lexer) lastSignificant() string {
+	for _, tk := range slices.Backward(l.toks) {
+		switch tk.Kind {
+		case token.Whitespace, token.Comment, token.DocComment:
+			continue
+		default:
+			return tk.Value
+		}
+	}
+	return ""
+}
+
+// matchOperator returns the byte length of the longest known multi-char operator
+// at the current position, or 0 when none matches (single-char punctuation).
+func (l *lexer) matchOperator() int {
+	for _, op := range operators {
+		if l.hasPrefix(op) {
+			return len(op)
+		}
+	}
+	return 0
 }
 
 func (l *lexer) lexLineComment(start int) {
@@ -174,3 +217,32 @@ func isIdentStart(c byte) bool {
 	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c >= 0x80
 }
 func isIdent(c byte) bool { return isIdentStart(c) || isDigit(c) }
+
+// operators lists multi-char operators, longest first, so matchOperator emits
+// each as a single Punct token (=> -> :: == === etc.) instead of splitting it.
+var operators = []string{
+	"<=>", "===", "!==", "**=", "...", "<<=", ">>=", "??=", "?->",
+	"->", "=>", "==", "!=", "<>", "<=", ">=", "&&", "||", "++", "--",
+	"+=", "-=", "*=", "/=", ".=", "%=", "&=", "|=", "^=", "::", "??",
+	"**", "<<", ">>",
+}
+
+// keywords are PHP reserved words (case-insensitive). Type names (int, string,
+// ...) and constants (true, false, null) are T_STRING in PHP and stay Ident.
+var keywords = map[string]bool{
+	"abstract": true, "and": true, "array": true, "as": true, "break": true,
+	"callable": true, "case": true, "catch": true, "class": true, "clone": true,
+	"const": true, "continue": true, "declare": true, "default": true, "do": true,
+	"echo": true, "else": true, "elseif": true, "empty": true, "enddeclare": true,
+	"endfor": true, "endforeach": true, "endif": true, "endswitch": true,
+	"endwhile": true, "enum": true, "extends": true, "final": true, "finally": true,
+	"fn": true, "for": true, "foreach": true, "function": true, "global": true,
+	"goto": true, "if": true, "implements": true, "include": true,
+	"include_once": true, "instanceof": true, "insteadof": true, "interface": true,
+	"isset": true, "list": true, "match": true, "namespace": true, "new": true,
+	"or": true, "print": true, "private": true, "protected": true, "public": true,
+	"readonly": true, "require": true, "require_once": true, "return": true,
+	"static": true, "switch": true, "throw": true, "trait": true, "try": true,
+	"unset": true, "use": true, "var": true, "while": true, "xor": true,
+	"yield": true,
+}
