@@ -82,15 +82,13 @@ func (NoClosingTag) Fix(s *tokens.Stream) bool {
 	for k := s.Len() - 1; k >= last; k-- {
 		s.RemoveAt(k)
 	}
-	// ensure a single trailing newline
+	// normalize EOF to exactly one trailing newline (idempotent with eof rule)
 	if s.Len() > 0 {
-		lastTok := s.At(s.Len() - 1)
-		if !strings.HasSuffix(lastTok.Value, "\n") {
-			if lastTok.Kind == token.Whitespace {
-				s.SetValue(s.Len()-1, lastTok.Value+"\n")
-			} else {
-				s.InsertAt(s.Len(), token.Token{Kind: token.Whitespace, Value: "\n"})
-			}
+		li := s.Len() - 1
+		if s.At(li).Kind == token.Whitespace {
+			s.SetValue(li, "\n")
+		} else {
+			s.InsertAt(s.Len(), token.Token{Kind: token.Whitespace, Value: "\n"})
 		}
 	}
 	return true

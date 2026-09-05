@@ -77,6 +77,9 @@ func (BlankLineAfterNamespace) Fix(s *tokens.Stream) bool {
 		if semi < 0 || semi+1 >= s.Len() {
 			continue
 		}
+		if nextSignificantValue(s, semi) == "" {
+			continue // namespace is the last statement; nothing to separate
+		}
 		if s.At(semi+1).Kind == token.Whitespace {
 			if hasNewline(s.At(semi+1).Value) && s.At(semi+1).Value != "\n\n" {
 				s.SetValue(semi+1, "\n\n")

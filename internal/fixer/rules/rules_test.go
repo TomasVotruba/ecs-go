@@ -216,6 +216,9 @@ func TestAllFixersIdempotent(t *testing.T) {
 		"<?php $x = <<<EOT\nline $a<$b if($c)\nEOT;\n",
 		"<?php $m=['a'=>1,'b'  =>  2];\n",
 		"<?php class A { use TraitB, TraitC; }\n",
+		"<?php echo 1;\n\n?>\n",
+		"<?php\nnamespace App;\n",
+		"<?xml version=\"1.0\"?>\n<root><?php echo 1; ?></root>",
 	}
 	for _, src := range corpus {
 		once := runAll(src)
@@ -290,6 +293,9 @@ func TestFullOpeningTag(t *testing.T) {
 	}
 	if _, changed := apply(t, FullOpeningTag{}, "<?= $x;"); changed {
 		t.Fatal("short echo tag must be left alone")
+	}
+	if _, changed := apply(t, FullOpeningTag{}, "<?xml version=\"1.0\"?>"); changed {
+		t.Fatal("XML declaration must not be converted")
 	}
 }
 
