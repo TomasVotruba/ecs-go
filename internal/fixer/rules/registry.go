@@ -48,6 +48,8 @@ func ConstructFixers() []fixer.Fixer {
 func StructuralFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		BracesPosition{},
+		VisibilityRequired{},
+		SingleTraitInsertPerStatement{},
 		BlankLinesBeforeNamespace{},
 		BlankLineAfterNamespace{},
 		SingleImportPerStatement{},

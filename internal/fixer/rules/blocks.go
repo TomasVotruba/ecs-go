@@ -78,6 +78,43 @@ func functionBraceKind(s *tokens.Stream, fn int) braceKind {
 	return braceFunctionDecl
 }
 
+// classMemberStarts returns the index of the first significant token of each
+// direct member declaration in the class body opened at open. Nested bodies
+// (method bodies, defaults, argument lists) are skipped.
+func classMemberStarts(s *tokens.Stream, open int) []int {
+	closeIdx := s.MatchForward(open)
+	if closeIdx < 0 {
+		return nil
+	}
+	var starts []int
+	expect := true
+	for k := open + 1; k < closeIdx; k++ {
+		t := s.At(k)
+		if t.Kind == token.Whitespace || t.Kind == token.Comment || t.Kind == token.DocComment {
+			continue
+		}
+		if expect {
+			starts = append(starts, k)
+			expect = false
+		}
+		if t.Kind == token.Punct {
+			switch t.Value {
+			case "{", "(", "[":
+				if m := s.MatchForward(k); m > 0 {
+					wasBody := t.Value == "{"
+					k = m
+					if wasBody {
+						expect = true // a method body closed; next token starts a member
+					}
+				}
+			case ";":
+				expect = true
+			}
+		}
+	}
+	return starts
+}
+
 // lineIndent returns the leading indentation of the line containing token idx.
 func lineIndent(s *tokens.Stream, idx int) string {
 	for j := idx; j >= 0; j-- {

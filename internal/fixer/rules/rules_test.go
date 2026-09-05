@@ -220,6 +220,7 @@ func TestAllFixersIdempotent(t *testing.T) {
 		"<?php\nnamespace App;\n",
 		"<?xml version=\"1.0\"?>\n<root><?php echo 1; ?></root>",
 		"<?php class A {\n    public function run() {\n        if ($x)\n        {\n            return 1;\n        }\n    }\n}\n",
+		"<?php class A {\n    use TraitB, TraitC;\n    function run() {}\n    var $old;\n    const X = 1;\n}\n",
 	}
 	for _, src := range corpus {
 		once := runAll(src)
