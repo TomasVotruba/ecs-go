@@ -1,62 +1,115 @@
 # ecs-go
 
-A thin, token-based PHP coding-standard checker and fixer in Go, modeled on
-[symplify/easy-coding-standard](https://github.com/symplify/easy-coding-standard).
+Fast, token-based PHP coding-standard checker and fixer - an [ECS](https://github.com/symplify/easy-coding-standard)-style
+tool written in Go. Runs across all CPU cores by default.
 
-This is a **skeleton**, not a full port: it ships a small standalone PHP lexer
-and three fixers to prove the architecture end to end.
+## Install
 
-## Why a custom lexer
+Via Composer (exposes `vendor/bin/ecs-go`):
 
-ECS (via PHP-CS-Fixer / PHP_CodeSniffer) works on a **flat, indexed, mutable
-token stream** — fixers walk tokens by index and insert/replace/remove them in
-place, then re-render.
-
-[`rectorphp/php-parser-in-go`](https://github.com/rectorphp/php-parser-in-go)
-does tokenize (`pkg/token`, with `T_WHITESPACE` / `T_COMMENT` / `T_DOC_COMMENT`),
-but it is a port of `z7zmey/php-parser`: `parser.Parse` returns an **AST**, and
-whitespace/comments hang off nodes as **`FreeFloating`** trivia — not a flat
-stream. That model is the opposite of what a fixer engine wants, so this project
-uses its own flat tokenizer instead. Swapping in php-parser-in-go later would
-mean flattening its AST + FreeFloating back into a stream.
-
-## Architecture
-
-```
-lexer   -> flat, lossless token slice (concat of values == source)
-tokens  -> mutable index-addressable Stream (Insert/Remove/Set/Render)
-fixer   -> Fixer interface: Fix(*Stream) bool
-rules   -> the built-in fixers
-finder  -> collect .php files, honor skips
-runner  -> read -> lex -> fix -> (write) per file
-reporter-> ECS-like summary
+```bash
+composer require tomasvotruba/ecs-go --dev
 ```
 
-## Built-in rules
+Or clone and build (requires Go):
 
-- `no_space_before_semicolon` — removes single-line whitespace before `;`
-- `no_trailing_whitespace` — trims spaces/tabs at line ends
-- `single_blank_line_at_eof` — exactly one trailing newline
+```bash
+git clone https://github.com/TomasVotruba/ecs-go.git
+cd ecs-go
+make build      # produces ./ecs-go
+```
 
 ## Usage
 
-```
-go build -o ecs-go .
+Check your code (reports a diff of what would change, exit code 1 if issues):
 
-./ecs-go testdata            # check (exit 1 if issues)
-./ecs-go --fix testdata      # fix in place
-./ecs-go list-checkers       # list rules
+```bash
+vendor/bin/ecs-go src tests
 ```
 
-## Test
+Fix in place:
+
+```bash
+vendor/bin/ecs-go --fix src tests
+```
+
+List the active fixers:
+
+```bash
+vendor/bin/ecs-go list-checkers
+```
+
+## What it looks like
 
 ```
-go test ./...
+1) src/Foo.php
+
+    ---------- begin diff ----------
+@@ @@
+ <?php
+-    namespace App;
++namespace App;
+-    $count=1;$total=2;
++    $count=1; $total=2;
+    ----------- end diff -----------
+
+Applied checkers:
+
+ * PhpCsFixer\Fixer\NamespaceNotation\NoLeadingNamespaceWhitespaceFixer
+ * PhpCsFixer\Fixer\Semicolon\SpaceAfterSemicolonFixer
+
+ [WARNING] 1 error is fixable! Just add "--fix" to console command and rerun to apply.
 ```
 
-## Limits
+## Fixers
 
-The lexer is a pragmatic subset of PHP: string interpolation is not split,
-heredoc/nowdoc are treated as generic content, and operators are emitted as
-single-char `Punct` tokens. Enough for line/whitespace fixers; extend the lexer
-before adding rules that need real operator or keyword semantics.
+**No leading namespace whitespace**
+
+```diff
+-    namespace App;
++namespace App;
+```
+
+**Blank line after opening tag**
+
+```diff
+ <?php
++
+ declare(strict_types=1);
+```
+
+**No single-line whitespace before semicolons**
+
+```diff
+-$name = 'Rector' ;
++$name = 'Rector';
+```
+
+**Space after semicolon**
+
+```diff
+-$a = 1;$b = 2;
++$a = 1; $b = 2;
+```
+
+**No whitespace in blank line** (a blank line full of spaces becomes truly empty)
+
+```diff
+ $a = 1;
+-····
++
+ $b = 2;
+```
+
+**No trailing whitespace**
+
+```diff
+-$a = 1;····
++$a = 1;
+```
+
+**Single blank line at end of file** (collapses trailing blank lines to exactly one newline)
+
+## License
+
+MIT

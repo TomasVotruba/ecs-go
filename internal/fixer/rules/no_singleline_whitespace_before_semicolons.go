@@ -1,0 +1,32 @@
+package rules
+
+import (
+	"strings"
+
+	"ecs-go/internal/token"
+	"ecs-go/internal/tokens"
+)
+
+// NoSinglelineWhitespaceBeforeSemicolons removes single-line whitespace before
+// a semicolon: "$x = 1 ;" becomes "$x = 1;".
+type NoSinglelineWhitespaceBeforeSemicolons struct{}
+
+func (NoSinglelineWhitespaceBeforeSemicolons) Name() string {
+	return `PhpCsFixer\Fixer\Semicolon\NoSinglelineWhitespaceBeforeSemicolonsFixer`
+}
+
+func (NoSinglelineWhitespaceBeforeSemicolons) Fix(s *tokens.Stream) bool {
+	changed := false
+	for i := s.Len() - 1; i >= 1; i-- {
+		t := s.At(i)
+		if t.Kind != token.Punct || t.Value != ";" {
+			continue
+		}
+		prev := s.At(i - 1)
+		if prev.Kind == token.Whitespace && !strings.ContainsAny(prev.Value, "\n\r") {
+			s.RemoveAt(i - 1)
+			changed = true
+		}
+	}
+	return changed
+}

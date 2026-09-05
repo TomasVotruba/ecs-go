@@ -2,10 +2,15 @@ package rules
 
 import "ecs-go/internal/fixer"
 
-// All returns every built-in fixer, in a stable, deterministic order.
+// All returns every built-in fixer, safest first, echoing the ordering of
+// ECS's SpacesLevel set.
 func All() []fixer.Fixer {
 	return []fixer.Fixer{
-		NoSpaceBeforeSemicolon{},
+		NoLeadingNamespaceWhitespace{},
+		NoSinglelineWhitespaceBeforeSemicolons{},
+		NoWhitespaceInBlankLine{},
+		SpaceAfterSemicolon{},
+		BlankLineAfterOpeningTag{},
 		NoTrailingWhitespace{},
 		SingleBlankLineAtEndOfFile{},
 	}

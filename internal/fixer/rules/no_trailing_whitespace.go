@@ -15,7 +15,9 @@ var (
 // NoTrailingWhitespace removes spaces and tabs at the end of a line.
 type NoTrailingWhitespace struct{}
 
-func (NoTrailingWhitespace) Name() string { return "no_trailing_whitespace" }
+func (NoTrailingWhitespace) Name() string {
+	return `PhpCsFixer\Fixer\Whitespace\NoTrailingWhitespaceFixer`
+}
 
 func (NoTrailingWhitespace) Fix(s *tokens.Stream) bool {
 	changed := false

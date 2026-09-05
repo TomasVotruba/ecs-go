@@ -10,7 +10,9 @@ import (
 // SingleBlankLineAtEndOfFile ensures the file ends with exactly one newline.
 type SingleBlankLineAtEndOfFile struct{}
 
-func (SingleBlankLineAtEndOfFile) Name() string { return "single_blank_line_at_eof" }
+func (SingleBlankLineAtEndOfFile) Name() string {
+	return `PhpCsFixer\Fixer\Whitespace\SingleBlankLineAtEofFixer`
+}
 
 func (SingleBlankLineAtEndOfFile) Fix(s *tokens.Stream) bool {
 	if s.Len() == 0 {
