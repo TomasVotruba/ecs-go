@@ -41,3 +41,25 @@ func TestSetValue(t *testing.T) {
 		t.Fatalf("setvalue: got %q", got)
 	}
 }
+
+func TestMatchForward(t *testing.T) {
+	// ( a [ b ] c )  -> outer "(" at 0 matches ")" at 6
+	s := mk("(", "a", "[", "b", "]", "c", ")")
+	if got := s.MatchForward(0); got != 6 {
+		t.Fatalf("outer match: got %d, want 6", got)
+	}
+	if got := s.MatchForward(2); got != 4 {
+		t.Fatalf("inner match: got %d, want 4", got)
+	}
+	if got := s.MatchForward(1); got != -1 {
+		t.Fatalf("non-opener should be -1, got %d", got)
+	}
+}
+
+func TestReplaceRange(t *testing.T) {
+	s := mk("a", "b", "c", "d")
+	s.ReplaceRange(1, 2, []token.Token{{Kind: token.Punct, Value: "X"}})
+	if got := s.Render(); got != "aXd" {
+		t.Fatalf("replace: got %q", got)
+	}
+}

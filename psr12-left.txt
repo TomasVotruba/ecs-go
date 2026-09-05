@@ -1,0 +1,71 @@
+PSR-12 rules left to implement
+==============================
+
+Reference: PHP-CS-Fixer @PSR12 = @PSR2 (+ @PSR1) plus extra rules.
+Below: everything in that set NOT yet implemented in ecs-go, grouped by what
+they need. Implemented rules (26) are listed at the bottom for reference.
+
+Legend:
+  [AST]   needs a real statement/AST model (brace/scope/type awareness) -
+          not safe on the flat token stream. Adopt php-parser-in-go next.
+  [TOKEN] doable on the current token stream in a future PR (bounded risk).
+  [LEX]   blocked on a lexer gap (heredoc/nowdoc, casts as tokens, ...).
+
+
+NEEDS AST / STATEMENT MODEL
+---------------------------
+braces_position                 opening brace placement (class/fn next line,
+                                control same line) - needs construct + brace scope
+class_definition                spacing in class/interface/trait headers
+function_declaration            "function" signature spacing, closures
+method_argument_space           multi-line argument layout, one-per-line
+compact_nullable_type_declaration   "? int" -> "?int" in type positions
+return_type_declaration         spacing around ":" of a return type
+ternary_operator_spaces         spacing around ternary "?"/":" (: is ambiguous)
+ordered_imports                 sort use statements
+ordered_class_elements          reorder class members (use_trait first)
+single_class_element_per_statement   split "public $a, $b;"
+single_trait_insert_per_statement    split "use A, B;" inside a class body
+visibility_required             add public/… to methods, properties, consts
+modifier_keywords               modifier presence + ordering (casing done)
+new_with_parentheses            "new Foo" -> "new Foo()" (needs class-name ctx)
+
+
+NEEDS LEXER WORK
+----------------
+(heredoc / nowdoc are now lexed as opaque string tokens - fixers leave them
+ alone.)
+no_closing_tag                  strip trailing "?>" (safe once tag handling solid)
+no_trailing_whitespace_in_comment   trim inside comment tokens
+short_open_tag / full_opening_tag    "<?" -> "<?php"
+
+
+TOKEN-DOABLE NEXT (bounded)
+---------------------------
+blank_line_after_namespace      one blank line after "namespace X;"
+single_line_after_imports       one blank line after the import block
+blank_line_between_import_groups blank line between class/function/const groups
+no_extra_blank_lines            collapse 2+ blank lines (PSR12 scopes to "use")
+no_multiple_statements_per_line one statement per line
+switch_case_semicolon_to_colon  "case 1;" -> "case 1:"
+switch_case_space               "case 1 :" -> "case 1:"
+no_break_comment                add "// no break" on fallthrough (heuristic)
+binary_operator_spaces          remaining operators: arithmetic (+ - * / %),
+                                bitwise (& | ^), which are unary-ambiguous and
+                                need operand context to space safely
+
+
+IMPLEMENTED (26)
+----------------
+casing:      lowercase_keywords, constant_case, lowercase_static_reference,
+             lowercase_cast, short_scalar_cast
+spacing:     no_leading_namespace_whitespace, no_singleline_whitespace_before_semicolons,
+             no_whitespace_in_blank_line, space_after_semicolon,
+             binary_operator_spaces (=, =>, ==, ===, !=, !==, <>, <=, >=, <=>, <, >, &&, ||, ??),
+             concat_space, cast_spaces, blank_line_after_opening_tag,
+             no_trailing_whitespace, single_blank_line_at_eof
+constructs:  single_space_around_construct, no_spaces_after_function_name,
+             spaces_inside_parentheses, unary_operator_spaces, elseif,
+             no_leading_import_slash, declare_equal_normalize
+structural:  single_import_per_statement, blank_lines_before_namespace,
+             no_blank_lines_after_class_opening, indentation_type

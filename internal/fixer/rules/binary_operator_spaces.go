@@ -7,10 +7,19 @@ import (
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Operator/BinaryOperatorSpacesFixer.php
 //
-// BinaryOperatorSpaces normalizes spacing to a single space around the "="
-// assignment and "=>" arrow operators, matching the ECS spaces set config.
+// binaryOperators are unambiguously binary operators (never unary), safe to
+// space on a flat token stream. Ambiguous ones (+ - & * used as unary/reference/
+// splat) are intentionally excluded.
+var binaryOperators = map[string]bool{
+	"==": true, "===": true, "!=": true, "!==": true, "<>": true,
+	"<=": true, ">=": true, "<=>": true, "<": true, ">": true,
+	"&&": true, "||": true, "??": true, "=>": true,
+}
+
+// BinaryOperatorSpaces normalizes spacing to a single space around binary
+// operators (assignment "=", arrow "=>", comparison and logical operators).
 // Whitespace spanning a newline is left alone to preserve alignment. Reference
-// assignment ("=& $x") is skipped.
+// assignment ("=& $x") and declare() headers are skipped.
 type BinaryOperatorSpaces struct{}
 
 func (BinaryOperatorSpaces) Name() string {
@@ -27,14 +36,10 @@ func (BinaryOperatorSpaces) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.Punct {
 			return false
 		}
-		switch t.Value {
-		case "=>":
-			return true
-		case "=":
+		if t.Value == "=" {
 			// leave reference assignment ("=& $x") and declare(...) headers alone
 			return nextSignificantValue(s, i) != "&" && !insideDeclareArgs(s, i)
-		default:
-			return false
 		}
+		return binaryOperators[t.Value]
 	})
 }

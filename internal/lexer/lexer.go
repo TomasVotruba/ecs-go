@@ -2,10 +2,10 @@
 // lossless token stream. It mirrors the shape of PHP's token_get_all rather
 // than building an AST, so fixers can walk and mutate tokens by index.
 //
-// It classifies keywords vs names and emits multi-char operators (=> -> :: ===
-// ...) as single Punct tokens. It is a pragmatic subset, not a full PHP grammar:
-// string interpolation is not split, heredoc/nowdoc are treated as generic
-// content, and casts are not recognized. Enough for coding-standard fixers.
+// It classifies keywords vs names, emits multi-char operators (=> -> :: === ...)
+// as single Punct tokens, and captures heredoc/nowdoc as one opaque String
+// token. It is a pragmatic subset, not a full PHP grammar: string interpolation
+// is not split and casts are not tokenized. Enough for coding-standard fixers.
 package lexer
 
 import (
@@ -83,6 +83,18 @@ func (l *lexer) lexPHP() {
 		l.pos += 2
 		l.emit(token.CloseTag, start)
 		l.inPHP = false
+	case l.hasPrefix("<<<"):
+		if end := l.scanHeredoc(); end > l.pos {
+			l.pos = end
+			l.emit(token.String, start)
+		} else {
+			if op := l.matchOperator(); op > 0 {
+				l.pos += op
+			} else {
+				l.pos++
+			}
+			l.emit(token.Punct, start)
+		}
 	case isSpace(c):
 		for l.pos < len(l.src) && isSpace(l.src[l.pos]) {
 			l.pos++
@@ -206,6 +218,64 @@ func (l *lexer) lexString(start int, quote byte) {
 
 func (l *lexer) hasPrefix(s string) bool {
 	return strings.HasPrefix(l.src[l.pos:], s)
+}
+
+// scanHeredoc returns the end offset of a heredoc/nowdoc starting at "<<<", or
+// -1 when the "<<<" is not a valid heredoc opener. The whole construct (through
+// the closing label) is treated as one opaque token so fixers never touch it.
+func (l *lexer) scanHeredoc() int {
+	src := l.src
+	p := l.pos + 3
+	for p < len(src) && (src[p] == ' ' || src[p] == '\t') {
+		p++
+	}
+	var quote byte
+	if p < len(src) && (src[p] == '\'' || src[p] == '"') {
+		quote = src[p]
+		p++
+	}
+	labelStart := p
+	for p < len(src) && isIdent(src[p]) {
+		p++
+	}
+	if p == labelStart {
+		return -1 // no label -> not a heredoc
+	}
+	label := src[labelStart:p]
+	if quote != 0 {
+		if p >= len(src) || src[p] != quote {
+			return -1
+		}
+		p++
+	}
+	// opener must end the line
+	for p < len(src) && src[p] != '\n' {
+		p++
+	}
+	if p >= len(src) {
+		return -1
+	}
+	// scan body lines for the closing label (PHP 7.3+ allows it indented)
+	for p < len(src) {
+		p++ // step past the newline to the start of the next line
+		lineStart := p
+		for lineStart < len(src) && (src[lineStart] == ' ' || src[lineStart] == '\t') {
+			lineStart++
+		}
+		if strings.HasPrefix(src[lineStart:], label) {
+			after := lineStart + len(label)
+			if after >= len(src) || !isIdent(src[after]) {
+				return after // closing marker found
+			}
+		}
+		for p < len(src) && src[p] != '\n' {
+			p++
+		}
+		if p >= len(src) {
+			return len(src) // unterminated; consume the rest
+		}
+	}
+	return len(src)
 }
 
 func isSpace(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }

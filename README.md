@@ -64,16 +64,16 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 ## PSR-12
 
 The `psr12` set implements the token-safe part of PHP-CS-Fixer's `@PSR-12`:
-casing (keywords, constants, static references, casts), operator and
-parenthesis spacing, language-construct spacing, `else if` -> `elseif`,
-`declare` normalization and leading import slash removal.
+casing (keywords, constants, static references, casts), operator spacing
+(assignment, arrow, comparison and logical operators), parenthesis and
+language-construct spacing, `else if` -> `elseif`, `declare` normalization,
+leading import slash removal, one import per statement, blank lines before a
+namespace, no blank lines after a class opening, and tab-to-space indentation.
 
-Rules that need structural analysis (brace matching, indentation, line
-layout) are not implemented yet - they require the next tokenizer step:
-`braces_position`, `indentation_type`, `method_argument_space`,
-`ordered_imports`, `single_import_per_statement`, class element ordering and
-visibility, `blank_lines_before_namespace`, and full binary-operator spacing
-(beyond `=` and `=>`).
+Rules that need full statement/AST analysis are still pending and are the
+natural next step (adopting an AST such as php-parser-in-go): `braces_position`,
+`method_argument_space` (multiline), `ordered_imports`, `visibility_required`,
+`ordered_class_elements`, and blank-line rules around namespaces and imports.
 
 ## What it looks like
 
@@ -179,6 +179,12 @@ Applied checkers:
 `unary_operator_spaces` (`$i ++` -> `$i++`), `elseif` (`else if` -> `elseif`),
 `no_leading_import_slash` (`use \Foo` -> `use Foo`), `declare_equal_normalize`
 (`strict_types = 1` -> `strict_types=1`).
+
+### Structural
+
+`single_import_per_statement` (`use A, B;` -> `use A;` / `use B;`),
+`blank_lines_before_namespace`, `no_blank_lines_after_class_opening`,
+`indentation_type` (leading tabs -> four spaces).
 
 ## License
 
