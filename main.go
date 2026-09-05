@@ -1,6 +1,5 @@
-// Command ecs-go is a thin, token-based coding-standard checker/fixer for PHP,
-// modeled on symplify/easy-coding-standard. It ships a small standalone PHP
-// lexer and a handful of fixers as a proof of the architecture.
+// Command ecs-go is a token-based coding-standard checker/fixer for PHP,
+// modeled on symplify/easy-coding-standard.
 package main
 
 import (
@@ -35,6 +34,7 @@ func run(args []string) int {
 		}
 	}
 
+	// runs across all CPU cores by default
 	cfg := config.Configure().WithPaths(paths...)
 
 	results, err := runner.Run(cfg, fix)
@@ -43,12 +43,7 @@ func run(args []string) int {
 		return 2
 	}
 
-	n := reporter.Report(os.Stdout, results, fix)
-	// check mode with findings -> non-zero, like ECS
-	if n > 0 && !fix {
-		return 1
-	}
-	return 0
+	return reporter.Report(os.Stdout, results, fix)
 }
 
 func listCheckers() int {
@@ -63,8 +58,10 @@ func usage() {
 	fmt.Print(`ecs-go - token-based PHP coding standard tool
 
 Usage:
-  ecs-go [paths...]          check paths (default: .)
-  ecs-go --fix [paths...]    fix paths in place
-  ecs-go list-checkers       list registered rules
+  ecs-go [paths...]            check paths (default: .)
+  ecs-go --fix [paths...]      fix paths in place
+  ecs-go list-checkers         list registered fixers
+
+Runs across all CPU cores by default.
 `)
 }

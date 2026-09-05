@@ -165,9 +165,11 @@ func (l *lexer) hasPrefix(s string) bool {
 	return strings.HasPrefix(l.src[l.pos:], s)
 }
 
-func isSpace(c byte) bool    { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }
-func isDigit(c byte) bool    { return c >= '0' && c <= '9' }
-func isNumber(c byte) bool   { return isDigit(c) || c == '.' || c == '_' || c == 'x' || c == 'X' || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') }
+func isSpace(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+func isNumber(c byte) bool {
+	return isDigit(c) || c == '.' || c == '_' || c == 'x' || c == 'X' || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
 func isIdentStart(c byte) bool {
 	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c >= 0x80
 }

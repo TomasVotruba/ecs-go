@@ -1,9 +1,12 @@
 <?php
-
-declare(strict_types=1);
+    namespace App;
 
 function greet($name)
-{
-    $message = 'Hello ' . $name ;
-    return $message  ;
+{  
+    $greeting = 'Hello ' . $name ;
+
+    $count=1;$total=2;
+    return $greeting;
 }
+
+

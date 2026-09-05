@@ -2,6 +2,8 @@
 package config
 
 import (
+	"runtime"
+
 	"ecs-go/internal/fixer"
 	"ecs-go/internal/fixer/rules"
 )
@@ -10,6 +12,7 @@ type Config struct {
 	Paths []string
 	Skip  []string // filepath.Match globs tested against each path
 	Rules []fixer.Fixer
+	Jobs  int // parallel workers
 }
 
 // Configure returns a config seeded with all built-in rules, echoing
@@ -18,6 +21,7 @@ func Configure() *Config {
 	return &Config{
 		Paths: []string{"."},
 		Rules: rules.All(),
+		Jobs:  runtime.NumCPU(),
 	}
 }
 
@@ -35,5 +39,12 @@ func (c *Config) WithSkip(patterns ...string) *Config {
 
 func (c *Config) WithRules(rs ...fixer.Fixer) *Config {
 	c.Rules = rs
+	return c
+}
+
+func (c *Config) WithJobs(n int) *Config {
+	if n > 0 {
+		c.Jobs = n
+	}
 	return c
 }
