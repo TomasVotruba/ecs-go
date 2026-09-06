@@ -207,9 +207,11 @@ from a pure-PHP file).
 ### Braces
 
 `braces_position` - PSR-12 brace placement: classes and named functions get
-their opening brace on the next line; control structures keep it on the same
-line after one space. Built on a small statement/scope layer that classifies
-each brace by its construct.
+their opening brace on the next line (kept inline for multi-line signatures, per
+PSR-12 4.5); control structures keep it on the same line after one space.
+`statement_indentation` - reindents statement lines to four spaces per brace
+level, leaving continuation lines (multi-line arguments, arrays, method chains)
+untouched. Both build on a small statement/scope layer.
 
 ### Class members
 

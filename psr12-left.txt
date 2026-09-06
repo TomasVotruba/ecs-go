@@ -2,7 +2,7 @@ PSR-12 rules left to implement
 ==============================
 
 Reference: PHP-CS-Fixer @PSR12 = @PSR2 (+ @PSR1) plus extra rules.
-Below: what remains NOT implemented in ecs-go. 41 fixers are done (see bottom).
+Below: what remains NOT implemented in ecs-go. 42 fixers are done (see bottom).
 
 A statement/scope layer exists: Stream.MatchForward/MatchBackward, classifyBrace
 (labels each "{"), and classMemberStarts (iterates class members). The rules
@@ -25,7 +25,6 @@ return_type_declaration         spacing around ":" of a return type
 ternary_operator_spaces         spacing around ternary "?"/":" (: is ambiguous)
 modifier_keywords               modifier ordering (casing/presence done)
 new_with_parentheses            "new Foo" -> "new Foo()" (needs class-name ctx)
-statement_indentation           re-indent statement bodies to depth
 
 
 LEFTOVERS (bounded / low value)
@@ -35,7 +34,7 @@ binary_operator_spaces          arithmetic/bitwise (+ - * / % & | ^): unary-
                                 ambiguous, need operand context
 
 
-IMPLEMENTED (41)
+IMPLEMENTED (42)
 ----------------
 casing:      lowercase_keywords, constant_case, lowercase_static_reference,
              lowercase_cast, short_scalar_cast
@@ -56,4 +55,5 @@ class:       visibility_required, single_trait_insert_per_statement,
 imports:     single_import_per_statement, ordered_imports,
              blank_line_between_import_groups, single_line_after_imports
 structural:  blank_lines_before_namespace, blank_line_after_namespace,
-             no_blank_lines_after_class_opening, indentation_type
+             no_blank_lines_after_class_opening, indentation_type,
+             statement_indentation

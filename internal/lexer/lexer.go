@@ -158,7 +158,11 @@ func (l *lexer) lexPHP() {
 // directly follows an object/static access operator (-> ?-> ::) is always a
 // property or method name, never a keyword.
 func (l *lexer) identKind(word string) token.Kind {
-	if prev := l.lastSignificant(); prev == "->" || prev == "?->" || prev == "::" {
+	if prev := l.lastSignificant(); prev == "->" || prev == "?->" || prev == "::" || prev == `\` {
+		return token.Ident // property/method name or namespace segment
+	}
+	// a namespace segment like "Enum\Action" is an identifier, not a keyword
+	if l.pos < len(l.src) && l.src[l.pos] == '\\' {
 		return token.Ident
 	}
 	if keywords[strings.ToLower(word)] {
