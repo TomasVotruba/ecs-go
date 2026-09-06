@@ -223,6 +223,8 @@ func TestAllFixersIdempotent(t *testing.T) {
 		"<?php class A {\n    use TraitB, TraitC;\n    function run() {}\n    var $old;\n    const X = 1;\n}\n",
 		"<?php\nuse const C\\Z;\nuse B\\Y;\nuse function F\\g;\nuse A\\X;\n\nclass A\n{\n    public int $a, $b;\n}\n",
 		"<?php\n$a = 1; $b = 2;$c = 3;\nswitch ($a) { case 1 : break; case 2; break; }\n",
+		"<?php\nclass A\n{\nfunction run($a)\n{\nif ($a) {\nreturn 1;\n}\n}\n}\n",
+		"<?php\n\nuse App\\Enum\\Action;\n\nfunction foo(\n    int $a,\n    int $b\n): void {\n}\n",
 	}
 	for _, src := range corpus {
 		once := runAll(src)

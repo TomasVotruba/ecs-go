@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"strings"
+
 	"ecs-go/internal/token"
 	"ecs-go/internal/tokens"
 )
@@ -27,32 +29,69 @@ func (BracesPosition) Fix(s *tokens.Stream) bool {
 		if s.At(i).Kind != token.Punct || s.At(i).Value != "{" {
 			continue
 		}
-		kind, keyword := classifyBrace(s, i)
+		kind, _ := classifyBrace(s, i)
+
+		nextLine := false
 		switch kind {
-		case braceClassLike, braceFunctionDecl:
-			want := "\n" + lineIndent(s, keyword)
-			if i > 0 && s.At(i-1).Kind == token.Whitespace {
-				if s.At(i-1).Value != want {
-					s.SetValue(i-1, want)
-					changed = true
-				}
-			} else {
-				s.InsertAt(i, token.Token{Kind: token.Whitespace, Value: want})
-				i++
-				changed = true
-			}
+		case braceClassLike:
+			nextLine = true
+		case braceFunctionDecl:
+			// PSR-12 keeps "){" on one line when the signature is multiline
+			nextLine = !funcSignatureMultiline(s, i)
 		case braceControl:
-			if i > 0 && s.At(i-1).Kind == token.Whitespace {
-				if s.At(i-1).Value != " " {
-					s.SetValue(i-1, " ")
-					changed = true
-				}
-			} else {
-				s.InsertAt(i, token.Token{Kind: token.Whitespace, Value: " "})
-				i++
+			nextLine = false
+		default:
+			continue
+		}
+
+		want := " "
+		if nextLine {
+			// depth-based so it stays correct regardless of the header's own
+			// (possibly wrong) indentation; statement_indentation fixes the rest
+			want = "\n" + strings.Repeat("    ", braceDepthAt(s, i))
+		}
+		if i > 0 && s.At(i-1).Kind == token.Whitespace {
+			if s.At(i-1).Value != want {
+				s.SetValue(i-1, want)
 				changed = true
 			}
+		} else {
+			s.InsertAt(i, token.Token{Kind: token.Whitespace, Value: want})
+			i++
+			changed = true
 		}
 	}
 	return changed
+}
+
+// funcSignatureMultiline reports whether the parameter list of the function
+// whose body opens at brace spans more than one line.
+func funcSignatureMultiline(s *tokens.Stream, brace int) bool {
+	closeParen := -1
+	for j := brace - 1; j >= 0; j-- {
+		t := s.At(j)
+		if t.Kind != token.Punct {
+			continue
+		}
+		if t.Value == ")" {
+			closeParen = j
+			break
+		}
+		if t.Value == "{" || t.Value == "}" || t.Value == ";" {
+			return false
+		}
+	}
+	if closeParen < 0 {
+		return false
+	}
+	open := s.MatchBackward(closeParen)
+	if open < 0 {
+		return false
+	}
+	for k := open; k <= closeParen; k++ {
+		if s.At(k).Kind == token.Whitespace && hasNewline(s.At(k).Value) {
+			return true
+		}
+	}
+	return false
 }

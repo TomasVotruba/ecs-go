@@ -113,6 +113,15 @@ func TestLexKeywordsVsIdent(t *testing.T) {
 	}
 }
 
+func TestKeywordLikeNamespaceSegmentIsIdent(t *testing.T) {
+	// "Enum" here is a namespace segment, not the enum keyword
+	for _, tk := range Lex(`<?php use App\Enum\Action;`) {
+		if tk.Value == "Enum" && tk.Kind != token.Ident {
+			t.Errorf("namespace segment Enum should be Ident, got %s", tk.Kind)
+		}
+	}
+}
+
 func TestKeywordAfterObjectOperatorIsIdent(t *testing.T) {
 	// `list` is a keyword, but as a property name it is a plain identifier
 	toks := Lex("<?php $this->list;")
