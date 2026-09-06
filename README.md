@@ -178,7 +178,19 @@ Applied checkers:
 (`foo ()` -> `foo()`), `spaces_inside_parentheses` (`( $a )` -> `($a)`),
 `unary_operator_spaces` (`$i ++` -> `$i++`), `elseif` (`else if` -> `elseif`),
 `no_leading_import_slash` (`use \Foo` -> `use Foo`), `declare_equal_normalize`
-(`strict_types = 1` -> `strict_types=1`).
+(`strict_types = 1` -> `strict_types=1`), `no_multiple_statements_per_line`
+(`$a; $b;` -> two lines), `switch_case_space` + `switch_case_semicolon_to_colon`
+(`case 1 ;` -> `case 1:`).
+
+### Comments and blank lines
+
+`no_trailing_whitespace_in_comment`, `no_extra_blank_lines` (collapse 2+ blank
+lines to one).
+
+### Imports
+
+`single_import_per_statement`, `ordered_imports` (group class / function / const),
+`blank_line_between_import_groups`, `single_line_after_imports`.
 
 ### Structural
 
@@ -203,9 +215,9 @@ each brace by its construct.
 
 `visibility_required` - adds an explicit `public` to methods, properties and
 constants that declare none (`var $x` -> `public $x`); `single_trait_insert_per_statement`
-- splits `use A, B;` inside a class into one per line. Both walk the class body
-via the scope layer, skipping trait use, enum cases and promoted constructor
-parameters.
+- splits `use A, B;` inside a class into one per line; `single_class_element_per_statement`
+- splits `public $a, $b;` into one per line. All walk the class body via the
+scope layer, skipping trait use, enum cases and promoted constructor parameters.
 
 ## License
 

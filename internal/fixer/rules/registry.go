@@ -9,12 +9,14 @@ func SpacingFixers() []fixer.Fixer {
 		NoLeadingNamespaceWhitespace{},
 		NoSinglelineWhitespaceBeforeSemicolons{},
 		NoWhitespaceInBlankLine{},
+		NoExtraBlankLines{},
 		SpaceAfterSemicolon{},
 		BinaryOperatorSpaces{},
 		ConcatSpace{},
 		CastSpaces{},
 		BlankLineAfterOpeningTag{},
 		NoTrailingWhitespace{},
+		NoTrailingWhitespaceInComment{},
 		SingleBlankLineAtEndOfFile{},
 	}
 }
@@ -41,6 +43,9 @@ func ConstructFixers() []fixer.Fixer {
 		UnaryOperatorSpaces{},
 		NoLeadingImportSlash{},
 		Elseif{},
+		SwitchCaseSemicolonToColon{},
+		SwitchCaseSpace{},
+		NoMultipleStatementsPerLine{},
 	}
 }
 
@@ -50,9 +55,12 @@ func StructuralFixers() []fixer.Fixer {
 		BracesPosition{},
 		VisibilityRequired{},
 		SingleTraitInsertPerStatement{},
+		SingleClassElementPerStatement{},
 		BlankLinesBeforeNamespace{},
 		BlankLineAfterNamespace{},
 		SingleImportPerStatement{},
+		OrderedImports{},
+		BlankLineBetweenImportGroups{},
 		SingleLineAfterImports{},
 		NoBlankLinesAfterClassOpening{},
 		IndentationType{},
