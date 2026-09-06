@@ -65,75 +65,104 @@ func (SingleImportPerStatement) SourceURL() string {
 }
 
 func (SingleImportPerStatement) Fix(s *tokens.Stream) bool {
+	return splitUseStatements(s, false)
+}
+
+// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/ClassNotation/SingleTraitInsertPerStatementFixer.php
+//
+// SingleTraitInsertPerStatement splits a grouped trait use inside a class body
+// into one per line: "use A, B;" -> "use A;\nuse B;".
+type SingleTraitInsertPerStatement struct{}
+
+func (SingleTraitInsertPerStatement) Name() string {
+	return `PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer`
+}
+
+func (SingleTraitInsertPerStatement) SourceURL() string {
+	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/ClassNotation/SingleTraitInsertPerStatementFixer.php"
+}
+
+func (SingleTraitInsertPerStatement) Fix(s *tokens.Stream) bool {
+	return splitUseStatements(s, true)
+}
+
+// splitUseStatements splits grouped "use" statements one per line. inClass picks
+// the scope: false handles top-level imports, true handles in-class trait use.
+func splitUseStatements(s *tokens.Stream, inClass bool) bool {
 	changed := false
 	i := 0
 	for i < s.Len() {
-		t := s.At(i)
-		if t.Kind != token.Keyword || strings.ToLower(t.Value) != "use" {
+		if s.At(i).Kind != token.Keyword || strings.ToLower(s.At(i).Value) != "use" {
 			i++
 			continue
 		}
-
-		j := skipWhitespace(s, i+1)
-		modifier := ""
-		if j < s.Len() && s.At(j).Kind == token.Keyword {
-			if lw := strings.ToLower(s.At(j).Value); lw == "function" || lw == "const" {
-				modifier = s.At(j).Value
-				j = skipWhitespace(s, j+1)
-			}
+		next, c := splitUseAt(s, i, inClass)
+		i = next
+		if c {
+			changed = true
 		}
-		if j < s.Len() && s.At(j).Kind == token.Punct && s.At(j).Value == "(" {
-			i++ // closure "use (...)"
-			continue
-		}
-		if inClassLikeBody(s, i) {
-			i++ // trait use inside a class - single_trait_insert_per_statement's job
-			continue
-		}
-
-		semi, group := -1, false
-		var commas []int
-		for k := j; k < s.Len(); k++ {
-			if s.At(k).Kind != token.Punct {
-				continue
-			}
-			switch s.At(k).Value {
-			case "{":
-				group = true
-			case ";":
-				semi = k
-			case ",":
-				commas = append(commas, k)
-			}
-			if group || semi >= 0 {
-				break
-			}
-		}
-		if group || semi < 0 || len(commas) == 0 {
-			i++
-			continue
-		}
-
-		indent := indentBefore(s, i)
-		parts := splitImportParts(s, j, semi, commas)
-
-		var repl []token.Token
-		for p, part := range parts {
-			if p > 0 {
-				repl = append(repl, token.Token{Kind: token.Whitespace, Value: "\n" + indent})
-			}
-			repl = append(repl, token.Token{Kind: token.Keyword, Value: "use"}, token.Token{Kind: token.Whitespace, Value: " "})
-			if modifier != "" {
-				repl = append(repl, token.Token{Kind: token.Keyword, Value: modifier}, token.Token{Kind: token.Whitespace, Value: " "})
-			}
-			repl = append(repl, part...)
-			repl = append(repl, token.Token{Kind: token.Punct, Value: ";"})
-		}
-		s.ReplaceRange(i, semi, repl)
-		changed = true
-		i += len(repl)
 	}
 	return changed
+}
+
+// splitUseAt splits the "use" statement at index i when its scope matches
+// inClass. It returns the index to continue from and whether it changed.
+func splitUseAt(s *tokens.Stream, i int, inClass bool) (int, bool) {
+	if inClassLikeBody(s, i) != inClass {
+		return i + 1, false
+	}
+
+	j := skipWhitespace(s, i+1)
+	modifier := ""
+	if j < s.Len() && s.At(j).Kind == token.Keyword {
+		if lw := strings.ToLower(s.At(j).Value); lw == "function" || lw == "const" {
+			modifier = s.At(j).Value
+			j = skipWhitespace(s, j+1)
+		}
+	}
+	if j < s.Len() && s.At(j).Kind == token.Punct && s.At(j).Value == "(" {
+		return i + 1, false // closure "use (...)"
+	}
+
+	semi, group := -1, false
+	var commas []int
+	for k := j; k < s.Len(); k++ {
+		if s.At(k).Kind != token.Punct {
+			continue
+		}
+		switch s.At(k).Value {
+		case "{":
+			group = true
+		case ";":
+			semi = k
+		case ",":
+			commas = append(commas, k)
+		}
+		if group || semi >= 0 {
+			break
+		}
+	}
+	if group || semi < 0 || len(commas) == 0 {
+		return i + 1, false
+	}
+
+	indent := indentBefore(s, i)
+	parts := splitImportParts(s, j, semi, commas)
+
+	var repl []token.Token
+	for p, part := range parts {
+		if p > 0 {
+			repl = append(repl, token.Token{Kind: token.Whitespace, Value: "\n" + indent})
+		}
+		repl = append(repl, token.Token{Kind: token.Keyword, Value: "use"}, token.Token{Kind: token.Whitespace, Value: " "})
+		if modifier != "" {
+			repl = append(repl, token.Token{Kind: token.Keyword, Value: modifier}, token.Token{Kind: token.Whitespace, Value: " "})
+		}
+		repl = append(repl, part...)
+		repl = append(repl, token.Token{Kind: token.Punct, Value: ";"})
+	}
+	s.ReplaceRange(i, semi, repl)
+	return i + len(repl), true
 }
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Import/SingleLineAfterImportsFixer.php

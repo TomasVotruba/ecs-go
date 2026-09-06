@@ -12,21 +12,26 @@ Legend:
   [LEX]   blocked on a lexer gap (heredoc/nowdoc, casts as tokens, ...).
 
 
-NEEDS AST / STATEMENT MODEL
----------------------------
-braces_position                 opening brace placement (class/fn next line,
-                                control same line) - needs construct + brace scope
+A small statement/scope layer now exists (Stream.MatchForward/MatchBackward +
+classifyBrace, which labels each "{" as class-like / function / closure /
+control / other). braces_position is implemented on it; the rules below become
+reachable next by extending the same layer (member iteration, statement spans).
+
+REACHABLE VIA THE SCOPE LAYER (next)
+------------------------------------
+single_class_element_per_statement   split "public $a, $b;" (member iteration +
+                                     prefix repeat - has the pieces already)
 class_definition                spacing in class/interface/trait headers
+ordered_class_elements          reorder class members (use_trait first)
+
+NEEDS FULLER AST / TYPE MODEL
+-----------------------------
 function_declaration            "function" signature spacing, closures
 method_argument_space           multi-line argument layout, one-per-line
 compact_nullable_type_declaration   "? int" -> "?int" in type positions
 return_type_declaration         spacing around ":" of a return type
 ternary_operator_spaces         spacing around ternary "?"/":" (: is ambiguous)
 ordered_imports                 sort use statements
-ordered_class_elements          reorder class members (use_trait first)
-single_class_element_per_statement   split "public $a, $b;"
-single_trait_insert_per_statement    split "use A, B;" inside a class body
-visibility_required             add public/… to methods, properties, consts
 modifier_keywords               modifier presence + ordering (casing done)
 new_with_parentheses            "new Foo" -> "new Foo()" (needs class-name ctx)
 
@@ -67,3 +72,6 @@ structural:  single_import_per_statement, single_line_after_imports,
              blank_lines_before_namespace, blank_line_after_namespace,
              no_blank_lines_after_class_opening, indentation_type
 php tag:     full_opening_tag, no_closing_tag
+braces:      braces_position (opening brace; via the statement/scope layer)
+class:       visibility_required, single_trait_insert_per_statement
+             (via the class-member iterator)

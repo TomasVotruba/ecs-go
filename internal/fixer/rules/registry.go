@@ -47,6 +47,9 @@ func ConstructFixers() []fixer.Fixer {
 // StructuralFixers reflow imports, namespace/class blank lines and indentation.
 func StructuralFixers() []fixer.Fixer {
 	return []fixer.Fixer{
+		BracesPosition{},
+		VisibilityRequired{},
+		SingleTraitInsertPerStatement{},
 		BlankLinesBeforeNamespace{},
 		BlankLineAfterNamespace{},
 		SingleImportPerStatement{},

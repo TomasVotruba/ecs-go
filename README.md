@@ -192,6 +192,21 @@ Applied checkers:
 `full_opening_tag` (`<?` -> `<?php`), `no_closing_tag` (strips a trailing `?>`
 from a pure-PHP file).
 
+### Braces
+
+`braces_position` - PSR-12 brace placement: classes and named functions get
+their opening brace on the next line; control structures keep it on the same
+line after one space. Built on a small statement/scope layer that classifies
+each brace by its construct.
+
+### Class members
+
+`visibility_required` - adds an explicit `public` to methods, properties and
+constants that declare none (`var $x` -> `public $x`); `single_trait_insert_per_statement`
+- splits `use A, B;` inside a class into one per line. Both walk the class body
+via the scope layer, skipping trait use, enum cases and promoted constructor
+parameters.
+
 ## License
 
 MIT
