@@ -225,6 +225,8 @@ func TestAllFixersIdempotent(t *testing.T) {
 		"<?php\n$a = 1; $b = 2;$c = 3;\nswitch ($a) { case 1 : break; case 2; break; }\n",
 		"<?php\nclass A\n{\nfunction run($a)\n{\nif ($a) {\nreturn 1;\n}\n}\n}\n",
 		"<?php\n\nuse App\\Enum\\Action;\n\nfunction foo(\n    int $a,\n    int $b\n): void {\n}\n",
+		"<?php\n\nfunction f(?int $a): ?string\n{\n    return $a ? 'y' : 'n';\n}\n",
+		"<?php\n\nclass A\n{\n    public const string ARRAY = 'x';\n\n    public function match($x): bool\n    {\n        return $x;\n    }\n}\n",
 	}
 	for _, src := range corpus {
 		once := runAll(src)

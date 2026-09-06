@@ -27,6 +27,11 @@ func (LowercaseKeywords) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.Keyword {
 			continue
 		}
+		// a keyword-spelled name in assignment position (e.g. a typed class
+		// constant "const string ARRAY = ...") must not be lowercased
+		if nextSignificantValue(s, i) == "=" {
+			continue
+		}
 		if lower := strings.ToLower(t.Value); lower != t.Value {
 			s.SetValue(i, lower)
 			changed = true
