@@ -12,6 +12,7 @@ func SpacingFixers() []fixer.Fixer {
 		NoExtraBlankLines{},
 		SpaceAfterSemicolon{},
 		BinaryOperatorSpaces{},
+		TernaryOperatorSpaces{},
 		ConcatSpace{},
 		CastSpaces{},
 		BlankLineAfterOpeningTag{},
@@ -46,6 +47,8 @@ func ConstructFixers() []fixer.Fixer {
 		SwitchCaseSemicolonToColon{},
 		SwitchCaseSpace{},
 		NoMultipleStatementsPerLine{},
+		MethodArgumentSpace{},
+		ReturnTypeDeclaration{},
 	}
 }
 
@@ -53,10 +56,12 @@ func ConstructFixers() []fixer.Fixer {
 func StructuralFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		IndentationType{},
+		ClassDefinition{},
 		BracesPosition{},
 		VisibilityRequired{},
 		SingleTraitInsertPerStatement{},
 		SingleClassElementPerStatement{},
+		OrderedClassElements{},
 		BlankLinesBeforeNamespace{},
 		BlankLineAfterNamespace{},
 		SingleImportPerStatement{},

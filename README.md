@@ -182,6 +182,12 @@ Applied checkers:
 (`$a; $b;` -> two lines), `switch_case_space` + `switch_case_semicolon_to_colon`
 (`case 1 ;` -> `case 1:`).
 
+### Functions and operators
+
+`method_argument_space` (single space after a comma in call/signature args),
+`return_type_declaration` (`) : int` -> `): int`), `ternary_operator_spaces`
+(`$a?$b:$c` -> `$a ? $b : $c`, nullable types left alone).
+
 ### Comments and blank lines
 
 `no_trailing_whitespace_in_comment`, `no_extra_blank_lines` (collapse 2+ blank
@@ -220,6 +226,10 @@ constants that declare none (`var $x` -> `public $x`); `single_trait_insert_per_
 - splits `use A, B;` inside a class into one per line; `single_class_element_per_statement`
 - splits `public $a, $b;` into one per line. All walk the class body via the
 scope layer, skipping trait use, enum cases and promoted constructor parameters.
+`class_definition` normalizes spacing in a class header (`class  A  extends B`
+-> `class A extends B`); `ordered_class_elements` groups members (trait use,
+constants, properties, methods) - conservatively, skipping any class with
+comments or attributes.
 
 ## License
 
