@@ -7,6 +7,13 @@ import (
 	"strings"
 )
 
+// alwaysSkipDirs are dependency directories never worth scanning.
+var alwaysSkipDirs = map[string]bool{
+	"vendor":       true,
+	"node_modules": true,
+	".git":         true,
+}
+
 // Find walks paths and returns every .php file not matching a skip glob.
 func Find(paths []string, skip []string) ([]string, error) {
 	var out []string
@@ -18,6 +25,9 @@ func Find(paths []string, skip []string) ([]string, error) {
 				return err
 			}
 			if d.IsDir() {
+				if alwaysSkipDirs[d.Name()] {
+					return fs.SkipDir
+				}
 				return nil
 			}
 			if !strings.HasSuffix(path, ".php") {
