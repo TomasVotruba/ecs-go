@@ -1,0 +1,104 @@
+name: Parity
+
+# Runs ECS and ecs-go on the same real codebase (laravel/framework) and fails if
+# ecs-go's output differs from ECS (psr12 + common) on any file. This is the 1:1
+# parity gate - it stays red until ecs-go reproduces ECS exactly.
+
+on:
+    pull_request: null
+    workflow_dispatch: null
+
+jobs:
+    ecs-parity:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: "1.26.6"
+
+            - name: Build ecs-go
+              run: go build -o /tmp/ecs-go .
+
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: "8.3"
+                  coverage: none
+
+            - name: Fetch a real codebase sample
+              run: |
+                  git clone --depth 1 https://github.com/laravel/framework.git /tmp/laravel
+                  # a moderate, self-contained component keeps the job fast
+                  mkdir -p /tmp/sample
+                  cp -r /tmp/laravel/src/Illuminate/Support/* /tmp/sample/
+                  cp -r /tmp/sample /tmp/ours
+                  cp -r /tmp/sample /tmp/ecs
+
+            - name: Run ecs-go
+              run: /tmp/ecs-go --fix /tmp/ours || true
+
+            - name: Install ECS and run it
+              run: |
+                  mkdir -p /tmp/ecsproj && cd /tmp/ecsproj
+                  composer require symplify/easy-coding-standard --no-interaction --quiet
+                  cat > ecs.php <<'PHP'
+                  <?php
+
+                  declare(strict_types=1);
+
+                  use Symplify\EasyCodingStandard\Config\ECSConfig;
+
+                  return ECSConfig::configure()
+                      ->withPaths(['/tmp/ecs'])
+                      ->withPreparedSets(psr12: true, common: true);
+                  PHP
+                  vendor/bin/ecs check --fix --no-progress-bar || true
+
+            - name: Compare outputs
+              run: |
+                  total=0
+                  differ=0
+                  for f in $(cd /tmp/ours && find . -name '*.php'); do
+                      total=$((total + 1))
+                      if ! diff -q "/tmp/ours/$f" "/tmp/ecs/$f" >/dev/null 2>&1; then
+                          differ=$((differ + 1))
+                      fi
+                  done
+                  same=$((total - differ))
+                  {
+                      echo "## ecs-go vs ECS (psr12 + common) on laravel/framework Support"
+                      echo ""
+                      echo "| metric | value |"
+                      echo "|---|---|"
+                      echo "| files | $total |"
+                      echo "| identical output | $same |"
+                      echo "| differing output | $differ |"
+                      echo ""
+                      echo "This is the 1:1 parity gate: it fails while any file differs from ECS."
+                  } >> "$GITHUB_STEP_SUMMARY"
+                  echo "identical=$same differing=$differ of $total"
+
+                  echo "### Sample divergences" >> "$GITHUB_STEP_SUMMARY"
+                  shown=0
+                  for f in $(cd /tmp/ours && find . -name '*.php'); do
+                      if [ "$shown" -ge 3 ]; then break; fi
+                      if ! diff -q "/tmp/ours/$f" "/tmp/ecs/$f" >/dev/null 2>&1; then
+                          {
+                              echo ""
+                              echo "<details><summary>$f</summary>"
+                              echo ""
+                              echo '```diff'
+                              diff "/tmp/ours/$f" "/tmp/ecs/$f" | head -40 || true
+                              echo '```'
+                              echo "</details>"
+                          } >> "$GITHUB_STEP_SUMMARY"
+                          shown=$((shown + 1))
+                      fi
+                  done
+
+                  # fail when ecs-go output does not match ECS
+                  if [ "$differ" -gt 0 ]; then
+                      echo "::error::ecs-go output differs from ECS on $differ of $total files"
+                      exit 1
+                  fi
