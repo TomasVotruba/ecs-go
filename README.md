@@ -188,6 +188,14 @@ Applied checkers:
 `return_type_declaration` (`) : int` -> `): int`), `ternary_operator_spaces`
 (`$a?$b:$c` -> `$a ? $b : $c`, nullable types left alone).
 
+### Arrays and strings
+
+`array_syntax` (`array(...)` -> `[...]`), `list_syntax` (`list(...)` -> `[...]`),
+`whitespace_after_comma_in_array` + `no_whitespace_before_comma_in_array`,
+`single_quote` (double -> single when safe), `standardize_not_equals` (`<>` ->
+`!=`), `no_empty_statement` (`$a = 1;;` -> `$a = 1;`), `line_ending` (CRLF ->
+LF), `magic_constant_casing` (`__line__` -> `__LINE__`), `magic_method_casing`.
+
 ### Comments and blank lines
 
 `no_trailing_whitespace_in_comment`, `no_extra_blank_lines` (collapse 2+ blank
