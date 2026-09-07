@@ -35,6 +35,7 @@ func CasingFixers() []fixer.Fixer {
 		IntegerLiteralCase{},
 		NativeTypeDeclarationCasing{},
 		NativeFunctionTypeDeclarationCasing{},
+		ClassReferenceNameCasing{},
 	}
 }
 
@@ -78,6 +79,9 @@ func CommonFixers() []fixer.Fixer {
 		DeclareParentheses{},
 		FunctionTypehintSpace{},
 		CompactNullableTypeDeclaration{},
+		TypesSpaces{},
+		AlignMultilineComment{},
+		AssignNullCoalescingToCoalesceEqual{},
 	}
 }
 
@@ -99,6 +103,8 @@ func PhpdocFixers() []fixer.Fixer {
 		PhpdocInlineTagNormalizer{},
 		PhpdocNoDuplicateTypes{},
 		PhpdocVarWithoutName{},
+		PhpdocIndent{},
+		PhpdocOrderByValue{},
 	}
 }
 
