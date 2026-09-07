@@ -1,0 +1,109 @@
+ECS rules NOT yet implemented in ecs-go
+=======================================
+
+Source: every Fixer/Sniff referenced across ecs-src config/set/* and
+src/Config/Level/* (psr12, common, clean-code, standalone-line, laravel,
+doctrine-annotations, and the Array/ControlStructures/Docblock/Spaces levels).
+
+Totals: 197 rules configured in ECS - 45 covered here = ~152 not yet done.
+(psr12-left.txt tracks the PSR-12 subset specifically; this is the whole ECS
+surface, most of which is beyond PSR-12: docblocks, arrays, cleanup, etc.)
+
+Note - a few below are already covered under a newer PHP-CS-Fixer name:
+  NoSpacesInsideParenthesisFixer   -> we have SpacesInsideParenthesesFixer
+
+
+PHPDOC / DOCBLOCK (~35) - needs a docblock parser
+-------------------------------------------------
+PhpdocIndent, PhpdocScalar, PhpdocTypes, PhpdocTrim,
+PhpdocTrimConsecutiveBlankLineSeparation, PhpdocSeparation, PhpdocSummary,
+PhpdocOrder, PhpdocOrderByValue, PhpdocLineSpan, PhpdocTagCasing, PhpdocTagType,
+PhpdocInlineTagNormalizer, PhpdocSingleLineVarSpacing, PhpdocToComment,
+PhpdocVarWithoutName, PhpdocReturnSelfReference, PhpdocNoAccess, PhpdocNoAliasTag,
+PhpdocNoDuplicateTypes, PhpdocNoEmptyReturn, PhpdocNoPackage,
+PhpdocNoUselessInheritdoc, NoEmptyPhpdoc, NoBlankLinesAfterPhpdoc,
+NoSuperfluousPhpdocTags, GeneralPhpdocAnnotationRemove, GeneralPhpdocTagRename,
+ParamReturnAndVarTagMalforms, SingleLineInlineVarDocBlock, DoubleAsteriskInlineVar,
+MergeDocBlockStart, TypeToVarTag, AddMissingParamName, AddMissingVarName,
+FixTagTypo, RemoveSuperfluousVarName, RemoveSuperfluousReturnName,
+RemovePropertyVariableNameDescription, RemoveMethodNameDuplicateDescription,
+RemoveEventSubscriberDescription, RemoveUselessDefaultComment,
+RemovePHPStormAnnotation
+
+DOCTRINE ANNOTATIONS (3)
+------------------------
+DoctrineAnnotationArrayAssignment, DoctrineAnnotationIndentation,
+DoctrineAnnotationSpaces
+
+ARRAYS (~11) - array-token structure + multiline reflow
+-------------------------------------------------------
+ArraySyntax (long -> short []), ListSyntax, ArrayIndentation,
+ArrayListItemNewline, ArrayOpenerAndCloserNewline, StandaloneLineInMultilineArray,
+NoWhitespaceBeforeCommaInArray, WhitespaceAfterCommaInArray,
+NoWhitespaceInEmptyArray, TrimArraySpaces, NormalizeIndexBrace,
+NoMultilineWhitespaceAroundDoubleArrow
+
+CASING (~8)
+-----------
+NativeFunctionCasing, NativeFunctionTypeDeclarationCasing,
+NativeTypeDeclarationCasing, MagicConstantCasing, MagicMethodCasing,
+ClassReferenceNameCasing, IntegerLiteralCase, PhpUnitMethodCasing
+
+TYPE DECLARATIONS (~6) - needs a type model
+-------------------------------------------
+CompactNullableTypehint, NullableTypeDeclarationForDefaultNullValue,
+TypeDeclarationSpaces, TypesSpaces, FunctionTypehintSpace, FullyQualifiedStrictTypes
+
+CONTROL STRUCTURES (~10)
+------------------------
+ControlStructureBraces, ControlStructureContinuationPosition, CurlyBracesPosition,
+NoAlternativeSyntax, NoSuperfluousElseif, NoUnneededControlParentheses,
+NoUnneededCurlyBraces, SwitchContinueToBreak, NoBreakComment, YodaStyle
+
+OPERATORS / EXPRESSIONS (~13)
+-----------------------------
+IncrementStyle, StandardizeIncrement, StandardizeNotEquals,
+NotOperatorWithSuccessorSpace, LongToShorthandOperator,
+AssignNullCoalescingToCoalesceEqual, TernaryToNullCoalescing,
+NoUselessConcatOperator, NoUselessNullsafeOperator, ObjectOperatorWithoutWhitespace,
+NoSpaceAroundDoubleColon, NoShortBoolCast, NoUnsetCast, NoBinaryString
+
+IMPORTS / NAMESPACE (~4)
+------------------------
+NoUnusedImports, LambdaNotUsedImport, NoUnneededImportAlias, CleanNamespace,
+PsrAutoloading
+
+CLEANUP / DEAD CODE / SIMPLIFY (~20)
+------------------------------------
+NoEmptyComment, NoEmptyStatement, NoUselessReturn, SimplifiedNullReturn,
+NoNullPropertyInitialization, NoUnreachableDefaultArgumentValue, RemoveDeadParam,
+RemoveDeadVarThis, RemoveParamNameReference, SelfAccessor, SelfStaticAccessor,
+ProtectedToPrivate, SwitchedTypeAndName, IsNull, FunctionToConstant,
+NoAliasFunctions, NoAliasLanguageConstructCall, NoMixedEchoPrint, Include,
+ExplicitIndirectVariable, ExplicitStringVariable
+
+STRINGS / HEREDOC (3)
+---------------------
+SingleQuote, HeredocToNowdoc, SpaceAfterCommaHereNowDoc
+
+STANDALONE-LINE (symplify custom, ~6)
+-------------------------------------
+StandaloneLinePlainConstructorParam, StandaloneLinePromotedProperty,
+StandaloneLineRequiredParam, StandaloneLineSymfonyAttributeParam,
+MethodChainingNewline, MethodChainingIndentation
+
+WHITESPACE / TAGS / MISC (~18)
+------------------------------
+FunctionDeclaration, NewWithParentheses, Encoding, LineEnding,
+LinebreakAfterOpeningTag, BlankLineBeforeStatement, BlankLineAfterStrictTypes,
+MultilineWhitespaceBeforeSemicolons, NoSpacesAroundOffset,
+NoSpacesInsideParenthesis (= SpacesInsideParentheses, covered), NoTrailingCommaInSingleline,
+TrailingCommaInMultiline, DeclareParentheses, AlignMultilineComment,
+MultilineCommentOpeningClosing, SingleLineCommentSpacing,
+LanguageConstructSpacing (sniff), SuperfluousWhitespace (sniff),
+GitMergeConflict (sniff)
+
+
+Biggest clusters by effort: PHPDOC (needs a docblock parser) and ARRAYS +
+TYPE DECLARATIONS (need array-structure / type-span modelling). Many CLEANUP
+rules are semantic refactors closer to Rector than to formatting.
