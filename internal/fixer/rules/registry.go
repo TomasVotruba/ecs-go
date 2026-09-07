@@ -57,6 +57,15 @@ func CommonFixers() []fixer.Fixer {
 	}
 }
 
+// PhpdocFixers normalize doc comments.
+func PhpdocFixers() []fixer.Fixer {
+	return []fixer.Fixer{
+		PhpdocScalar{},
+		PhpdocNoEmptyReturn{},
+		PhpdocTrim{},
+	}
+}
+
 // ConstructFixers cover keyword/parenthesis/operator spacing and import cleanups
 // from the PSR-12 set.
 func ConstructFixers() []fixer.Fixer {
@@ -105,6 +114,7 @@ func StructuralFixers() []fixer.Fixer {
 func All() []fixer.Fixer {
 	all := []fixer.Fixer{FullOpeningTag{}}
 	all = append(all, CommonFixers()...)
+	all = append(all, PhpdocFixers()...)
 	all = append(all, CasingFixers()...)
 	all = append(all, SpacingFixers()...)
 	all = append(all, ConstructFixers()...)

@@ -211,6 +211,13 @@ single when safe), `standardize_not_equals` (`<>` -> `!=`), `no_empty_statement`
 `no_trailing_whitespace_in_comment`, `no_extra_blank_lines` (collapse 2+ blank
 lines to one).
 
+### PHPDoc
+
+`phpdoc_trim` (drop blank lines at the ends of a docblock), `phpdoc_no_empty_return`
+(`@return void`/`@return null` removed), `phpdoc_scalar` (`@param integer` ->
+`@param int`, `boolean` -> `bool`, `double`/`real` -> `float`). Built on a small
+docblock parser.
+
 ### Imports
 
 `single_import_per_statement`, `ordered_imports` (group class / function / const),
