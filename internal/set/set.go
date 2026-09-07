@@ -17,10 +17,18 @@ func Spaces() []fixer.Fixer { return rules.SpacingFixers() }
 // ordering, ...) are not yet implemented on the flat token stream.
 func PSR12() []fixer.Fixer { return rules.All() }
 
+// PERCS mirrors PHP-CS-Fixer's @PER-CS (as exposed by ECS SetList::PER_CS): the
+// full rule set plus single_line_empty_body, which is PER-CS-specific and not
+// part of the default/common output.
+func PERCS() []fixer.Fixer {
+	return append(rules.All(), rules.SingleLineEmptyBody{})
+}
+
 var byName = map[string]func() []fixer.Fixer{
 	"spaces": Spaces,
 	"casing": rules.CasingFixers,
 	"psr12":  PSR12,
+	"per-cs": PERCS,
 	"common": rules.All,
 }
 

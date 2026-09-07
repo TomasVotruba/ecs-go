@@ -53,7 +53,9 @@ Drop an `ecs-go.json` in your project root (auto-loaded, or point at one with
 }
 ```
 
-- `sets` - enable a prepared set: `spaces`, `casing`, `psr12`, `common`.
+- `sets` - enable a prepared set: `spaces`, `casing`, `psr12`, `per-cs`, `common`.
+  `per-cs` mirrors PHP-CS-Fixer's `@PER-CS` (as ECS's `SetList::PER_CS`) and adds
+  `single_line_empty_body` on top of the full set.
 - `level` - gradual adoption: `{"spaces": N}` enables the first N rules of the
   spaces set (safest first), so you can raise coverage one step at a time.
 - `rules` - enable individual fixers by name.
