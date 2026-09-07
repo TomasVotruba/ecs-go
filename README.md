@@ -192,9 +192,17 @@ Applied checkers:
 
 `array_syntax` (`array(...)` -> `[...]`), `list_syntax` (`list(...)` -> `[...]`),
 `whitespace_after_comma_in_array` + `no_whitespace_before_comma_in_array`,
-`single_quote` (double -> single when safe), `standardize_not_equals` (`<>` ->
-`!=`), `no_empty_statement` (`$a = 1;;` -> `$a = 1;`), `line_ending` (CRLF ->
-LF), `magic_constant_casing` (`__line__` -> `__LINE__`), `magic_method_casing`.
+`trailing_comma_in_multiline` (arrays), `no_trailing_comma_in_singleline`,
+`no_spaces_around_offset` (`$a[ 0 ]` -> `$a[0]`), `single_quote` (double ->
+single when safe), `standardize_not_equals` (`<>` -> `!=`), `no_empty_statement`
+(`$a = 1;;` -> `$a = 1;`), `line_ending` (CRLF -> LF).
+
+### More casing / operators / comments / imports
+
+`magic_constant_casing` (`__line__` -> `__LINE__`), `magic_method_casing`,
+`native_function_casing` (curated), `integer_literal_case` (`0XFF` -> `0xff`),
+`object_operator_without_whitespace` (`$a -> b` -> `$a->b`), `no_empty_comment`,
+`single_line_comment_spacing` (`//x` -> `// x`), `no_unused_imports`.
 
 ### Comments and blank lines
 
