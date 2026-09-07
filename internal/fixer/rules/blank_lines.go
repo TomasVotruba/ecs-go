@@ -25,12 +25,17 @@ func (NoExtraBlankLines) SourceURL() string {
 
 func (NoExtraBlankLines) Fix(s *tokens.Stream) bool {
 	changed := false
-	for i := range s.Len() {
-		t := s.At(i)
-		if t.Kind != token.Whitespace {
+	for i := 0; i < s.Len(); i++ {
+		if s.At(i).Kind != token.Whitespace {
 			continue
 		}
-		if v := threeOrMoreNewlines.ReplaceAllString(t.Value, "\n\n"); v != t.Value {
+		// merge any adjacent whitespace tokens (e.g. left by import removal) so
+		// a run of blank lines lives in one token the regex can collapse
+		for i+1 < s.Len() && s.At(i+1).Kind == token.Whitespace {
+			s.SetValue(i, s.At(i).Value+s.At(i+1).Value)
+			s.RemoveAt(i + 1)
+		}
+		if v := threeOrMoreNewlines.ReplaceAllString(s.At(i).Value, "\n\n"); v != s.At(i).Value {
 			s.SetValue(i, v)
 			changed = true
 		}

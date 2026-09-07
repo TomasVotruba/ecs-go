@@ -9,7 +9,6 @@ func SpacingFixers() []fixer.Fixer {
 		NoLeadingNamespaceWhitespace{},
 		NoSinglelineWhitespaceBeforeSemicolons{},
 		NoWhitespaceInBlankLine{},
-		NoExtraBlankLines{},
 		SpaceAfterSemicolon{},
 		BinaryOperatorSpaces{},
 		TernaryOperatorSpaces{},
@@ -32,6 +31,8 @@ func CasingFixers() []fixer.Fixer {
 		ShortScalarCast{},
 		MagicConstantCasing{},
 		MagicMethodCasing{},
+		NativeFunctionCasing{},
+		IntegerLiteralCase{},
 	}
 }
 
@@ -44,8 +45,14 @@ func CommonFixers() []fixer.Fixer {
 		ListSyntax{},
 		NoWhitespaceBeforeCommaInArray{},
 		WhitespaceAfterCommaInArray{},
+		TrailingCommaInMultiline{},
+		NoTrailingCommaInSingleline{},
+		NoSpacesAroundOffset{},
+		ObjectOperatorWithoutWhitespace{},
 		StandardizeNotEquals{},
 		NoEmptyStatement{},
+		NoEmptyComment{},
+		SingleLineCommentSpacing{},
 		SingleQuote{},
 	}
 }
@@ -81,12 +88,14 @@ func StructuralFixers() []fixer.Fixer {
 		OrderedClassElements{},
 		BlankLinesBeforeNamespace{},
 		BlankLineAfterNamespace{},
+		NoUnusedImports{},
 		SingleImportPerStatement{},
 		OrderedImports{},
 		BlankLineBetweenImportGroups{},
 		SingleLineAfterImports{},
 		NoBlankLinesAfterClassOpening{},
 		StatementIndentation{},
+		NoExtraBlankLines{}, // after import removal, which can leave extra blanks
 	}
 }
 
