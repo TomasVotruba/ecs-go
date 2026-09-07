@@ -97,6 +97,30 @@ func TestLexHeredocNowdocOpaque(t *testing.T) {
 	}
 }
 
+func TestLexMultilineAttributeWithNowdoc(t *testing.T) {
+	src := "<?php\n#[Deprecated(message: <<<'TXT'\nprose e.g. with. dots\nTXT)]\nclass A {}"
+	var attr string
+	for _, tk := range Lex(src) {
+		if tk.Kind == token.Comment && len(tk.Value) > 2 && tk.Value[:2] == "#[" {
+			attr = tk.Value
+		}
+	}
+	if attr == "" {
+		t.Fatal("multiline attribute not captured as one token")
+	}
+	if !strings.Contains(attr, "prose e.g. with. dots") {
+		t.Errorf("nowdoc body not inside the attribute token: %q", attr)
+	}
+	// lossless
+	var got strings.Builder
+	for _, tk := range Lex(src) {
+		got.WriteString(tk.Value)
+	}
+	if got.String() != src {
+		t.Errorf("not lossless:\n src: %q\n got: %q", src, got.String())
+	}
+}
+
 func TestLexKeywordsVsIdent(t *testing.T) {
 	toks := Lex("<?php function foo() { return bar; }")
 	kind := map[string]token.Kind{}

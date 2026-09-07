@@ -99,6 +99,11 @@ func (LowercaseStaticReference) Fix(s *tokens.Stream) bool {
 		if lower != "self" && lower != "static" && lower != "parent" {
 			continue
 		}
+		// SELF/PARENT/STATIC can be constant names: "ObjectReference::SELF" (member
+		// access) or "const string PARENT = ..." (declaration) - not the keyword
+		if memberPrev(s, i) || nextSignificantValue(s, i) == "=" {
+			continue
+		}
 		if lower != t.Value {
 			s.SetValue(i, lower)
 			changed = true
