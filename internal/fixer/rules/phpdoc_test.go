@@ -42,3 +42,32 @@ func TestPhpdocScalar(t *testing.T) {
 		t.Fatal("prose 'integer' must not change")
 	}
 }
+
+func TestPhpdocScalarEdgeCases(t *testing.T) {
+	// a class named like an alias (Laravel's Str) must not be touched
+	if _, changed := apply(t, PhpdocScalar{}, "<?php\n/**\n * @param Str $a\n */\nfunction f($a) {}"); changed {
+		t.Fatal("class name Str must not become string")
+	}
+	// array suffix is normalized
+	got, _ := apply(t, PhpdocScalar{}, "<?php\n/**\n * @param integer[]|null $a\n */\nfunction f($a) {}")
+	if want := "<?php\n/**\n * @param int[]|null $a\n */\nfunction f($a) {}"; got != want {
+		t.Fatalf("array suffix: got %q", got)
+	}
+	// single-line docblock
+	got, _ = apply(t, PhpdocScalar{}, "<?php\n/** @var integer $x */\n$x = 1;")
+	if want := "<?php\n/** @var int $x */\n$x = 1;"; got != want {
+		t.Fatalf("single-line: got %q", got)
+	}
+}
+
+func TestPhpdocNoEmptyReturnKeepsUnion(t *testing.T) {
+	// "null" as part of a union is a real type, not an empty return
+	for _, src := range []string{
+		"<?php\n/**\n * @return null|string\n */\nfunction f() {}",
+		"<?php\n/**\n * @return void|int\n */\nfunction f() {}",
+	} {
+		if _, changed := apply(t, PhpdocNoEmptyReturn{}, src); changed {
+			t.Fatalf("union return must be kept: %q", src)
+		}
+	}
+}

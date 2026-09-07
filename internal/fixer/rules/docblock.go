@@ -12,16 +12,21 @@ type docLine struct {
 }
 
 type docblock struct {
-	open  string
-	inner []docLine
-	close string
+	open   string
+	inner  []docLine
+	close  string
+	single bool // "/** ... */" on one line
 }
 
-// parseDoc splits a multi-line /** ... */ value. Single-line docblocks and
-// malformed input return ok=false.
+// parseDoc splits a /** ... */ value into content lines. Malformed input returns
+// ok=false. Single-line docblocks are supported.
 func parseDoc(v string) (docblock, bool) {
-	if !strings.HasPrefix(v, "/**") || !strings.HasSuffix(v, "*/") {
+	if !strings.HasPrefix(v, "/**") || !strings.HasSuffix(v, "*/") || len(v) < 5 {
 		return docblock{}, false
+	}
+	if !strings.Contains(v, "\n") {
+		body := strings.TrimSpace(v[3 : len(v)-2])
+		return docblock{open: "/**", inner: []docLine{{content: body}}, close: "*/", single: true}, true
 	}
 	lines := strings.Split(v, "\n")
 	if len(lines) < 3 {
@@ -45,6 +50,12 @@ func parseDoc(v string) (docblock, bool) {
 }
 
 func (d docblock) render() string {
+	if d.single {
+		if len(d.inner) == 0 || d.inner[0].content == "" {
+			return "/** */"
+		}
+		return "/** " + d.inner[0].content + " */"
+	}
 	var b strings.Builder
 	b.WriteString(d.open)
 	for _, l := range d.inner {

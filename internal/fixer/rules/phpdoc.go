@@ -55,7 +55,9 @@ func (PhpdocTrim) Fix(s *tokens.Stream) bool {
 	})
 }
 
-var emptyReturnRe = regexp.MustCompile(`(?i)^@return\s+(void|null)\b`)
+// only when void/null is the whole return type - not part of a union like
+// "null|string", which is a real nullable type
+var emptyReturnRe = regexp.MustCompile(`(?i)^@return\s+(void|null)($|\s)`)
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Phpdoc/PhpdocNoEmptyReturnFixer.php
 //
@@ -129,15 +131,21 @@ func (PhpdocScalar) Fix(s *tokens.Stream) bool {
 	})
 }
 
-// normalizeScalarType replaces scalar aliases in a phpdoc type, handling unions
-// and nullables ("integer|null" -> "int|null").
+// normalizeScalarType replaces scalar aliases in a phpdoc type, handling unions,
+// nullables and array suffixes ("integer[]|null" -> "int[]|null"). The lookup is
+// case-sensitive so a class named like an alias (e.g. Laravel's "Str") is safe.
 func normalizeScalarType(typ string) string {
 	nullable := strings.HasPrefix(typ, "?")
 	body := strings.TrimPrefix(typ, "?")
 	parts := strings.Split(body, "|")
 	for i, p := range parts {
-		if repl, ok := phpdocScalarMap[strings.ToLower(p)]; ok {
-			parts[i] = repl
+		base, suffix := p, ""
+		for strings.HasSuffix(base, "[]") {
+			base = base[:len(base)-2]
+			suffix = "[]" + suffix
+		}
+		if repl, ok := phpdocScalarMap[base]; ok {
+			parts[i] = repl + suffix
 		}
 	}
 	out := strings.Join(parts, "|")
