@@ -27,10 +27,19 @@ func (r FileResult) Changed() bool { return len(r.AppliedRules) > 0 }
 // Run scans the config's paths and applies rules across Jobs workers. When
 // write is true, changed files are written back to disk. Results are returned
 // sorted by path so output is deterministic regardless of worker scheduling.
-func Run(cfg *config.Config, write bool) ([]FileResult, error) {
+// Progress receives per-file progress updates during a run.
+type Progress interface {
+	Start(total int)
+	Advance()
+}
+
+func Run(cfg *config.Config, write bool, prog Progress) ([]FileResult, error) {
 	files, err := finder.Find(cfg.Paths, cfg.Skip)
 	if err != nil {
 		return nil, err
+	}
+	if prog != nil {
+		prog.Start(len(files))
 	}
 
 	jobs := max(cfg.Jobs, 1)
@@ -45,6 +54,9 @@ func Run(cfg *config.Config, write bool) ([]FileResult, error) {
 		wg.Go(func() {
 			for path := range paths {
 				res, err := fixFile(cfg, path, write)
+				if prog != nil {
+					prog.Advance()
+				}
 				if err != nil {
 					errOnce.Do(func() { firstErr = err })
 					continue

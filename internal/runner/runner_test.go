@@ -19,7 +19,7 @@ func TestRunFixesFile(t *testing.T) {
 	cfg := config.Configure().WithPaths(dir)
 
 	// check mode: reports but does not write
-	results, err := Run(cfg, false)
+	results, err := Run(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func TestRunFixesFile(t *testing.T) {
 	}
 
 	// fix mode: writes cleaned content
-	if _, err := Run(cfg, true); err != nil {
+	if _, err := Run(cfg, true, nil); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(path)
@@ -41,7 +41,7 @@ func TestRunFixesFile(t *testing.T) {
 	}
 
 	// second check run is clean
-	results, _ = Run(cfg, false)
+	results, _ = Run(cfg, false, nil)
 	if len(results) != 0 {
 		t.Fatalf("expected clean after fix, got %+v", results)
 	}
