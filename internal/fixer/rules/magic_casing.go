@@ -88,10 +88,17 @@ func (MagicMethodCasing) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.Ident {
 			continue
 		}
-		if canonical, ok := magicMethods[strings.ToLower(t.Value)]; ok && canonical != t.Value {
-			s.SetValue(i, canonical)
-			changed = true
+		canonical, ok := magicMethods[strings.ToLower(t.Value)]
+		if !ok || canonical == t.Value {
+			continue
 		}
+		// a magic method is always a declaration or call ("__set("); a constant
+		// named "__SET" (followed by "=") must not be recased
+		if nextSignificantValue(s, i) != "(" {
+			continue
+		}
+		s.SetValue(i, canonical)
+		changed = true
 	}
 	return changed
 }
