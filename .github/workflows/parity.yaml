@@ -1,9 +1,8 @@
 name: Parity
 
-# Runs ECS and ecs-go on the same real codebase (laravel/framework) and reports
-# how far ecs-go's output is from ECS (psr12 + common). ecs-go implements a
-# subset of those sets, so divergence is expected - this job tracks the gap and
-# never blocks the build.
+# Runs ECS and ecs-go on the same real codebase (laravel/framework) and fails if
+# ecs-go's output differs from ECS (psr12 + common) on any file. This is the 1:1
+# parity gate - it stays red until ecs-go reproduces ECS exactly.
 
 on:
     pull_request: null
@@ -12,7 +11,6 @@ on:
 jobs:
     ecs-parity:
         runs-on: ubuntu-latest
-        continue-on-error: true
         steps:
             - uses: actions/checkout@v4
 
@@ -77,8 +75,7 @@ jobs:
                       echo "| identical output | $same |"
                       echo "| differing output | $differ |"
                       echo ""
-                      echo "ecs-go implements a subset of psr12+common, so some divergence is expected."
-                      echo "This job tracks the gap; it does not block the build."
+                      echo "This is the 1:1 parity gate: it fails while any file differs from ECS."
                   } >> "$GITHUB_STEP_SUMMARY"
                   echo "identical=$same differing=$differ of $total"
 
@@ -99,3 +96,9 @@ jobs:
                           shown=$((shown + 1))
                       fi
                   done
+
+                  # fail when ecs-go output does not match ECS
+                  if [ "$differ" -gt 0 ]; then
+                      echo "::error::ecs-go output differs from ECS on $differ of $total files"
+                      exit 1
+                  fi
