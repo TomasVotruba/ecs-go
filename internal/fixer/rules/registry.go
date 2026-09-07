@@ -33,6 +33,7 @@ func CasingFixers() []fixer.Fixer {
 		MagicMethodCasing{},
 		NativeFunctionCasing{},
 		IntegerLiteralCase{},
+		NativeTypeDeclarationCasing{},
 	}
 }
 
@@ -54,6 +55,12 @@ func CommonFixers() []fixer.Fixer {
 		NoEmptyComment{},
 		SingleLineCommentSpacing{},
 		SingleQuote{},
+		TrimArraySpaces{},
+		NoSpaceAroundDoubleColon{},
+		AttributeBlockNoSpaces{},
+		HeredocToNowdoc{},
+		NoBinaryString{},
+		NoUselessConcatOperator{},
 	}
 }
 
@@ -61,8 +68,16 @@ func CommonFixers() []fixer.Fixer {
 func PhpdocFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		PhpdocScalar{},
+		PhpdocTypes{},
+		PhpdocNoAliasTag{},
+		PhpdocNoPackage{},
+		PhpdocNoAccess{},
+		PhpdocSingleLineVarSpacing{},
 		PhpdocNoEmptyReturn{},
 		PhpdocTrim{},
+		PhpdocTrimConsecutiveBlankLineSeparation{},
+		NoEmptyPhpdoc{},
+		NoBlankLinesAfterPhpdoc{},
 	}
 }
 
