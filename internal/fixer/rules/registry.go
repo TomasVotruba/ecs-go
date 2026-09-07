@@ -33,6 +33,8 @@ func CasingFixers() []fixer.Fixer {
 		MagicMethodCasing{},
 		NativeFunctionCasing{},
 		IntegerLiteralCase{},
+		NativeTypeDeclarationCasing{},
+		NativeFunctionTypeDeclarationCasing{},
 	}
 }
 
@@ -54,6 +56,28 @@ func CommonFixers() []fixer.Fixer {
 		NoEmptyComment{},
 		SingleLineCommentSpacing{},
 		SingleQuote{},
+		TrimArraySpaces{},
+		NoSpaceAroundDoubleColon{},
+		AttributeBlockNoSpaces{},
+		HeredocToNowdoc{},
+		NoBinaryString{},
+		NoUselessConcatOperator{},
+		NoShortBoolCast{},
+		NoUnsetCast{},
+		NoWhitespaceInEmptyArray{},
+		NormalizeIndexBrace{},
+		NoMultilineWhitespaceAroundDoubleArrow{},
+		StandardizeIncrement{},
+		IncrementStyle{},
+		LongToShorthandOperator{},
+		SwitchContinueToBreak{},
+		NoUnneededImportAlias{},
+		CleanNamespace{},
+		MultilineCommentOpeningClosing{},
+		Encoding{},
+		DeclareParentheses{},
+		FunctionTypehintSpace{},
+		CompactNullableTypeDeclaration{},
 	}
 }
 
@@ -61,8 +85,20 @@ func CommonFixers() []fixer.Fixer {
 func PhpdocFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		PhpdocScalar{},
+		PhpdocTypes{},
+		PhpdocNoAliasTag{},
+		PhpdocNoPackage{},
+		PhpdocNoAccess{},
+		PhpdocSingleLineVarSpacing{},
 		PhpdocNoEmptyReturn{},
 		PhpdocTrim{},
+		PhpdocTrimConsecutiveBlankLineSeparation{},
+		NoEmptyPhpdoc{},
+		NoBlankLinesAfterPhpdoc{},
+		PhpdocTagCasing{},
+		PhpdocInlineTagNormalizer{},
+		PhpdocNoDuplicateTypes{},
+		PhpdocVarWithoutName{},
 	}
 }
 
