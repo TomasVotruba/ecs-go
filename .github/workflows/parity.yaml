@@ -83,11 +83,8 @@ jobs:
                   fi
                   # stdout diagnostics (the summary table is not fetchable via CLI)
                   echo "=== implemented: $(wc -l < /tmp/impl.txt) | ecs.json bytes: $(wc -c < /tmp/ecs.json) ==="
-                  echo "=== top applied checkers (raw counts) ==="
-                  head -15 /tmp/counts.txt || true
-                  echo "=== JSON top-level keys ===" && jq -r 'keys[]?' /tmp/ecs.json 2>/dev/null || true
-                  echo "=== first file entry (truncated) ===" && jq -c '.files | to_entries[0]?' /tmp/ecs.json 2>/dev/null | head -c 1000 || true
-                  echo ""
+                  echo "=== top applied checkers, raw (before excluding implemented) ==="
+                  head -20 /tmp/counts.txt || true
 
             - name: Compare outputs
               run: |
