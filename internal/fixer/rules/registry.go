@@ -73,6 +73,7 @@ func ConstructFixers() []fixer.Fixer {
 		NoMultipleStatementsPerLine{},
 		MethodArgumentSpace{},
 		ReturnTypeDeclaration{},
+		NewWithParentheses{},
 	}
 }
 
