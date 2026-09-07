@@ -126,6 +126,8 @@ func (l *lexer) lexPHP() {
 			l.pos++
 		}
 		l.emit(token.Variable, start)
+	case l.hasPrefix("#["):
+		l.lexAttribute(start)
 	case l.hasPrefix("//") || c == '#':
 		l.lexLineComment(start)
 	case l.hasPrefix("/*"):
@@ -248,6 +250,51 @@ func (l *lexer) lexString(start int, quote byte) {
 
 func (l *lexer) hasPrefix(s string) bool {
 	return strings.HasPrefix(l.src[l.pos:], s)
+}
+
+// lexAttribute consumes a "#[ ... ]" attribute as one opaque token, matching
+// brackets across lines and skipping string and heredoc/nowdoc content inside
+// (so a multiline nowdoc in an attribute never leaks out as code).
+func (l *lexer) lexAttribute(start int) {
+	l.pos += 2 // consume "#["
+	depth := 1
+	for l.pos < len(l.src) && depth > 0 {
+		switch c := l.src[l.pos]; {
+		case c == '[':
+			depth++
+			l.pos++
+		case c == ']':
+			depth--
+			l.pos++
+		case c == '\'' || c == '"':
+			l.skipString(c)
+		case l.hasPrefix("<<<"):
+			if end := l.scanHeredoc(); end > l.pos {
+				l.pos = end
+			} else {
+				l.pos++
+			}
+		default:
+			l.pos++
+		}
+	}
+	l.emit(token.Comment, start)
+}
+
+// skipString advances past a single- or double-quoted string, honoring escapes.
+func (l *lexer) skipString(quote byte) {
+	l.pos++ // opening quote
+	for l.pos < len(l.src) {
+		c := l.src[l.pos]
+		if c == '\\' && l.pos+1 < len(l.src) {
+			l.pos += 2
+			continue
+		}
+		l.pos++
+		if c == quote {
+			return
+		}
+	}
 }
 
 // scanHeredoc returns the end offset of a heredoc/nowdoc starting at "<<<", or
