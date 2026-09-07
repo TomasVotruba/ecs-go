@@ -30,6 +30,23 @@ func CasingFixers() []fixer.Fixer {
 		LowercaseStaticReference{},
 		LowercaseCast{},
 		ShortScalarCast{},
+		MagicConstantCasing{},
+		MagicMethodCasing{},
+	}
+}
+
+// CommonFixers are non-PSR-12 rules from ECS's common/clean-code sets that are
+// token-safe here.
+func CommonFixers() []fixer.Fixer {
+	return []fixer.Fixer{
+		LineEnding{},
+		ArraySyntax{},
+		ListSyntax{},
+		NoWhitespaceBeforeCommaInArray{},
+		WhitespaceAfterCommaInArray{},
+		StandardizeNotEquals{},
+		NoEmptyStatement{},
+		SingleQuote{},
 	}
 }
 
@@ -77,6 +94,7 @@ func StructuralFixers() []fixer.Fixer {
 // (normalize the tag) and NoClosingTag last (trailing tag/EOF cleanup).
 func All() []fixer.Fixer {
 	all := []fixer.Fixer{FullOpeningTag{}}
+	all = append(all, CommonFixers()...)
 	all = append(all, CasingFixers()...)
 	all = append(all, SpacingFixers()...)
 	all = append(all, ConstructFixers()...)
