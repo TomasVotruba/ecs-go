@@ -55,6 +55,33 @@ jobs:
                   PHP
                   vendor/bin/ecs check --fix --no-progress-bar || true
 
+            - name: Rank missing fixers (data-driven backlog)
+              run: |
+                  cd /tmp/ecsproj
+                  # what ECS would apply on the pristine sample, as JSON
+                  vendor/bin/ecs check /tmp/sample --output-format=json > /tmp/ecs.json 2>/dev/null || true
+                  # fixers we already implement
+                  /tmp/ecs-go list-checkers | sed 's/^[[:space:]]*-[[:space:]]*//; /Registered/d' | sort -u > /tmp/impl.txt
+                  # count applied checkers across files, most frequent first
+                  jq -r '[.files[]?.diffs[]?.applied_checkers[]?] | group_by(.) | map("\(length) \(.[0])") | .[]' /tmp/ecs.json 2>/dev/null | sort -rn > /tmp/counts.txt || true
+                  {
+                      echo "## Backlog: ECS fixers not yet in ecs-go, ranked by frequency on the sample"
+                      echo ""
+                      echo "| fixer | files |"
+                      echo "|---|---|"
+                  } >> "$GITHUB_STEP_SUMMARY"
+                  n=0
+                  while read -r count chk; do
+                      [ "$n" -ge 25 ] && break
+                      if ! grep -qxF "$chk" /tmp/impl.txt; then
+                          echo "| \`$chk\` | $count |" >> "$GITHUB_STEP_SUMMARY"
+                          n=$((n + 1))
+                      fi
+                  done < /tmp/counts.txt
+                  if [ "$n" -eq 0 ]; then
+                      echo "| (no data - check the ECS JSON shape) | |" >> "$GITHUB_STEP_SUMMARY"
+                  fi
+
             - name: Compare outputs
               run: |
                   total=0
