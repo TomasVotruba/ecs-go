@@ -228,6 +228,7 @@ func TestAllFixersIdempotent(t *testing.T) {
 		"<?php\n\nfunction f(?int $a): ?string\n{\n    return $a ? 'y' : 'n';\n}\n",
 		"<?php\n\nclass A\n{\n    public const string ARRAY = 'x';\n\n    public function match($x): bool\n    {\n        return $x;\n    }\n}\n",
 		"<?php\n\n$a = array(1 ,2, \"plain\");\nif ($a <> $b) {\n};\necho __line__;\n",
+		"<?php\n\n/**\n *\n * Summary.\n *\n * @param integer $a\n * @return void\n */\nfunction f($a)\n{\n}\n",
 	}
 	for _, src := range corpus {
 		once := runAll(src)
