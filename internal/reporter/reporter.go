@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"ecs-go/internal/runner"
@@ -56,6 +57,11 @@ func Report(w io.Writer, results []runner.FileResult, isFixer bool) int {
 		n, verb,
 	))
 	return 1
+}
+
+// Footer prints an ECS-style run summary: files scanned, time and memory.
+func Footer(w io.Writer, files int, d time.Duration, memBytes uint64) {
+	_, _ = fmt.Fprintf(w, "\n // %d files · %s · %d MB\n", files, d.Truncate(time.Millisecond), memBytes/(1024*1024))
 }
 
 func newFormatter(w io.Writer) formatter {

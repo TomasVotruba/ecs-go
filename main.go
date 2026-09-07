@@ -5,6 +5,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"time"
 
 	"ecs-go/internal/config"
 	"ecs-go/internal/fixer/rules"
@@ -51,13 +53,22 @@ func run(args []string) int {
 	// CLI paths override the config; runs across all CPU cores by default
 	cfg.WithPaths(paths...)
 
-	results, err := runner.Run(cfg, fix)
+	start := time.Now()
+	progress := reporter.NewProgress(os.Stderr)
+
+	results, err := runner.Run(cfg, fix, progress)
+	progress.Finish()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		return 2
 	}
 
-	return reporter.Report(os.Stdout, results, fix)
+	code := reporter.Report(os.Stdout, results, fix)
+
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	reporter.Footer(os.Stdout, progress.Total(), time.Since(start), mem.Sys)
+	return code
 }
 
 // loadConfig uses an explicit --config path, else an ecs-go.json in the working
