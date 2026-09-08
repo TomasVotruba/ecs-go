@@ -256,6 +256,47 @@ scope layer, skipping trait use, enum cases and promoted constructor parameters.
 constants, properties, methods) - conservatively, skipping any class with
 comments or attributes.
 
+## Rust experiment: is it faster?
+
+`rust/` holds a minimal Rust port of the engine - the same PHP lexer, token
+stream and a subset of ten PSR-12 fixers - to answer one question: how much of
+ecs-go's runtime is the language, not the algorithm? To keep it honest, every
+tool runs the *same* ten rules (the Go side via a `--config` listing them, the
+PHP ECS side via a matching `--rules` config), so all three do the same work; Go
+and Rust also produce byte-for-byte identical output. The ported rules:
+
+`lowercase_keywords`, `constant_case`, `lowercase_static_reference`,
+`no_leading_namespace_whitespace`, `no_singleline_whitespace_before_semicolons`,
+`no_whitespace_in_blank_line`, `space_after_semicolon`, `blank_line_after_opening_tag`,
+`no_trailing_whitespace`, `single_blank_line_at_eof`.
+
+Benchmark, `--fix` over real codebases (best of 3 runs, 24-core Linux):
+
+| codebase | .php files | ecs-go | ecs-rust | ecs (PHP) | go vs rust | go vs ecs |
+|---|---:|---:|---:|---:|---:|---:|
+| laravel/framework (src) | 1696 | 0.245s | 0.075s | 0.328s | 3.28x | 1.34x |
+| symfony/symfony (src) | 11434 | 2.196s | 0.624s | 2.099s | 3.52x | 0.96x |
+
+Two takeaways. Rust is ~3.4x faster than Go on the same work - that gap is the
+raw per-token cost, since the algorithm is identical. But the original PHP ECS is
+already in the same league as ecs-go for this subset (it edges it out on symfony):
+ECS is process-parallel and its tokenizer is C, so the language alone buys less
+than expected here. The `Performance (Go vs Rust)` CI workflow rebuilds all
+three, re-checks Go/Rust output parity, and reproduces this table on every PR.
+
+Run it yourself (`rust/bench.sh`; set `ECS_CMD` to add the PHP column):
+
+```bash
+go build -o /tmp/ecs-go-bin .
+cargo build --release --manifest-path rust/Cargo.toml
+rust/target/release/ecs-rust list-rules > /tmp/rules.txt   # the shared subset
+# turn /tmp/rules.txt into a {"paths":["."],"rules":[...]} ecs-go.json, then:
+GO_BIN=/tmp/ecs-go-bin \
+RUST_BIN=rust/target/release/ecs-rust \
+CONFIG=/tmp/bench-config.json \
+  rust/bench.sh "laravel" /path/to/laravel/src
+```
+
 ## License
 
 MIT
