@@ -304,14 +304,13 @@ func superfluousTag(content string, sig funcSig) (bool, bool) {
 }
 
 // typeIsSuperfluous reports whether a phpdoc type adds nothing over the native
-// type: it is "mixed", or it normalizes to exactly the native type and is not
-// more specific (no generics/shapes/callable signatures).
+// type: it normalizes to exactly the native type and is not more specific (no
+// generics/shapes/callable signatures). A "mixed" tag is superfluous only when
+// the native type is also mixed; on an untyped param/return "@param mixed" adds
+// information and is kept, matching ECS (allow_mixed).
 func typeIsSuperfluous(phpType, native string) bool {
 	if strings.ContainsAny(phpType, "<{(") {
 		return false
-	}
-	if strings.EqualFold(strings.TrimPrefix(phpType, "?"), "mixed") {
-		return true
 	}
 	if native == "" {
 		return false

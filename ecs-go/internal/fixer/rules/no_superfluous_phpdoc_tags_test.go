@@ -24,10 +24,15 @@ func TestNoSuperfluousPhpdocTags(t *testing.T) {
 		"<?php\n/**\n * @param int $n the count\n */\nfunction f(int $n) {}",
 		"<?php\n/**\n * @param int $n the count\n */\nfunction f(int $n) {}", false)
 
-	// @param mixed is always superfluous
+	// @param mixed on an untyped param -> kept (ECS allow_mixed: mixed adds info)
 	assertFix(t, f,
 		"<?php\n/**\n * @param mixed $v\n */\nfunction f($v) {}",
-		"<?php\n/**\n */\nfunction f($v) {}", true)
+		"<?php\n/**\n * @param mixed $v\n */\nfunction f($v) {}", false)
+
+	// @param mixed matching a native mixed type -> removed (superfluous)
+	assertFix(t, f,
+		"<?php\n/**\n * @param mixed $v\n */\nfunction f(mixed $v) {}",
+		"<?php\n/**\n */\nfunction f(mixed $v) {}", true)
 
 	// untyped param with a real phpdoc type -> kept (phpdoc adds info)
 	assertFix(t, f,
@@ -39,10 +44,10 @@ func TestNoSuperfluousPhpdocTags(t *testing.T) {
 		"<?php\n/**\n * @return never\n */\nfunction f(): never {}",
 		"<?php\n/**\n */\nfunction f(): never {}", true)
 
-	// @return mixed removed even without a native return type
+	// @return mixed without a native return type -> kept
 	assertFix(t, f,
 		"<?php\n/**\n * @return mixed\n */\nfunction f() {}",
-		"<?php\n/**\n */\nfunction f() {}", true)
+		"<?php\n/**\n * @return mixed\n */\nfunction f() {}", false)
 
 	// @return more specific than native -> kept
 	assertFix(t, f,
@@ -64,10 +69,10 @@ func TestNoSuperfluousPhpdocTags(t *testing.T) {
 		"<?php\nclass C {\n/**\n * @var array\n */\nprotected array $items;\n}",
 		"<?php\nclass C {\n/**\n */\nprotected array $items;\n}", true)
 
-	// @var mixed on an untyped property -> removed
+	// @var mixed on an untyped property -> kept
 	assertFix(t, f,
 		"<?php\nclass C {\n/**\n * @var mixed\n */\nprotected $value;\n}",
-		"<?php\nclass C {\n/**\n */\nprotected $value;\n}", true)
+		"<?php\nclass C {\n/**\n * @var mixed\n */\nprotected $value;\n}", false)
 
 	// param default value does not break signature parsing
 	assertFix(t, f,
