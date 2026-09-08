@@ -15,8 +15,8 @@ Or clone and build (requires Go):
 
 ```bash
 git clone https://github.com/TomasVotruba/ecs-go.git
-cd ecs-go
-make build      # produces ./ecs-go
+cd ecs-go/ecs-go   # the Go tool lives here; the Rust port is in ecs-rust/
+make build         # produces ./ecs-go
 ```
 
 ## Usage

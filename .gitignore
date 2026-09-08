@@ -1,4 +1,4 @@
-/ecs-go
+/ecs-go/ecs-go
 /vendor/
 *.test
 *.out
