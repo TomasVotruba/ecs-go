@@ -162,6 +162,11 @@ func chainLineHasBreakingChar(s *tokens.Stream, pos int) bool {
 // expression (so breaking it would be unsafe). A safe root directly follows a
 // statement boundary or a simple assignment / return.
 func rootPrecededByExpression(s *tokens.Stream, root int) bool {
+	// a chain root that begins its own line is a safe break point, even inside a
+	// multi-line expression or argument list (symplify breaks these too)
+	if root > 0 && s.At(root-1).Kind == token.Whitespace && strings.Contains(s.At(root-1).Value, "\n") {
+		return false
+	}
 	p := sigPrev(s, root)
 	if p < 0 {
 		return false

@@ -26,6 +26,10 @@ func TestMethodChainingNewline(t *testing.T) {
 		{"<?php\nfoo($x->a()->b());", "<?php\nfoo($x->a()->b());", false},
 		{"<?php\n$y = (new Foo())->bar()->baz();", "<?php\n$y = (new Foo())->bar()->baz();", false},
 
+		// a chain that starts its own line (inside a multi-line expression) splits
+		{"<?php\nreturn (\n    $this->a($x)->b() ||\n    $this->c()->d()\n);",
+			"<?php\nreturn (\n    $this->a($x)\n        ->b() ||\n    $this->c()\n        ->d()\n);", true},
+
 		// already multi-line: no-op
 		{"<?php\n$x->one()\n    ->two();", "<?php\n$x->one()\n    ->two();", false},
 	}
