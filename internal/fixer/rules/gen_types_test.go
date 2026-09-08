@@ -6,37 +6,6 @@ import (
 	"ecs-go/internal/fixer"
 )
 
-func TestGenTypesFunctionTypehintSpace(t *testing.T) {
-	cases := []struct {
-		src, want string
-		changed   bool
-	}{
-		{"<?php function f(int$x){}", "<?php function f(int $x){}", true},
-		{"<?php function f(int  $x){}", "<?php function f(int $x){}", true},
-		{"<?php function f(Foo$x){}", "<?php function f(Foo $x){}", true},
-		{"<?php public function m(Foo  $y){}", "<?php public function m(Foo $y){}", true},
-		{"<?php fn(int$x) => $x;", "<?php fn(int $x) => $x;", true},
-		// already correct - no-op
-		{"<?php function f(int $x){}", "<?php function f(int $x){}", false},
-		// untyped parameter must not gain a space
-		{"<?php function f($x){}", "<?php function f($x){}", false},
-		// a function call is not a signature
-		{"<?php strlen($x);", "<?php strlen($x);", false},
-		// newline between type and variable is left intact
-		{"<?php function f(int\n$x){}", "<?php function f(int\n$x){}", false},
-	}
-	for _, c := range cases {
-		got, changed := apply(t, FunctionTypehintSpace{}, c.src)
-		if got != c.want || changed != c.changed {
-			t.Fatalf("src=%q changed=%v got=%q want=%q", c.src, changed, got, c.want)
-		}
-		// idempotent
-		if again, _ := apply(t, FunctionTypehintSpace{}, got); again != got {
-			t.Fatalf("not idempotent: %q -> %q", got, again)
-		}
-	}
-}
-
 func TestGenTypesCompactNullableTypeDeclaration(t *testing.T) {
 	cases := []struct {
 		src, want string
@@ -93,7 +62,6 @@ func TestGenTypesNativeFunctionTypeDeclarationCasing(t *testing.T) {
 
 func TestGenTypesSourceURLs(t *testing.T) {
 	fixers := []fixer.Fixer{
-		FunctionTypehintSpace{},
 		CompactNullableTypeDeclaration{},
 		NativeFunctionTypeDeclarationCasing{},
 	}
