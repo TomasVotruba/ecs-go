@@ -45,6 +45,7 @@ func CommonFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		LineEnding{},
 		IsNull{},
+		YodaStyle{},
 		ArraySyntax{},
 		ListSyntax{},
 		NoWhitespaceBeforeCommaInArray{},
