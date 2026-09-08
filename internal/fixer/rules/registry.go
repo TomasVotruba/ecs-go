@@ -86,6 +86,9 @@ func CommonFixers() []fixer.Fixer {
 		SingleLineCommentStyle{},
 		ExplicitIndirectVariable{},
 		NoNullPropertyInitialization{},
+		Include{},
+		EmptyLoopBody{},
+		EmptyLoopCondition{},
 	}
 }
 
@@ -110,6 +113,9 @@ func PhpdocFixers() []fixer.Fixer {
 		PhpdocIndent{},
 		PhpdocOrderByValue{},
 		PhpdocLineSpan{},
+		PhpdocTypesOrder{},
+		PhpdocVarAnnotationCorrectOrder{},
+		PhpdocReturnSelfReference{},
 	}
 }
 
