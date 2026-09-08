@@ -139,6 +139,7 @@ func ConstructFixers() []fixer.Fixer {
 		SwitchCaseSpace{},
 		NoMultipleStatementsPerLine{},
 		MethodArgumentSpace{},
+		StandaloneLinePromotedProperty{},
 		ReturnTypeDeclaration{},
 		NewWithParentheses{},
 		FunctionDeclaration{},
