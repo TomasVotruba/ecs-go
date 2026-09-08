@@ -161,6 +161,16 @@ func TestSingleSpaceAroundConstruct(t *testing.T) {
 	if _, changed := apply(t, SingleSpaceAroundConstruct{}, "<?php static::foo();"); changed {
 		t.Fatal("static:: should not gain a space")
 	}
+	// "new static(" / "new class(" are class references, not constructs: no space
+	if _, changed := apply(t, SingleSpaceAroundConstruct{}, "<?php return new static($x);"); changed {
+		t.Fatal("new static( should not gain a space")
+	}
+	if got, changed := apply(t, SingleSpaceAroundConstruct{}, "<?php return new static ($x);"); !changed || got != "<?php return new static($x);" {
+		t.Fatalf("new static (: changed=%v got=%q", changed, got)
+	}
+	if _, changed := apply(t, SingleSpaceAroundConstruct{}, "<?php $o = new class($a) {};"); changed {
+		t.Fatal("new class( should not gain a space")
+	}
 }
 
 func TestNoSpacesAfterFunctionName(t *testing.T) {
