@@ -95,45 +95,53 @@ func reflowMultilineArgs(s *tokens.Stream) bool {
 		if sigNext(s, open) == closeIdx {
 			continue // empty ()
 		}
-		base := lineIndentBefore(s, open)
-		argIndent := base + "    "
-		argNL := "\n" + argIndent
-
-		// collect top-level comma positions inside (open, close)
-		var commas []int
-		depth := 0
-		for j := open + 1; j < closeIdx; j++ {
-			t := s.At(j)
-			if t.Kind != token.Punct {
-				continue
-			}
-			switch t.Value {
-			case "(", "[", "{":
-				depth++
-			case ")", "]", "}":
-				depth--
-			case ",":
-				if depth == 0 {
-					commas = append(commas, j)
-				}
-			}
-		}
-
-		// apply right-to-left so indices stay valid: ")" first, then commas, then "("
-		if editSlotBefore(s, closeIdx, "\n"+base) {
+		if reflowParen(s, open, closeIdx) {
 			changed = true
 		}
-		for _, c := range slices.Backward(commas) {
-			if n := sigNext(s, c); n == closeIdx {
-				continue // trailing comma: no argument follows
-			}
-			if editSlotAfter(s, c, argNL) {
-				changed = true
+	}
+	return changed
+}
+
+// reflowParen puts each top-level argument of the paren at open on its own line,
+// with "(" and ")" on their own lines, indented one level past the call.
+func reflowParen(s *tokens.Stream, open, closeIdx int) bool {
+	changed := false
+	base := lineIndentBefore(s, open)
+	argNL := "\n" + base + "    "
+
+	var commas []int
+	depth := 0
+	for j := open + 1; j < closeIdx; j++ {
+		t := s.At(j)
+		if t.Kind != token.Punct {
+			continue
+		}
+		switch t.Value {
+		case "(", "[", "{":
+			depth++
+		case ")", "]", "}":
+			depth--
+		case ",":
+			if depth == 0 {
+				commas = append(commas, j)
 			}
 		}
-		if editSlotAfter(s, open, argNL) {
+	}
+
+	// apply right-to-left so indices stay valid: ")" first, then commas, then "("
+	if editSlotBefore(s, closeIdx, "\n"+base) {
+		changed = true
+	}
+	for _, c := range slices.Backward(commas) {
+		if n := sigNext(s, c); n == closeIdx {
+			continue // trailing comma: no argument follows
+		}
+		if editSlotAfter(s, c, argNL) {
 			changed = true
 		}
+	}
+	if editSlotAfter(s, open, argNL) {
+		changed = true
 	}
 	return changed
 }
