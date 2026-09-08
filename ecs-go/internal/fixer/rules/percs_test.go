@@ -13,8 +13,14 @@ func TestNewWithParentheses(t *testing.T) {
 	if _, changed := apply(t, NewWithParentheses{}, "<?php $a = new class {};"); changed {
 		t.Fatal("anonymous class must not gain parentheses")
 	}
-	if _, changed := apply(t, NewWithParentheses{}, "<?php $a = new $type;"); changed {
-		t.Fatal("dynamic new $var is left alone")
+	// dynamic class references gain parentheses too (matches ECS)
+	got, changed = apply(t, NewWithParentheses{}, "<?php $a = new $type; $b = new $this->job;")
+	if want := "<?php $a = new $type(); $b = new $this->job();"; !changed || got != want {
+		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
+	}
+	// an existing call on a dynamic reference is left intact
+	if _, changed := apply(t, NewWithParentheses{}, "<?php $a = new $this->make();"); changed {
+		t.Fatal("new $this->make() already has parentheses")
 	}
 }
 
