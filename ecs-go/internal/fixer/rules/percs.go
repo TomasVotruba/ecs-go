@@ -32,16 +32,27 @@ func (NewWithParentheses) Fix(s *tokens.Stream) bool {
 		if j >= s.Len() {
 			continue
 		}
-		// only a static class name (Ident, \-qualified, self/parent/static)
+		// a static class name (Ident, \-qualified, self/parent/static) or a
+		// dynamic class reference (new $var, new $this->prop, new $a::$b)
 		nt := s.At(j)
 		if nt.Kind == token.Keyword && strings.ToLower(nt.Value) == "class" {
 			continue // anonymous class
+		}
+		if nt.Kind == token.Variable {
+			k := consumeNewVarRef(s, j)
+			if nextSignificantValue(s, k-1) == "(" {
+				continue // already has parentheses
+			}
+			s.InsertAt(k, token.Token{Kind: token.Punct, Value: "("})
+			s.InsertAt(k+1, token.Token{Kind: token.Punct, Value: ")"})
+			changed = true
+			continue
 		}
 		isName := nt.Kind == token.Ident ||
 			(nt.Kind == token.Punct && nt.Value == `\`) ||
 			(nt.Kind == token.Keyword && isStaticRef(nt.Value))
 		if !isName {
-			continue // dynamic new $var, new (expr), ...
+			continue // new (expr), ...
 		}
 		// consume the class reference (Ident / \ / self-parent-static)
 		k := j
@@ -62,6 +73,34 @@ func (NewWithParentheses) Fix(s *tokens.Stream) bool {
 		changed = true
 	}
 	return changed
+}
+
+// consumeNewVarRef returns the index just past a dynamic class reference that
+// starts with a variable at `start`: "$var", "$this->prop", "$a::$b", "$a[0]".
+// It stops before a "(" so an existing constructor/method call is left intact.
+func consumeNewVarRef(s *tokens.Stream, start int) int {
+	k := start + 1 // past the initial variable
+	for k < s.Len() {
+		c := s.At(k)
+		if c.Kind == token.Punct && (c.Value == "->" || c.Value == "?->" || c.Value == "::") {
+			m := skipWhitespace(s, k+1)
+			if m < s.Len() && (s.At(m).Kind == token.Ident || s.At(m).Kind == token.Variable) {
+				k = m + 1
+				continue
+			}
+			break
+		}
+		if c.Kind == token.Punct && c.Value == "[" {
+			cl := s.MatchForward(k)
+			if cl < 0 {
+				break
+			}
+			k = cl + 1
+			continue
+		}
+		break
+	}
+	return k
 }
 
 func isStaticRef(v string) bool {
