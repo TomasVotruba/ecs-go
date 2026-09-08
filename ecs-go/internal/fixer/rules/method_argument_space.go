@@ -25,12 +25,9 @@ func (MethodArgumentSpace) SourceURL() string {
 }
 
 func (MethodArgumentSpace) Fix(s *tokens.Stream) bool {
-	changed := false
 	// ensure_fully_multiline: a call/declaration argument list that already spans
 	// lines gets one argument per line, "(" and ")" on their own lines.
-	if reflowMultilineArgs(s) {
-		changed = true
-	}
+	changed := reflowMultilineArgs(s)
 	var stack []string
 	for i := 0; i < s.Len(); i++ {
 		t := s.At(i)
