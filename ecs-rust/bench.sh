@@ -49,7 +49,7 @@ sec() { awk -v ns="$1" 'BEGIN { printf "%.3f", ns/1e9 }'; }
 echo "## ecs-go vs ecs-rust (same PSR-12 rule subset, best of $RUNS runs)"
 echo ""
 if [ -n "$ECS_CMD" ]; then
-    echo "| codebase | .php files | ecs-go | ecs-rust | ecs (PHP) |"
+    echo "| codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |"
     echo "|---|---:|---:|---:|---:|"
 else
     echo "| codebase | .php files | ecs-go | ecs-rust |"
@@ -68,7 +68,7 @@ while [ $# -ge 2 ]; do
     if [ -n "$ECS_CMD" ]; then
         # shellcheck disable=SC2086
         best ecs_ns "$src" $ECS_CMD
-        echo "| $label | $files | $(sec "$go_ns")s | $(sec "$rust_ns")s | $(sec "$ecs_ns")s |"
+        echo "| $label | $files | $(sec "$ecs_ns")s | $(sec "$go_ns")s | $(sec "$rust_ns")s |"
     else
         echo "| $label | $files | $(sec "$go_ns")s | $(sec "$rust_ns")s |"
     fi

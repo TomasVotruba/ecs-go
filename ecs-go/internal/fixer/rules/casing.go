@@ -7,6 +7,19 @@ import (
 	"ecs-go/internal/tokens"
 )
 
+// lowerASCII lowercases s like strings.ToLower, but returns s unchanged (no
+// allocation) when it is already lowercase ASCII - the common case for keywords
+// and constants. Non-ASCII or uppercase input falls back to strings.ToLower so
+// the result stays byte-identical.
+func lowerASCII(s string) string {
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; (c >= 'A' && c <= 'Z') || c >= 0x80 {
+			return strings.ToLower(s)
+		}
+	}
+	return s
+}
+
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Casing/LowercaseKeywordsFixer.php
 //
 // LowercaseKeywords lowercases PHP keywords (FUNCTION -> function).
@@ -32,7 +45,7 @@ func (LowercaseKeywords) Fix(s *tokens.Stream) bool {
 		if nextSignificantValue(s, i) == "=" {
 			continue
 		}
-		if lower := strings.ToLower(t.Value); lower != t.Value {
+		if lower := lowerASCII(t.Value); lower != t.Value {
 			s.SetValue(i, lower)
 			changed = true
 		}
@@ -60,7 +73,7 @@ func (ConstantCase) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.Ident {
 			continue
 		}
-		lower := strings.ToLower(t.Value)
+		lower := lowerASCII(t.Value)
 		if lower != "true" && lower != "false" && lower != "null" {
 			continue
 		}
@@ -95,7 +108,7 @@ func (LowercaseStaticReference) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.Ident && t.Kind != token.Keyword {
 			continue
 		}
-		lower := strings.ToLower(t.Value)
+		lower := lowerASCII(t.Value)
 		if lower != "self" && lower != "static" && lower != "parent" {
 			continue
 		}

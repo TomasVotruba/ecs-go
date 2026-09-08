@@ -9,7 +9,7 @@
     },
     "bin": ["bin/ecs-go"],
     "scripts": {
-        "build": "go build -o ecs-go .",
+        "build": "cd ecs-go && go build -o ecs-go .",
         "post-install-cmd": "@build",
         "post-update-cmd": "@build"
     }

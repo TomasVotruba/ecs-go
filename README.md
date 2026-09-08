@@ -15,8 +15,8 @@ Or clone and build (requires Go):
 
 ```bash
 git clone https://github.com/TomasVotruba/ecs-go.git
-cd ecs-go
-make build      # produces ./ecs-go
+cd ecs-go/ecs-go   # the Go tool lives here; the Rust port is in ecs-rust/
+make build         # produces ./ecs-go
 ```
 
 ## Usage
@@ -65,19 +65,24 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 
 ## Performance
 
-The `Performance` CI workflow runs ecs-go, a Rust port, and the original PHP ECS
-over the same PSR-12 rule subset on real codebases (best of 5 runs on a GitHub
-runner) and compares wall time. Representative numbers:
+The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
+(in `ecs-rust/`) over the same PSR-12 rule subset on real codebases and compares
+wall time. All three run `--fix` in parallel across every core; Go and Rust also
+produce byte-for-byte identical output. Best of 7 runs on a 24-core Linux box:
 
-| codebase | .php files | ecs-go | ecs-rust | ECS (PHP) |
+| codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | ~0.2s | ~0.09s | ~0.24s |
-| symfony/symfony (src) | 11443 | ~2.5s | ~0.9s | ~1.4s |
+| laravel/framework (src) | 1696 | 0.212s | 0.039s | 0.082s |
+| symfony/symfony (src) | 11434 | 1.867s | 0.586s | 0.513s |
 
-ecs-go is in the same ballpark as the original PHP ECS - a little quicker on the
-smaller tree, a little slower on the large one - while the Rust port is the
-fastest of the three. All three fix a fresh copy in parallel across the machine's
-cores. Exact figures for each change land in that workflow's job summary.
+Both compiled tools are 3-5x faster than the original PHP ECS, and once Go is
+tuned they run neck-and-neck: ecs-go wins on the small tree (lower startup), the
+Rust port edges it on the large one. ecs-go relaxes the GC for a batch run,
+presizes the lexer's token slice, and avoids allocations in its hottest fixers;
+ecs-rust lexes into copy-on-write span tokens, fixes files in parallel with
+rayon, and uses the mimalloc allocator. The upshot: the big early Rust-over-Go
+gap was mostly GC and allocation overhead, not the language - close those and the
+two converge. Exact figures for each change land in that workflow's job summary.
 
 ## PSR-12
 

@@ -2,7 +2,7 @@
 // ported from ecs-go's internal/lexer. Concatenating the value of each returned
 // token reproduces the source byte for byte.
 
-use crate::token::{Kind, Token};
+use crate::token::{Kind, Token, Value};
 
 // Multi-char operators, longest first, emitted as a single Punct each.
 const OPERATORS: &[&[u8]] = &[
@@ -46,7 +46,7 @@ struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     fn emit(&mut self, k: Kind, start: usize) {
-        self.toks.push(Token::new(k, &self.src[start..self.pos]));
+        self.toks.push(Token::span(k, start, self.pos));
     }
 
     fn has_prefix(&self, s: &[u8]) -> bool {
@@ -81,8 +81,7 @@ impl<'a> Lexer<'a> {
             }
         }
         if self.pos > start {
-            self.toks
-                .push(Token::new(Kind::InlineHtml, &self.src[start..self.pos]));
+            self.toks.push(Token::span(Kind::InlineHtml, start, self.pos));
         }
         if self.pos < self.src.len() {
             self.lex_open_tag();
@@ -194,7 +193,12 @@ impl<'a> Lexer<'a> {
         for tk in self.toks.iter().rev() {
             match tk.kind {
                 Kind::Whitespace | Kind::Comment | Kind::DocComment => continue,
-                _ => return &tk.value,
+                _ => {
+                    return match &tk.value {
+                        Value::Span(a, b) => &self.src[*a as usize..*b as usize],
+                        Value::Owned(v) => v,
+                    }
+                }
             }
         }
         b""
@@ -232,7 +236,7 @@ impl<'a> Lexer<'a> {
         if val.starts_with(b"/**") && val != b"/**/" {
             kind = Kind::DocComment;
         }
-        self.toks.push(Token::new(kind, val));
+        self.toks.push(Token::span(kind, start, self.pos));
     }
 
     fn lex_string(&mut self, start: usize, quote: u8) {

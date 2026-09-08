@@ -19,12 +19,13 @@ jobs:
                   go-version: "1.26.6"
 
             - name: Build ecs-go
+              working-directory: ecs-go
               run: go build -o /tmp/ecs-go-bin .
 
             - uses: dtolnay/rust-toolchain@stable
 
             - name: Build ecs-rust
-              run: cargo build --release --manifest-path rust/Cargo.toml
+              run: cargo build --release --manifest-path ecs-rust/Cargo.toml
 
             - uses: shivammathur/setup-php@v2
               with:
@@ -42,7 +43,7 @@ jobs:
 
             - name: Build the matching Go rule subset config
               run: |
-                  RUST_BIN=rust/target/release/ecs-rust
+                  RUST_BIN=ecs-rust/target/release/ecs-rust
                   "$RUST_BIN" list-rules > /tmp/rules.txt
                   python3 - <<'PY'
                   import json
@@ -83,7 +84,7 @@ jobs:
 
             - name: Correctness - Go subset vs Rust must match byte-for-byte
               run: |
-                  RUST_BIN=rust/target/release/ecs-rust
+                  RUST_BIN=ecs-rust/target/release/ecs-rust
                   fail=0
                   for proj in laravel symfony; do
                       rm -rf /tmp/co-go /tmp/co-rust
@@ -107,10 +108,10 @@ jobs:
             - name: Benchmark
               run: |
                   export GO_BIN=/tmp/ecs-go-bin
-                  export RUST_BIN=rust/target/release/ecs-rust
+                  export RUST_BIN=ecs-rust/target/release/ecs-rust
                   export CONFIG=/tmp/bench-config.json
                   export ECS_CMD="php /tmp/ecsproj/vendor/bin/ecs check --fix --no-progress-bar --config /tmp/ecs.php"
                   export RUNS=5
-                  bash rust/bench.sh \
+                  bash ecs-rust/bench.sh \
                       "laravel/framework (src)" /tmp/laravel/src \
                       "symfony/symfony (src)" /tmp/symfony/src | tee -a "$GITHUB_STEP_SUMMARY"

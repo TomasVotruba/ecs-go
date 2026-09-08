@@ -18,7 +18,8 @@ import (
 // Lex converts source into a flat token slice. Concatenating the Value of each
 // returned token reproduces src exactly.
 func Lex(src string) []token.Token {
-	l := &lexer{src: src}
+	// most tokens are a few bytes; presize to avoid repeated slice regrowth
+	l := &lexer{src: src, toks: make([]token.Token, 0, len(src)/3+8)}
 	l.run()
 	return l.toks
 }
