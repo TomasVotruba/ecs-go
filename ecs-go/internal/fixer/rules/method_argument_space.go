@@ -1,6 +1,9 @@
 package rules
 
 import (
+	"slices"
+	"strings"
+
 	"ecs-go/internal/token"
 	"ecs-go/internal/tokens"
 )
@@ -22,7 +25,9 @@ func (MethodArgumentSpace) SourceURL() string {
 }
 
 func (MethodArgumentSpace) Fix(s *tokens.Stream) bool {
-	changed := false
+	// ensure_fully_multiline: a call/declaration argument list that already spans
+	// lines gets one argument per line, "(" and ")" on their own lines.
+	changed := reflowMultilineArgs(s)
 	var stack []string
 	for i := 0; i < s.Len(); i++ {
 		t := s.At(i)
@@ -69,4 +74,152 @@ func (MethodArgumentSpace) Fix(s *tokens.Stream) bool {
 		}
 	}
 	return changed
+}
+
+// reflowMultilineArgs makes every already-multiline call/declaration argument
+// list fully multiline: "(" then each argument on its own line indented one
+// level past the call, and ")" on its own line at the call's indentation.
+func reflowMultilineArgs(s *tokens.Stream) bool {
+	changed := false
+	for open := 0; open < s.Len(); open++ {
+		if s.At(open).Kind != token.Punct || s.At(open).Value != "(" {
+			continue
+		}
+		closeIdx := s.MatchForward(open)
+		if closeIdx < 0 || !argListIsMultiline(s, open, closeIdx) {
+			continue
+		}
+		if !isCallOrDeclParen(s, open) {
+			continue
+		}
+		if sigNext(s, open) == closeIdx {
+			continue // empty ()
+		}
+		base := lineIndentBefore(s, open)
+		argIndent := base + "    "
+		argNL := "\n" + argIndent
+
+		// collect top-level comma positions inside (open, close)
+		var commas []int
+		depth := 0
+		for j := open + 1; j < closeIdx; j++ {
+			t := s.At(j)
+			if t.Kind != token.Punct {
+				continue
+			}
+			switch t.Value {
+			case "(", "[", "{":
+				depth++
+			case ")", "]", "}":
+				depth--
+			case ",":
+				if depth == 0 {
+					commas = append(commas, j)
+				}
+			}
+		}
+
+		// apply right-to-left so indices stay valid: ")" first, then commas, then "("
+		if editSlotBefore(s, closeIdx, "\n"+base) {
+			changed = true
+		}
+		for _, c := range slices.Backward(commas) {
+			if n := sigNext(s, c); n == closeIdx {
+				continue // trailing comma: no argument follows
+			}
+			if editSlotAfter(s, c, argNL) {
+				changed = true
+			}
+		}
+		if editSlotAfter(s, open, argNL) {
+			changed = true
+		}
+	}
+	return changed
+}
+
+// argListIsMultiline reports whether the argument list is split at the top level
+// - a newline right after "(" or right after a top-level comma. Newlines that
+// only occur inside a nested array/closure argument do not count, matching ECS's
+// ensure_fully_multiline trigger.
+func argListIsMultiline(s *tokens.Stream, open, closeIdx int) bool {
+	if n := open + 1; n < closeIdx && s.At(n).Kind == token.Whitespace && hasNewline(s.At(n).Value) {
+		return true
+	}
+	depth := 0
+	for j := open + 1; j < closeIdx; j++ {
+		t := s.At(j)
+		if t.Kind != token.Punct {
+			continue
+		}
+		switch t.Value {
+		case "(", "[", "{":
+			depth++
+		case ")", "]", "}":
+			depth--
+		case ",":
+			if depth == 0 && j+1 < closeIdx && s.At(j+1).Kind == token.Whitespace && hasNewline(s.At(j+1).Value) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isCallOrDeclParen reports whether the "(" at open opens a function/method call
+// or a function/closure declaration (not a control structure, array or grouping).
+func isCallOrDeclParen(s *tokens.Stream, open int) bool {
+	p := sigPrev(s, open)
+	if p < 0 {
+		return false
+	}
+	t := s.At(p)
+	switch t.Kind {
+	case token.Ident, token.Variable:
+		return true
+	case token.Punct:
+		return t.Value == ")" || t.Value == "]"
+	case token.Keyword:
+		lv := strings.ToLower(t.Value)
+		return lv == "function" || lv == "fn"
+	}
+	return false
+}
+
+// lineIndentBefore returns the indentation of the line containing token idx.
+func lineIndentBefore(s *tokens.Stream, idx int) string {
+	for i := idx - 1; i >= 0; i-- {
+		if t := s.At(i); t.Kind == token.Whitespace && strings.Contains(t.Value, "\n") {
+			if nl := strings.LastIndexByte(t.Value, '\n'); nl >= 0 {
+				return t.Value[nl+1:]
+			}
+		}
+	}
+	return ""
+}
+
+// editSlotAfter sets the whitespace immediately after token idx to val.
+func editSlotAfter(s *tokens.Stream, idx int, val string) bool {
+	if idx+1 < s.Len() && s.At(idx+1).Kind == token.Whitespace {
+		if s.At(idx+1).Value != val {
+			s.SetValue(idx+1, val)
+			return true
+		}
+		return false
+	}
+	s.InsertAt(idx+1, token.Token{Kind: token.Whitespace, Value: val})
+	return true
+}
+
+// editSlotBefore sets the whitespace immediately before token idx to val.
+func editSlotBefore(s *tokens.Stream, idx int, val string) bool {
+	if idx > 0 && s.At(idx-1).Kind == token.Whitespace {
+		if s.At(idx-1).Value != val {
+			s.SetValue(idx-1, val)
+			return true
+		}
+		return false
+	}
+	s.InsertAt(idx, token.Token{Kind: token.Whitespace, Value: val})
+	return true
 }
