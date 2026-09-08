@@ -7,9 +7,13 @@ mod rules;
 mod stream;
 mod token;
 
+// A parallel-friendly allocator: many worker threads each churn token buffers,
+// so a contention-aware allocator (mimalloc) beats the system one here.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use rayon::prelude::*;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use walkdir::WalkDir;
 
@@ -38,32 +42,49 @@ fn main() {
         paths.push(".".to_string());
     }
 
+    configure_thread_pool();
+
     let start = Instant::now();
     let files = find_php_files(&paths);
     let total = files.len();
 
-    let changed = AtomicUsize::new(0);
-    files.par_iter().for_each(|path| {
-        if fix_file(path, fix) {
-            changed.fetch_add(1, Ordering::Relaxed);
-        }
-    });
+    // map/reduce: no shared atomics or locks on the hot path.
+    let changed: usize = files
+        .par_iter()
+        .with_min_len(16) // batch small files so scheduling overhead stays low
+        .map(|path| fix_file(path, fix) as usize)
+        .sum();
 
     let elapsed = start.elapsed();
     eprintln!(
         "ecs-rust: {} of {} files changed in {:.3}s",
-        changed.load(Ordering::Relaxed),
+        changed,
         total,
         elapsed.as_secs_f64()
     );
 }
 
-fn fix_file(path: &PathBuf, write: bool) -> bool {
+// Work is a mix of CPU (lex/fix) and blocking I/O (read/write). Oversubscribing
+// cores lets a thread make progress while a peer waits on the filesystem. Honor
+// an explicit RAYON_NUM_THREADS if the user set one.
+fn configure_thread_pool() {
+    if std::env::var_os("RAYON_NUM_THREADS").is_some() {
+        return;
+    }
+    if let Ok(n) = std::thread::available_parallelism() {
+        let _ = rayon::ThreadPoolBuilder::new()
+            .num_threads(n.get() * 2)
+            .build_global();
+    }
+}
+
+fn fix_file(path: &Path, write: bool) -> bool {
     let src = match std::fs::read(path) {
         Ok(s) => s,
         Err(_) => return false,
     };
-    let mut s = stream::Stream::new(lexer::lex(&src));
+    let toks = lexer::lex(&src);
+    let mut s = stream::Stream::new(&src, toks);
     if !rules::fix(&mut s) {
         return false;
     }

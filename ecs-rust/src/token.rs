@@ -16,19 +16,33 @@ pub enum Kind {
     Punct,  // operators, braces, ; , etc.
 }
 
-// Token value is kept as raw bytes so the stream is byte-for-byte lossless,
-// matching Go's use of string (bytes) rather than assuming valid UTF-8.
+// A token's bytes are either a span into the original source (the common case,
+// zero-allocation) or owned bytes produced when a fixer rewrites the token. This
+// copy-on-write model keeps lexing allocation-free while staying byte-lossless.
+#[derive(Clone)]
+pub enum Value {
+    Span(u32, u32), // [start, end) byte offsets into the source
+    Owned(Vec<u8>),
+}
+
 #[derive(Clone)]
 pub struct Token {
     pub kind: Kind,
-    pub value: Vec<u8>,
+    pub value: Value,
 }
 
 impl Token {
-    pub fn new(kind: Kind, value: &[u8]) -> Self {
+    pub fn span(kind: Kind, start: usize, end: usize) -> Self {
         Token {
             kind,
-            value: value.to_vec(),
+            value: Value::Span(start as u32, end as u32),
+        }
+    }
+
+    pub fn owned(kind: Kind, bytes: Vec<u8>) -> Self {
+        Token {
+            kind,
+            value: Value::Owned(bytes),
         }
     }
 }

@@ -4,7 +4,7 @@
 // the same name.
 
 use crate::stream::Stream;
-use crate::token::{Kind, Token};
+use crate::token::Kind;
 
 // FQCNs of the ported fixers, matching ecs-go's names. Used to build the Go-side
 // `--rules` subset for a fair, identical-work comparison.
@@ -41,8 +41,8 @@ pub fn fix(s: &mut Stream) -> bool {
 fn next_significant_value(s: &Stream, i: usize) -> Vec<u8> {
     let mut j = i + 1;
     while j < s.len() {
-        if s.at(j).kind != Kind::Whitespace {
-            return s.at(j).value.clone();
+        if s.kind(j) != Kind::Whitespace {
+            return s.bytes(j).to_vec();
         }
         j += 1;
     }
@@ -52,9 +52,10 @@ fn next_significant_value(s: &Stream, i: usize) -> Vec<u8> {
 fn member_prev(s: &Stream, i: usize) -> bool {
     let mut j = i as isize - 1;
     while j >= 0 {
-        let t = s.at(j as usize);
-        if t.kind != Kind::Whitespace {
-            return t.value == b"->" || t.value == b"?->" || t.value == b"::";
+        let k = j as usize;
+        if s.kind(k) != Kind::Whitespace {
+            let b = s.bytes(k);
+            return b == b"->" || b == b"?->" || b == b"::";
         }
         j -= 1;
     }
@@ -70,15 +71,15 @@ fn has_newline(v: &[u8]) -> bool {
 fn lowercase_keywords(s: &mut Stream) -> bool {
     let mut changed = false;
     for i in 0..s.len() {
-        if s.at(i).kind != Kind::Keyword {
+        if s.kind(i) != Kind::Keyword {
             continue;
         }
         if next_significant_value(s, i) == b"=" {
             continue;
         }
-        let lower = s.at(i).value.to_ascii_lowercase();
-        if lower != s.at(i).value {
-            s.set_value(i, &lower);
+        let lower = s.bytes(i).to_ascii_lowercase();
+        if lower.as_slice() != s.bytes(i) {
+            s.set_owned(i, lower);
             changed = true;
         }
     }
@@ -88,18 +89,18 @@ fn lowercase_keywords(s: &mut Stream) -> bool {
 fn constant_case(s: &mut Stream) -> bool {
     let mut changed = false;
     for i in 0..s.len() {
-        if s.at(i).kind != Kind::Ident {
+        if s.kind(i) != Kind::Ident {
             continue;
         }
-        let lower = s.at(i).value.to_ascii_lowercase();
+        let lower = s.bytes(i).to_ascii_lowercase();
         if lower != b"true" && lower != b"false" && lower != b"null" {
             continue;
         }
         if member_prev(s, i) {
             continue;
         }
-        if lower != s.at(i).value {
-            s.set_value(i, &lower);
+        if lower.as_slice() != s.bytes(i) {
+            s.set_owned(i, lower);
             changed = true;
         }
     }
@@ -109,19 +110,19 @@ fn constant_case(s: &mut Stream) -> bool {
 fn lowercase_static_reference(s: &mut Stream) -> bool {
     let mut changed = false;
     for i in 0..s.len() {
-        let kind = s.at(i).kind;
+        let kind = s.kind(i);
         if kind != Kind::Ident && kind != Kind::Keyword {
             continue;
         }
-        let lower = s.at(i).value.to_ascii_lowercase();
+        let lower = s.bytes(i).to_ascii_lowercase();
         if lower != b"self" && lower != b"static" && lower != b"parent" {
             continue;
         }
         if member_prev(s, i) || next_significant_value(s, i) == b"=" {
             continue;
         }
-        if lower != s.at(i).value {
-            s.set_value(i, &lower);
+        if lower.as_slice() != s.bytes(i) {
+            s.set_owned(i, lower);
             changed = true;
         }
     }
@@ -131,19 +132,19 @@ fn lowercase_static_reference(s: &mut Stream) -> bool {
 fn no_leading_namespace_whitespace(s: &mut Stream) -> bool {
     let mut changed = false;
     for i in 1..s.len() {
-        if s.at(i).kind != Kind::Keyword || s.at(i).value != b"namespace" {
+        if s.kind(i) != Kind::Keyword || s.bytes(i) != b"namespace" {
             continue;
         }
-        if s.at(i - 1).kind != Kind::Whitespace {
+        if s.kind(i - 1) != Kind::Whitespace {
             continue;
         }
-        let prev = &s.at(i - 1).value;
+        let prev = s.bytes(i - 1).to_vec();
         match prev.iter().rposition(|&c| c == b'\n') {
             None => continue,
             Some(idx) => {
                 let trimmed = prev[..idx + 1].to_vec();
-                if trimmed != *prev {
-                    s.set_value(i - 1, &trimmed);
+                if trimmed != prev {
+                    s.set_owned(i - 1, trimmed);
                     changed = true;
                 }
             }
@@ -157,11 +158,10 @@ fn no_singleline_whitespace_before_semicolons(s: &mut Stream) -> bool {
     let mut i = s.len();
     while i >= 2 {
         i -= 1;
-        if s.at(i).kind != Kind::Punct || s.at(i).value != b";" {
+        if s.kind(i) != Kind::Punct || s.bytes(i) != b";" {
             continue;
         }
-        let prev = s.at(i - 1);
-        if prev.kind == Kind::Whitespace && !has_newline(&prev.value) {
+        if s.kind(i - 1) == Kind::Whitespace && !has_newline(s.bytes(i - 1)) {
             s.remove_at(i - 1);
             changed = true;
         }
@@ -172,10 +172,11 @@ fn no_singleline_whitespace_before_semicolons(s: &mut Stream) -> bool {
 fn no_whitespace_in_blank_line(s: &mut Stream) -> bool {
     let mut changed = false;
     for i in 0..s.len() {
-        if s.at(i).kind != Kind::Whitespace {
+        if s.kind(i) != Kind::Whitespace {
             continue;
         }
-        let mut segments: Vec<&[u8]> = s.at(i).value.split(|&c| c == b'\n').collect();
+        let val = s.bytes(i).to_vec();
+        let mut segments: Vec<&[u8]> = val.split(|&c| c == b'\n').collect();
         if segments.len() <= 2 {
             continue;
         }
@@ -189,7 +190,7 @@ fn no_whitespace_in_blank_line(s: &mut Stream) -> bool {
         }
         if touched {
             let joined = segments.join(&b'\n');
-            s.set_value(i, &joined);
+            s.set_owned(i, joined);
             changed = true;
         }
     }
@@ -200,23 +201,23 @@ fn space_after_semicolon(s: &mut Stream) -> bool {
     let mut changed = false;
     let mut i = 0;
     while i < s.len() {
-        if s.at(i).kind != Kind::Punct || s.at(i).value != b";" {
+        if s.kind(i) != Kind::Punct || s.bytes(i) != b";" {
             i += 1;
             continue;
         }
         if i + 1 >= s.len() {
             break;
         }
-        let next = s.at(i + 1);
-        if next.kind == Kind::Whitespace || next.kind == Kind::CloseTag {
+        let nk = s.kind(i + 1);
+        if nk == Kind::Whitespace || nk == Kind::CloseTag {
             i += 1;
             continue;
         }
-        if next.kind == Kind::Punct && (next.value == b")" || next.value == b";") {
+        if nk == Kind::Punct && (s.bytes(i + 1) == b")" || s.bytes(i + 1) == b";") {
             i += 1;
             continue;
         }
-        s.insert_at(i + 1, Token::new(Kind::Whitespace, b" "));
+        s.insert_owned(i + 1, Kind::Whitespace, b" ".to_vec());
         changed = true;
         i += 2; // skip inserted whitespace
     }
@@ -227,19 +228,19 @@ fn blank_line_after_opening_tag(s: &mut Stream) -> bool {
     if s.len() < 3 {
         return false;
     }
-    if s.at(0).kind != Kind::OpenTag || s.at(0).value != b"<?php" {
+    if s.kind(0) != Kind::OpenTag || s.bytes(0) != b"<?php" {
         return false;
     }
-    if s.at(1).kind != Kind::Whitespace {
+    if s.kind(1) != Kind::Whitespace {
         return false;
     }
-    let ws = s.at(1).value.clone();
+    let ws = s.bytes(1);
     if !ws.starts_with(b"\n") || ws.starts_with(b"\n\n") {
         return false;
     }
     let mut v = vec![b'\n'];
-    v.extend_from_slice(&ws);
-    s.set_value(1, &v);
+    v.extend_from_slice(ws);
+    s.set_owned(1, v);
     true
 }
 
@@ -247,12 +248,12 @@ fn no_trailing_whitespace(s: &mut Stream) -> bool {
     let mut changed = false;
     let last = s.len().wrapping_sub(1);
     for i in 0..s.len() {
-        if s.at(i).kind != Kind::Whitespace {
+        if s.kind(i) != Kind::Whitespace {
             continue;
         }
-        let v = strip_trailing_ws(&s.at(i).value, i == last);
-        if v != s.at(i).value {
-            s.set_value(i, &v);
+        let v = strip_trailing_ws(s.bytes(i), i == last);
+        if v.as_slice() != s.bytes(i) {
+            s.set_owned(i, v);
             changed = true;
         }
     }
@@ -291,17 +292,16 @@ fn single_blank_line_at_eof(s: &mut Stream) -> bool {
         return false;
     }
     let last = s.len() - 1;
-    let t = s.at(last);
-    if t.kind == Kind::Whitespace {
-        if t.value != b"\n" {
-            s.set_value(last, b"\n");
+    if s.kind(last) == Kind::Whitespace {
+        if s.bytes(last) != b"\n" {
+            s.set_owned(last, b"\n".to_vec());
             return true;
         }
         return false;
     }
-    if t.value.ends_with(b"\n") {
+    if s.bytes(last).ends_with(b"\n") {
         return false;
     }
-    s.insert_at(s.len(), Token::new(Kind::Whitespace, b"\n"));
+    s.insert_owned(s.len(), Kind::Whitespace, b"\n".to_vec());
     true
 }

@@ -65,19 +65,21 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 
 ## Performance
 
-The `Performance` CI workflow runs ecs-go, a Rust port, and the original PHP ECS
-over the same PSR-12 rule subset on real codebases (best of 5 runs on a GitHub
-runner) and compares wall time. Representative numbers:
+The `Performance` CI workflow runs ecs-go, a Rust port (in `ecs-rust/`), and the
+original PHP ECS over the same PSR-12 rule subset on real codebases and compares
+wall time. All three run `--fix` in parallel across every core; Go and Rust also
+produce byte-for-byte identical output. Best of 7 runs on a 24-core Linux box:
 
 | codebase | .php files | ecs-go | ecs-rust | ECS (PHP) |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | ~0.2s | ~0.09s | ~0.24s |
-| symfony/symfony (src) | 11443 | ~2.5s | ~0.9s | ~1.4s |
+| laravel/framework (src) | 1696 | 0.179s | 0.075s | 0.203s |
+| symfony/symfony (src) | 11434 | 1.823s | 0.500s | 1.698s |
 
-ecs-go is in the same ballpark as the original PHP ECS - a little quicker on the
-smaller tree, a little slower on the large one - while the Rust port is the
-fastest of the three. All three fix a fresh copy in parallel across the machine's
-cores. Exact figures for each change land in that workflow's job summary.
+ecs-go is in the same ballpark as the original PHP ECS - a touch quicker on the
+small tree, a touch slower on the large one. The Rust port is ~3.6x faster than
+Go: it lexes into copy-on-write span tokens (no per-token allocation), fixes
+files in parallel with rayon, and uses the mimalloc allocator. Exact figures for
+each change land in that workflow's job summary.
 
 ## PSR-12
 

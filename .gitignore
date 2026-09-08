@@ -2,5 +2,5 @@
 /vendor/
 *.test
 *.out
-/rust/target/
-/rust/Cargo.lock
+/ecs-rust/target/
+/ecs-rust/Cargo.lock
