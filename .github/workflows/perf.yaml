@@ -1,0 +1,75 @@
+name: Performance (Go vs Rust)
+
+# Builds ecs-go and the Rust port, checks they produce byte-identical output for
+# the same PSR-12 rule subset, then benchmarks wall time on laravel/framework and
+# symfony/symfony. Results land in the job summary.
+
+on:
+    pull_request: null
+    workflow_dispatch: null
+
+jobs:
+    go-vs-rust:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: "1.26.6"
+
+            - name: Build ecs-go
+              run: go build -o /tmp/ecs-go-bin .
+
+            - uses: dtolnay/rust-toolchain@stable
+
+            - name: Build ecs-rust
+              run: cargo build --release --manifest-path rust/Cargo.toml
+
+            - name: Fetch real codebases
+              run: |
+                  git clone --depth 1 --single-branch https://github.com/laravel/framework.git /tmp/laravel
+                  git clone --depth 1 --single-branch https://github.com/symfony/symfony.git /tmp/symfony
+
+            - name: Build the matching Go rule subset config
+              run: |
+                  RUST_BIN=rust/target/release/ecs-rust
+                  "$RUST_BIN" list-rules > /tmp/rules.txt
+                  python3 - <<'PY'
+                  import json
+                  rules = [l.strip() for l in open('/tmp/rules.txt') if l.strip()]
+                  json.dump({"paths": ["."], "rules": rules}, open('/tmp/bench-config.json', 'w'), indent=2)
+                  PY
+
+            - name: Correctness - Go subset vs Rust must match byte-for-byte
+              run: |
+                  RUST_BIN=rust/target/release/ecs-rust
+                  fail=0
+                  for proj in laravel symfony; do
+                      rm -rf /tmp/co-go /tmp/co-rust
+                      cp -r /tmp/$proj/src /tmp/co-go
+                      cp -r /tmp/$proj/src /tmp/co-rust
+                      /tmp/ecs-go-bin --fix --config /tmp/bench-config.json /tmp/co-go >/dev/null 2>&1 || true
+                      "$RUST_BIN" --fix /tmp/co-rust >/dev/null 2>&1 || true
+                      differ=$(diff -rq /tmp/co-go /tmp/co-rust 2>/dev/null | wc -l)
+                      total=$(find /tmp/co-go -name '*.php' | wc -l)
+                      echo "$proj: $total files, $differ differing"
+                      if [ "$differ" -gt 0 ]; then
+                          diff -rq /tmp/co-go /tmp/co-rust 2>/dev/null | head -5
+                          fail=1
+                      fi
+                  done
+                  if [ "$fail" -ne 0 ]; then
+                      echo "::error::Rust output diverges from ecs-go on the shared rule subset"
+                      exit 1
+                  fi
+
+            - name: Benchmark
+              run: |
+                  export GO_BIN=/tmp/ecs-go-bin
+                  export RUST_BIN=rust/target/release/ecs-rust
+                  export CONFIG=/tmp/bench-config.json
+                  export RUNS=5
+                  bash rust/bench.sh \
+                      "laravel/framework (src)" /tmp/laravel/src \
+                      "symfony/symfony (src)" /tmp/symfony/src | tee -a "$GITHUB_STEP_SUMMARY"
