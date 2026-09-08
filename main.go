@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"time"
 
 	"ecs-go/internal/config"
@@ -15,6 +16,9 @@ import (
 )
 
 func main() {
+	// A short-lived batch process: relax the GC so it collects far less during
+	// the run instead of reclaiming memory the process is about to release anyway.
+	debug.SetGCPercent(400)
 	os.Exit(run(os.Args[1:]))
 }
 
