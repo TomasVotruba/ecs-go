@@ -83,6 +83,9 @@ func CommonFixers() []fixer.Fixer {
 		AlignMultilineComment{},
 		AssignNullCoalescingToCoalesceEqual{},
 		NullableTypeDeclarationForDefaultNullValue{},
+		SingleLineCommentStyle{},
+		ExplicitIndirectVariable{},
+		NoNullPropertyInitialization{},
 	}
 }
 
@@ -106,6 +109,7 @@ func PhpdocFixers() []fixer.Fixer {
 		PhpdocVarWithoutName{},
 		PhpdocIndent{},
 		PhpdocOrderByValue{},
+		PhpdocLineSpan{},
 	}
 }
 
