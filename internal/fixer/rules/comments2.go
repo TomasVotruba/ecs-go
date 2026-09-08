@@ -47,8 +47,14 @@ func (NoEmptyComment) Fix(s *tokens.Stream) bool {
 		}
 		if commentBody(t.Value) == "" {
 			s.RemoveAt(i)
-			i--
 			changed = true
+			// merge whitespace left adjacent by the removal, so a now-blank line
+			// is a single token that no_whitespace_in_blank_line can clear.
+			if i-1 >= 0 && i < s.Len() && s.At(i-1).Kind == token.Whitespace && s.At(i).Kind == token.Whitespace {
+				s.SetValue(i-1, s.At(i-1).Value+s.At(i).Value)
+				s.RemoveAt(i)
+			}
+			i--
 		}
 	}
 	return changed
