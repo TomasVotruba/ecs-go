@@ -71,7 +71,6 @@ func CommonFixers() []fixer.Fixer {
 		NormalizeIndexBrace{},
 		NoMultilineWhitespaceAroundDoubleArrow{},
 		StandardizeIncrement{},
-		IncrementStyle{},
 		LongToShorthandOperator{},
 		SwitchContinueToBreak{},
 		NoUnneededImportAlias{},
