@@ -26,6 +26,15 @@ jobs:
             - name: Build ecs-rust
               run: cargo build --release --manifest-path rust/Cargo.toml
 
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: "8.3"
+
+            - name: Install the original PHP ECS
+              run: |
+                  mkdir -p /tmp/ecsproj && cd /tmp/ecsproj
+                  composer require symplify/easy-coding-standard --no-interaction --quiet
+
             - name: Fetch real codebases
               run: |
                   git clone --depth 1 --single-branch https://github.com/laravel/framework.git /tmp/laravel
@@ -40,6 +49,35 @@ jobs:
                   rules = [l.strip() for l in open('/tmp/rules.txt') if l.strip()]
                   json.dump({"paths": ["."], "rules": rules}, open('/tmp/bench-config.json', 'w'), indent=2)
                   PY
+
+            - name: Build the matching PHP ECS config
+              run: |
+                  # Configure ECS with the same ported rule subset. Fall back to
+                  # ECS's real psr12+common sets if any FQCN is not a loadable ECS
+                  # fixer (so the benchmark still runs on a valid config).
+                  python3 - <<'PY'
+                  rules = [l.strip() for l in open('/tmp/rules.txt') if l.strip()]
+                  body = "->withRules([" + ", ".join("'" + r + "'" for r in rules) + "])"
+                  php = ("<?php\n"
+                         "use Symplify\\EasyCodingStandard\\Config\\ECSConfig;\n"
+                         "return ECSConfig::configure()" + body + ";\n")
+                  open('/tmp/ecs.php', 'w').write(php)
+                  PY
+                  printf '<?php\necho 1;\n' > /tmp/smoke.php
+                  # ECS exits 1 when it finds fixable issues (expected); only a
+                  # config/class error (fatal, unknown fixer) means the rule list
+                  # is unusable. Detect that from the output, not the exit code.
+                  php /tmp/ecsproj/vendor/bin/ecs check /tmp/smoke.php \
+                      --no-progress-bar --config /tmp/ecs.php > /tmp/smoke.out 2>&1 || true
+                  if grep -qiE 'fatal error|was not found|does not exist|is not a|not registered|PHP Warning' /tmp/smoke.out; then
+                      echo "rule-list config rejected by ECS; falling back to psr12+common"
+                      sed -n '1,50p' /tmp/smoke.out
+                      cat > /tmp/ecs.php <<'PHP'
+                  <?php
+                  use Symplify\EasyCodingStandard\Config\ECSConfig;
+                  return ECSConfig::configure()->withPreparedSets(psr12: true, common: true);
+                  PHP
+                  fi
 
             - name: Correctness - Go subset vs Rust must match byte-for-byte
               run: |
@@ -69,6 +107,7 @@ jobs:
                   export GO_BIN=/tmp/ecs-go-bin
                   export RUST_BIN=rust/target/release/ecs-rust
                   export CONFIG=/tmp/bench-config.json
+                  export ECS_CMD="php /tmp/ecsproj/vendor/bin/ecs check --fix --no-progress-bar --config /tmp/ecs.php"
                   export RUNS=5
                   bash rust/bench.sh \
                       "laravel/framework (src)" /tmp/laravel/src \
