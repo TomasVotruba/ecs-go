@@ -12,7 +12,7 @@
 #   ECS_CMD   optional command to run the PHP ECS --fix on a dir passed as the
 #             last argument (e.g. "php vendor/bin/ecs check --fix
 #             --no-progress-bar --config /tmp/ecs.php"). When set, an "ecs (PHP)"
-#             column and an ecs-go speedup-vs-ECS column are added.
+#             wall-time column is added.
 #   RUNS      timed repetitions per binary (default 5)
 #
 # Args: <label> <source-dir> [<label> <source-dir> ...]
@@ -45,16 +45,15 @@ best() {
 }
 
 sec() { awk -v ns="$1" 'BEGIN { printf "%.3f", ns/1e9 }'; }
-speedup() { awk -v g="$1" -v r="$2" 'BEGIN { printf "%.2f", g/r }'; }
 
 echo "## ecs-go vs ecs-rust (same PSR-12 rule subset, best of $RUNS runs)"
 echo ""
 if [ -n "$ECS_CMD" ]; then
-    echo "| codebase | .php files | ecs-go | ecs-rust | ecs (PHP) | go vs rust | go vs ecs |"
-    echo "|---|---:|---:|---:|---:|---:|---:|"
-else
-    echo "| codebase | .php files | ecs-go | ecs-rust | speedup |"
+    echo "| codebase | .php files | ecs-go | ecs-rust | ecs (PHP) |"
     echo "|---|---:|---:|---:|---:|"
+else
+    echo "| codebase | .php files | ecs-go | ecs-rust |"
+    echo "|---|---:|---:|---:|"
 fi
 
 while [ $# -ge 2 ]; do
@@ -69,8 +68,8 @@ while [ $# -ge 2 ]; do
     if [ -n "$ECS_CMD" ]; then
         # shellcheck disable=SC2086
         best ecs_ns "$src" $ECS_CMD
-        echo "| $label | $files | $(sec "$go_ns")s | $(sec "$rust_ns")s | $(sec "$ecs_ns")s | $(speedup "$go_ns" "$rust_ns")x | $(speedup "$ecs_ns" "$go_ns")x |"
+        echo "| $label | $files | $(sec "$go_ns")s | $(sec "$rust_ns")s | $(sec "$ecs_ns")s |"
     else
-        echo "| $label | $files | $(sec "$go_ns")s | $(sec "$rust_ns")s | $(speedup "$go_ns" "$rust_ns")x |"
+        echo "| $label | $files | $(sec "$go_ns")s | $(sec "$rust_ns")s |"
     fi
 done

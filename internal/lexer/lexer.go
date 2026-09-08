@@ -195,7 +195,11 @@ func (l *lexer) lastSignificant() string {
 // matchOperator returns the byte length of the longest known multi-char operator
 // at the current position, or 0 when none matches (single-char punctuation).
 func (l *lexer) matchOperator() int {
-	for _, op := range operators {
+	if l.pos >= len(l.src) {
+		return 0
+	}
+	// only the operators starting with the current byte, longest first
+	for _, op := range operatorsByByte[l.src[l.pos]] {
 		if l.hasPrefix(op) {
 			return len(op)
 		}
@@ -373,6 +377,17 @@ var operators = []string{
 	"+=", "-=", "*=", "/=", ".=", "%=", "&=", "|=", "^=", "::", "??",
 	"**", "<<", ">>",
 }
+
+// operatorsByByte groups operators by their first byte, preserving the
+// longest-first order of `operators`, so matchOperator only tests the few
+// candidates for the current byte instead of all of them.
+var operatorsByByte = func() [256][]string {
+	var m [256][]string
+	for _, op := range operators {
+		m[op[0]] = append(m[op[0]], op)
+	}
+	return m
+}()
 
 // keywords are PHP reserved words (case-insensitive). Type names (int, string,
 // ...) and constants (true, false, null) are T_STRING in PHP and stay Ident.

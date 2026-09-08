@@ -11,7 +11,7 @@ import (
 // i, or -1 if there is none.
 func nextSignificantIndex(s *tokens.Stream, i int) int {
 	for j := i + 1; j < s.Len(); j++ {
-		if s.At(j).Kind != token.Whitespace {
+		if s.Kind(j) != token.Whitespace {
 			return j
 		}
 	}
