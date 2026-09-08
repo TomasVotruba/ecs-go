@@ -21,6 +21,10 @@ func (s *Stream) Len() int { return len(s.toks) }
 
 func (s *Stream) At(i int) token.Token { return s.toks[i] }
 
+// Kind returns just the kind of the token at i, avoiding a full Token copy in
+// the hot index-scanning helpers.
+func (s *Stream) Kind(i int) token.Kind { return s.toks[i].Kind }
+
 func (s *Stream) Set(i int, t token.Token) { s.toks[i] = t }
 
 // SetValue replaces only the Value of the token at i, keeping its kind.
@@ -118,9 +122,14 @@ func (s *Stream) ReplaceRange(start, end int, repl []token.Token) {
 
 // Render concatenates every token value back into source.
 func (s *Stream) Render() string {
+	n := 0
+	for i := range s.toks {
+		n += len(s.toks[i].Value)
+	}
 	var b strings.Builder
-	for _, t := range s.toks {
-		b.WriteString(t.Value)
+	b.Grow(n)
+	for i := range s.toks {
+		b.WriteString(s.toks[i].Value)
 	}
 	return b.String()
 }

@@ -95,7 +95,7 @@ func isReturnTypeColon(s *tokens.Stream, i int) bool {
 // i, or -1 if there is none.
 func prevSignificantIndex(s *tokens.Stream, i int) int {
 	for j := i - 1; j >= 0; j-- {
-		if s.At(j).Kind != token.Whitespace {
+		if s.Kind(j) != token.Whitespace {
 			return j
 		}
 	}
