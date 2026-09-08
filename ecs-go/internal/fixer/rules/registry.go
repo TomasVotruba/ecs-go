@@ -55,6 +55,7 @@ func CommonFixers() []fixer.Fixer {
 		NoSpacesAroundOffset{},
 		ObjectOperatorWithoutWhitespace{},
 		StandardizeNotEquals{},
+		TernaryToNullCoalescing{},
 		NoEmptyStatement{},
 		NoEmptyComment{},
 		SingleLineCommentSpacing{},
