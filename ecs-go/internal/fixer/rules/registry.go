@@ -165,6 +165,7 @@ func StructuralFixers() []fixer.Fixer {
 		SingleLineAfterImports{},
 		NoBlankLinesAfterClassOpening{},
 		StatementIndentation{},
+		MethodChainingNewline{},
 		NoExtraBlankLines{}, // after import removal, which can leave extra blanks
 	}
 }

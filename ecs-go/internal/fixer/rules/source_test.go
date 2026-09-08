@@ -8,7 +8,7 @@ import (
 )
 
 var sourceURLPattern = regexp.MustCompile(
-	`^https://github\.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/[A-Za-z]+/[A-Za-z]+Fixer\.php$`,
+	`^https://github\.com/(PHP-CS-Fixer/PHP-CS-Fixer/blob/master|symplify/coding-standard/blob/main)/src/Fixer/[A-Za-z]+/[A-Za-z]+Fixer\.php$`,
 )
 
 // TestEveryFixerHasSourceURL enforces the Fixer contract offline: every rule

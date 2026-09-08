@@ -11,6 +11,10 @@ import (
 // SourceBase is the GitHub location of the original PHP-CS-Fixer fixers.
 const SourceBase = "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/"
 
+// SymplifySourceBase is the GitHub location of symplify's coding-standard fixers,
+// for the few rules ported from there rather than PHP-CS-Fixer.
+const SymplifySourceBase = "https://github.com/symplify/coding-standard/blob/main/src/Fixer/"
+
 type Fixer interface {
 	// Name is the checker identifier (the PHP-CS-Fixer FQCN) shown in reports.
 	Name() string
@@ -30,5 +34,8 @@ func SourceURLFor(name string) string {
 	}
 	category := parts[len(parts)-2]
 	class := parts[len(parts)-1]
+	if strings.HasPrefix(name, `Symplify\CodingStandard\`) {
+		return SymplifySourceBase + category + "/" + class + ".php"
+	}
 	return SourceBase + category + "/" + class + ".php"
 }
