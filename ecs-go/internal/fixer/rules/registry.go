@@ -98,6 +98,7 @@ func CommonFixers() []fixer.Fixer {
 func PhpdocFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		NoSuperfluousPhpdocTags{},
+		PhpdocNoUselessInheritdoc{},
 		PhpdocScalar{},
 		PhpdocTypes{},
 		PhpdocNoAliasTag{},
