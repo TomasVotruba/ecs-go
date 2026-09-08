@@ -62,22 +62,24 @@ jobs:
                          "use Symplify\\EasyCodingStandard\\Config\\ECSConfig;\n"
                          "return ECSConfig::configure()" + body + ";\n")
                   open('/tmp/ecs.php', 'w').write(php)
+                  print(f"ECS config built from {len(rules)} rules")
                   PY
-                  printf '<?php\necho 1;\n' > /tmp/smoke.php
-                  # ECS exits 1 when it finds fixable issues (expected); only a
-                  # config/class error (fatal, unknown fixer) means the rule list
-                  # is unusable. Detect that from the output, not the exit code.
-                  php /tmp/ecsproj/vendor/bin/ecs check /tmp/smoke.php \
-                      --no-progress-bar --config /tmp/ecs.php > /tmp/smoke.out 2>&1 || true
-                  if grep -qiE 'fatal error|was not found|does not exist|is not a|not registered|PHP Warning' /tmp/smoke.out; then
-                      echo "rule-list config rejected by ECS; falling back to psr12+common"
-                      sed -n '1,50p' /tmp/smoke.out
-                      cat > /tmp/ecs.php <<'PHP'
-                  <?php
-                  use Symplify\EasyCodingStandard\Config\ECSConfig;
-                  return ECSConfig::configure()->withPreparedSets(psr12: true, common: true);
-                  PHP
+                  # Trust the ECS timing only if ECS actually does work: it must
+                  # fix a deliberately messy file with this config (covers uppercase
+                  # keywords, trailing whitespace and blank lines - all in the
+                  # ported PSR-12 subset). Fail loudly otherwise, so the benchmark
+                  # can never report a no-op time as if it were real work.
+                  printf '<?php\nIF (TRUE) {   \n\n\n    ECHO 1;   \n}\n' > /tmp/verify.php
+                  cp /tmp/verify.php /tmp/verify.orig
+                  php /tmp/ecsproj/vendor/bin/ecs check /tmp/verify.php --fix \
+                      --no-progress-bar --config /tmp/ecs.php > /tmp/verify.out 2>&1 || true
+                  if diff -q /tmp/verify.php /tmp/verify.orig >/dev/null 2>&1; then
+                      echo "::error::ECS did not modify a messy file with the ported subset - config/path is wrong, benchmark times would be meaningless"
+                      echo "--- ecs.php ---"; cat /tmp/ecs.php
+                      echo "--- ecs output ---"; cat /tmp/verify.out
+                      exit 1
                   fi
+                  echo "ECS verified: it fixes a messy file with the ported subset"
 
             - name: Correctness - Go subset vs Rust must match byte-for-byte
               run: |
