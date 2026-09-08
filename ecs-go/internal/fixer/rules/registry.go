@@ -86,6 +86,7 @@ func CommonFixers() []fixer.Fixer {
 		NullableTypeDeclarationForDefaultNullValue{},
 		SingleLineCommentStyle{},
 		ExplicitIndirectVariable{},
+		ExplicitStringVariable{},
 		NoNullPropertyInitialization{},
 		Include{},
 		EmptyLoopBody{},
