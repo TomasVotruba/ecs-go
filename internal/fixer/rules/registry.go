@@ -95,6 +95,7 @@ func CommonFixers() []fixer.Fixer {
 // PhpdocFixers normalize doc comments.
 func PhpdocFixers() []fixer.Fixer {
 	return []fixer.Fixer{
+		NoSuperfluousPhpdocTags{},
 		PhpdocScalar{},
 		PhpdocTypes{},
 		PhpdocNoAliasTag{},
