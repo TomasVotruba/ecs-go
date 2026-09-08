@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"slices"
 	"strings"
 
 	"ecs-go/internal/token"
@@ -125,8 +126,7 @@ func reflowMultilineArgs(s *tokens.Stream) bool {
 		if editSlotBefore(s, closeIdx, "\n"+base) {
 			changed = true
 		}
-		for k := len(commas) - 1; k >= 0; k-- {
-			c := commas[k]
+		for _, c := range slices.Backward(commas) {
 			if n := sigNext(s, c); n == closeIdx {
 				continue // trailing comma: no argument follows
 			}
