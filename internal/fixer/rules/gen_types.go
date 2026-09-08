@@ -63,49 +63,6 @@ func enclosingFuncParamOpen(s *tokens.Stream, i int) int {
 	return -1
 }
 
-// PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/FunctionNotation/FunctionTypehintSpaceFixer.php
-//
-// FunctionTypehintSpace forces exactly one space between a parameter type hint
-// and the "$variable" that follows it inside a function/method/closure parameter
-// list ("int$x" and "int  $x" -> "int $x"). Native types and class names both
-// lex as Ident, so the type is detected as an Ident directly before the Variable.
-type FunctionTypehintSpace struct{}
-
-func (FunctionTypehintSpace) Name() string {
-	return `PhpCsFixer\Fixer\FunctionNotation\FunctionTypehintSpaceFixer`
-}
-
-func (FunctionTypehintSpace) SourceURL() string {
-	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/FunctionNotation/FunctionTypehintSpaceFixer.php"
-}
-
-func (FunctionTypehintSpace) Fix(s *tokens.Stream) bool {
-	changed := false
-	for i := 0; i < s.Len(); i++ {
-		if s.At(i).Kind != token.Variable {
-			continue
-		}
-		if enclosingFuncParamOpen(s, i) < 0 {
-			continue
-		}
-		// type token abuts the variable: insert a single space
-		if i-1 >= 0 && s.At(i-1).Kind == token.Ident {
-			s.InsertAt(i, token.Token{Kind: token.Whitespace, Value: " "})
-			changed = true
-			continue
-		}
-		// type, whitespace, variable: collapse the whitespace to a single space
-		if i-2 >= 0 && s.At(i-1).Kind == token.Whitespace && s.At(i-2).Kind == token.Ident {
-			ws := s.At(i - 1).Value
-			if ws != " " && !hasNewline(ws) {
-				s.SetValue(i-1, " ")
-				changed = true
-			}
-		}
-	}
-	return changed
-}
-
 // isNullableTypePos reports whether the "?" at i is a nullable-type marker rather
 // than a ternary. A nullable "?" follows a type-position token (":", "(", ",",
 // "|" or a visibility/modifier keyword); a ternary "?" follows an expression.

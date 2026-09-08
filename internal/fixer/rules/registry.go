@@ -77,11 +77,12 @@ func CommonFixers() []fixer.Fixer {
 		MultilineCommentOpeningClosing{},
 		Encoding{},
 		DeclareParentheses{},
-		FunctionTypehintSpace{},
+		TypeDeclarationSpaces{},
 		CompactNullableTypeDeclaration{},
 		TypesSpaces{},
 		AlignMultilineComment{},
 		AssignNullCoalescingToCoalesceEqual{},
+		NullableTypeDeclarationForDefaultNullValue{},
 	}
 }
 
@@ -125,6 +126,7 @@ func ConstructFixers() []fixer.Fixer {
 		MethodArgumentSpace{},
 		ReturnTypeDeclaration{},
 		NewWithParentheses{},
+		FunctionDeclaration{},
 	}
 }
 
@@ -138,6 +140,7 @@ func StructuralFixers() []fixer.Fixer {
 		SingleTraitInsertPerStatement{},
 		SingleClassElementPerStatement{},
 		OrderedClassElements{},
+		ClassAttributesSeparation{},
 		BlankLinesBeforeNamespace{},
 		BlankLineAfterNamespace{},
 		NoUnusedImports{},
