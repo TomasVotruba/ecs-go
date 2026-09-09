@@ -68,16 +68,16 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
 (in `ecs-rust/`) over the same PSR-12 rule subset on real codebases and compares
 wall time. All three run `--fix` in parallel across every core; Go and Rust also
-produce byte-for-byte identical output. Best of 7 runs on a 24-core Linux box:
+produce byte-for-byte identical output. Mean of 10 runs on a 24-core Linux box:
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 0.212s | 0.039s | 0.082s |
-| symfony/symfony (src) | 11434 | 1.867s | 0.586s | 0.513s |
+| laravel/framework (src) | 1696 | 1.016s | 0.076s | 0.087s |
+| symfony/symfony (src) | 11434 | 7.893s | 0.572s | 0.521s |
 
-Both compiled tools are 3-5x faster than the original PHP ECS, and once Go is
-tuned they run neck-and-neck: ecs-go wins on the small tree (lower startup), the
-Rust port edges it on the large one. ecs-go relaxes the GC for a batch run,
+Both compiled tools are ~13-15x faster than the original PHP ECS on average, and
+they run neck-and-neck with each other: ecs-go edges the small tree (lower
+startup), the Rust port edges the large one. ecs-go relaxes the GC for a batch run,
 presizes the lexer's token slice, and avoids allocations in its hottest fixers;
 ecs-rust lexes into copy-on-write span tokens, fixes files in parallel with
 rayon, and uses the mimalloc allocator. The upshot: the big early Rust-over-Go
