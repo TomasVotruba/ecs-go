@@ -27,10 +27,26 @@ func (YodaStyle) SourceURL() string {
 
 func yodaOp(v string) bool {
 	switch v {
-	case "==", "===", "!=", "!==":
+	case "==", "===", "!=", "!==", "<", ">", "<=", ">=":
 		return true
 	}
 	return false
+}
+
+// yodaMirror flips a relational operator when its operands are swapped, so
+// "5 > $z" becomes "$z < 5". Equality operators are symmetric and unchanged.
+func yodaMirror(v string) string {
+	switch v {
+	case "<":
+		return ">"
+	case ">":
+		return "<"
+	case "<=":
+		return ">="
+	case ">=":
+		return "<="
+	}
+	return v
 }
 
 func isYodaLiteral(t token.Token) bool {
@@ -85,6 +101,11 @@ func (YodaStyle) Fix(s *tokens.Stream) bool {
 		left := append([]token.Token(nil), s.Tokens()[sw.ls:sw.le+1]...)
 		mid := append([]token.Token(nil), s.Tokens()[sw.le+1:sw.rs]...)
 		right := append([]token.Token(nil), s.Tokens()[sw.rs:sw.re+1]...)
+		for k := range mid {
+			if mid[k].Kind == token.Punct {
+				mid[k].Value = yodaMirror(mid[k].Value)
+			}
+		}
 		repl := append(append(append([]token.Token(nil), right...), mid...), left...)
 		s.ReplaceRange(sw.ls, sw.re, repl)
 	}
@@ -220,7 +241,7 @@ func isRightBoundary(s *tokens.Stream, j int) bool {
 	t := s.At(j)
 	if t.Kind == token.Punct {
 		switch t.Value {
-		case ")", "]", "}", ";", ",", ":", "&&", "||", "?", "??", ".":
+		case ")", "]", "}", ";", ",", ":", "&&", "||", "?", "??", ".", "=>":
 			return true
 		}
 		return false
