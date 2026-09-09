@@ -1,0 +1,131 @@
+ECS rules NOT yet implemented in ecs-go
+=======================================
+
+Source: every Fixer/Sniff referenced across ecs-src config/set/* and
+src/Config/Level/*, plus the PER-CS rules ecs-go tracks.
+
+Totals: 208 rules configured in ECS - 87 implemented here = ~122 not yet done.
+(psr12-left.txt tracks the PSR-12 subset; this is the whole ECS surface.)
+
+A few "missing" below are already covered under a newer PHP-CS-Fixer name:
+  NoSpacesInsideParenthesisFixer   -> SpacesInsideParenthesesFixer
+  SingleBlankLineBeforeNamespaceFixer -> BlankLinesBeforeNamespaceFixer
+
+
+PHPDOC / ANNOTATIONS (~28) - docblock parser exists; 11 done
+------------------------------------------------------------
+NoSuperfluousPhpdocTags (top parity gap - needs signature comparison),
+PhpdocSeparation, PhpdocIndent, PhpdocSummary, PhpdocOrder, PhpdocOrderByValue,
+PhpdocTagCasing, PhpdocTagType, PhpdocToComment, PhpdocLineSpan,
+PhpdocInlineTagNormalizer, PhpdocVarWithoutName, PhpdocReturnSelfReference,
+PhpdocNoDuplicateTypes, PhpdocNoUselessInheritdoc, DoubleAsteriskInlineVar,
+SingleLineInlineVarDocBlock, MergeDocBlockStart, TypeToVarTag,
+ParamReturnAndVarTagMalforms, GeneralPhpdocAnnotationRemove, GeneralPhpdocTagRename,
+AddMissingParamName, AddMissingVarName, FixTagTypo,
+Remove{SuperfluousReturnName,SuperfluousVarName,PropertyVariableNameDescription,
+MethodNameDuplicateDescription,EventSubscriberDescription,UselessDefaultComment,
+PHPStormAnnotation,ParamNameReference,DeadParam,DeadVarThis} (symplify custom)
+
+DOCTRINE ANNOTATIONS (3) - needs an annotation parser
+-----------------------------------------------------
+DoctrineAnnotationArrayAssignment, DoctrineAnnotationIndentation, DoctrineAnnotationSpaces
+
+ARRAYS (~6)
+-----------
+ArrayIndentation, ArrayListItemNewline, ArrayOpenerAndCloserNewline,
+NoWhitespaceInEmptyArray, NormalizeIndexBrace, NoMultilineWhitespaceAroundDoubleArrow,
+StandaloneLineInMultilineArray
+
+TYPES (~9) - need a type/signature model
+----------------------------------------
+TypeDeclarationSpaces, TypesSpaces, NativeFunctionTypeDeclarationCasing,
+NullableTypeDeclaration, NullableTypeDeclarationForDefaultNullValue,
+CompactNullableTypeDeclaration (a.k.a. CompactNullableTypehint), OrderedTypes,
+FunctionTypehintSpace, FullyQualifiedStrictTypes
+
+CONTROL STRUCTURES / BRACES (~9)
+--------------------------------
+ControlStructureBraces, ControlStructureContinuationPosition, CurlyBracesPosition,
+NoAlternativeSyntax, NoSuperfluousElseif, NoUnneededControlParentheses,
+NoUnneededCurlyBraces, SwitchContinueToBreak, YodaStyle, NoBreakComment,
+FunctionDeclaration
+
+OPERATORS (~11)
+---------------
+IncrementStyle, StandardizeIncrement, NotOperatorWithSuccessorSpace,
+OperatorLinebreak, LongToShorthandOperator, AssignNullCoalescingToCoalesceEqual,
+TernaryToNullCoalescing, NoUselessNullsafeOperator, NoShortBoolCast, NoUnsetCast,
+NoBinaryString (done)
+
+CASING (~3)
+-----------
+ClassReferenceNameCasing, PhpUnitMethodCasing, ModifierKeywords
+
+IMPORTS / NAMESPACE (~5)
+------------------------
+LambdaNotUsedImport, NoUnneededImportAlias, CleanNamespace, PsrAutoloading,
+NoBlankLineBetweenImports
+
+WHITESPACE / COMMENTS / TAGS (~10)
+----------------------------------
+AlignMultilineComment, MultilineCommentOpeningClosing, MultilineWhitespaceBeforeSemicolons,
+BlankLineAfterStrictTypes, BlankLineBeforeStatement, LinebreakAfterOpeningTag,
+Encoding, SpaceAfterCommaHereNowDoc, DeclareParentheses,
+LanguageConstructSpacing (sniff), SuperfluousWhitespace (sniff), GitMergeConflict (sniff)
+
+CLASS STRUCTURE (~1)
+--------------------
+ClassAttributesSeparation
+
+STANDALONE-LINE + CHAINING (symplify custom, ~6)
+------------------------------------------------
+StandaloneLinePlainConstructorParam, StandaloneLinePromotedProperty,
+StandaloneLineRequiredParam, StandaloneLineSymfonyAttributeParam,
+MethodChainingNewline, MethodChainingIndentation
+
+CLEANUP / SEMANTIC (Rector-like, ~14)
+-------------------------------------
+FunctionToConstant, NoAliasFunctions, NoAliasLanguageConstructCall, NoMixedEchoPrint,
+Include, ExplicitIndirectVariable, ExplicitStringVariable, IsNull, SelfAccessor,
+SelfStaticAccessor, ProtectedToPrivate, NoNullPropertyInitialization,
+NoUnreachableDefaultArgumentValue, NoUselessReturn, SimplifiedNullReturn,
+SwitchedTypeAndName, FixParamNameTypo
+
+
+IMPLEMENTED (87)
+----------------
+casing:      lowercase_keywords, constant_case, lowercase_static_reference,
+             lowercase_cast, short_scalar_cast, magic_constant_casing,
+             magic_method_casing, native_function_casing, integer_literal_case,
+             native_type_declaration_casing
+spacing:     no_leading_namespace_whitespace, no_singleline_whitespace_before_semicolons,
+             no_whitespace_in_blank_line, no_extra_blank_lines, space_after_semicolon,
+             binary_operator_spaces, ternary_operator_spaces, concat_space, cast_spaces,
+             blank_line_after_opening_tag, no_trailing_whitespace,
+             no_trailing_whitespace_in_comment, single_blank_line_at_eof
+functions:   method_argument_space, return_type_declaration, no_spaces_after_function_name,
+             new_with_parentheses
+constructs:  single_space_around_construct, spaces_inside_parentheses,
+             unary_operator_spaces, elseif, no_leading_import_slash,
+             declare_equal_normalize, switch_case_semicolon_to_colon, switch_case_space,
+             no_multiple_statements_per_line, no_space_around_double_colon
+arrays:      array_syntax, list_syntax, whitespace_after_comma_in_array,
+             no_whitespace_before_comma_in_array, trailing_comma_in_multiline,
+             no_trailing_comma_in_singleline, no_spaces_around_offset, trim_array_spaces
+strings:     single_quote, heredoc_to_nowdoc, no_binary_string
+operators:   standardize_not_equals, object_operator_without_whitespace,
+             no_useless_concat_operator
+comments:    no_empty_comment, single_line_comment_spacing
+attributes:  attribute_block_no_spaces
+php tag:     full_opening_tag, no_closing_tag
+braces:      braces_position, single_line_empty_body (per-cs)
+class:       visibility_required, single_trait_insert_per_statement,
+             single_class_element_per_statement, class_definition, ordered_class_elements
+imports:     single_import_per_statement, ordered_imports,
+             blank_line_between_import_groups, single_line_after_imports, no_unused_imports
+phpdoc:      phpdoc_scalar, phpdoc_types, phpdoc_no_alias_tag, phpdoc_no_package,
+             phpdoc_no_access, phpdoc_single_line_var_spacing, phpdoc_no_empty_return,
+             phpdoc_trim, phpdoc_trim_consecutive_blank_line_separation, no_empty_phpdoc,
+             no_blank_lines_after_phpdoc
+structural:  blank_lines_before_namespace, blank_line_after_namespace,
+             no_blank_lines_after_class_opening, indentation_type, statement_indentation

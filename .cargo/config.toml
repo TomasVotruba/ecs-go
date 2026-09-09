@@ -1,0 +1,5 @@
+# Build the Rust benchmark tuned for the machine it compiles on. This is a local
+# performance experiment, not a distributed binary, so native codegen is fine and
+# lets the lexer's byte scans autovectorize.
+[build]
+rustflags = ["-C", "target-cpu=native"]

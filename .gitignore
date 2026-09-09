@@ -1,4 +1,6 @@
-/ecs-go
+/ecs-go/ecs-go
 /vendor/
 *.test
 *.out
+/ecs-rust/target/
+/ecs-rust/Cargo.lock

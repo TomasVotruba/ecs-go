@@ -11,6 +11,9 @@ on:
 jobs:
     test:
         runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ecs-go
         steps:
             - uses: actions/checkout@v4
 
@@ -26,6 +29,9 @@ jobs:
 
     format:
         runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ecs-go
         steps:
             - uses: actions/checkout@v4
 
@@ -54,6 +60,9 @@ jobs:
 
     analysis:
         runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ecs-go
         steps:
             - uses: actions/checkout@v4
 
@@ -68,9 +77,13 @@ jobs:
               if: ${{ !cancelled() }}
               with:
                   version: v2.12.2
+                  working-directory: ecs-go
 
     security:
         runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ecs-go
         steps:
             - uses: actions/checkout@v4
 
@@ -89,6 +102,9 @@ jobs:
 
     fixer_sources:
         runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ecs-go
         steps:
             - uses: actions/checkout@v4
 
