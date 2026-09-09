@@ -77,6 +77,9 @@ jobs:
               if: ${{ !cancelled() }}
               with:
                   version: v2.12.2
+                  # build from source so the linter is compiled with the job's Go
+                  # (prebuilt binaries lag the toolchain and reject a newer go.mod)
+                  install-mode: goinstall
                   working-directory: ecs-go
 
     security:
@@ -94,7 +97,7 @@ jobs:
             - uses: actions/cache@v4
               with:
                   path: ~/go/bin/govulncheck
-                  key: govulncheck-v1.6.0
+                  key: govulncheck-v1.6.0-go1.27.1
             - name: install govulncheck
               run: test -x ~/go/bin/govulncheck || go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
             - name: govulncheck
