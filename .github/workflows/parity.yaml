@@ -1,6 +1,6 @@
 name: Parity
 
-# Runs ECS and ecs-go on the same real codebase (laravel/framework) and fails if
+# Runs ECS and ecs-go on the same real codebase (full rector-src) and fails if
 # ecs-go's output differs from ECS (psr12 + common) on any file. This is the 1:1
 # parity gate - it stays red until ecs-go reproduces ECS exactly.
 
@@ -29,10 +29,10 @@ jobs:
 
             - name: Fetch a real codebase sample
               run: |
-                  git clone --depth 1 https://github.com/laravel/framework.git /tmp/laravel
-                  # a moderate, self-contained component keeps the job fast
+                  git clone --depth 1 https://github.com/rectorphp/rector-src.git /tmp/rector
+                  # full rector-src tree; .php.inc fixtures are skipped by the *.php find below
                   mkdir -p /tmp/sample
-                  cp -r /tmp/laravel/src/Illuminate/Support/* /tmp/sample/
+                  cp -r /tmp/rector/src /tmp/rector/rules /tmp/rector/tests /tmp/sample/
                   cp -r /tmp/sample /tmp/ours
                   cp -r /tmp/sample /tmp/ecs
 
@@ -99,7 +99,7 @@ jobs:
                   done
                   same=$((total - differ))
                   {
-                      echo "## ecs-go vs ECS (psr12 + common) on laravel/framework Support"
+                      echo "## ecs-go vs ECS (psr12 + common) on full rector-src"
                       echo ""
                       echo "| metric | value |"
                       echo "|---|---|"
