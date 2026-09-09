@@ -34,8 +34,8 @@ func (ArrayListItemNewline) Fix(s *tokens.Stream) bool {
 		if closeIdx < 0 || sigNext(s, open) == closeIdx {
 			continue // empty []
 		}
-		if rangeHasNewline(s, open, closeIdx) {
-			continue // already multiline: array_indentation aligns it
+		if arrayTopLevelMultiline(s, open, closeIdx) {
+			continue // items already on their own lines: array_indentation aligns it
 		}
 		if !arrayHasTopLevelArrow(s, open, closeIdx) {
 			continue // plain list array: leave inline
@@ -52,6 +52,30 @@ func (ArrayListItemNewline) Fix(s *tokens.Stream) bool {
 		}
 	}
 	return changed
+}
+
+// arrayTopLevelMultiline reports whether the array already has a newline at its
+// own nesting level (an item on its own line). Newlines only inside a nested
+// element (e.g. a match block) do not count.
+func arrayTopLevelMultiline(s *tokens.Stream, open, closeIdx int) bool {
+	depth := 0
+	for j := open + 1; j < closeIdx; j++ {
+		t := s.At(j)
+		if t.Kind == token.Punct {
+			switch t.Value {
+			case "(", "[", "{":
+				depth++
+				continue
+			case ")", "]", "}":
+				depth--
+				continue
+			}
+		}
+		if depth == 0 && t.Kind == token.Whitespace && hasNewline(t.Value) {
+			return true
+		}
+	}
+	return false
 }
 
 // arrayHasTopLevelArrow reports whether a "=>" appears at the array's own nesting
