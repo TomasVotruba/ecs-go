@@ -122,7 +122,9 @@ func reflowParen(s *tokens.Stream, open, closeIdx int) bool {
 		case ")", "]", "}":
 			depth--
 		case ",":
-			if depth == 0 {
+			// skip a trailing comma (nothing but the closer follows it); decided
+			// now, before edits shift indices
+			if depth == 0 && sigNext(s, j) != closeIdx {
 				commas = append(commas, j)
 			}
 		}
@@ -133,9 +135,6 @@ func reflowParen(s *tokens.Stream, open, closeIdx int) bool {
 		changed = true
 	}
 	for _, c := range slices.Backward(commas) {
-		if n := sigNext(s, c); n == closeIdx {
-			continue // trailing comma: no argument follows
-		}
 		if editSlotAfter(s, c, argNL) {
 			changed = true
 		}
