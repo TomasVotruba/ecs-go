@@ -22,9 +22,11 @@ func TestMethodChainingNewline(t *testing.T) {
 		// a "[" earlier on the line likewise
 		{"<?php\n$s = $a->b($m[2])->c();", "<?php\n$s = $a->b($m[2])->c();", false},
 
-		// grouped / call-argument chains: left inline
+		// a chain inline inside a call's arguments is left alone
 		{"<?php\nfoo($x->a()->b());", "<?php\nfoo($x->a()->b());", false},
-		{"<?php\n$y = (new Foo())->bar()->baz();", "<?php\n$y = (new Foo())->bar()->baz();", false},
+		// grouped root: the first call stays inline, later calls split
+		{"<?php\n$y = (new Foo())->bar()->baz();", "<?php\n$y = (new Foo())->bar()\n    ->baz();", true},
+		{"<?php\n$y = (new Foo())->bar();", "<?php\n$y = (new Foo())->bar();", false},
 
 		// a chain that starts its own line (inside a multi-line expression) splits
 		{"<?php\nreturn (\n    $this->a($x)->b() ||\n    $this->c()->d()\n);",
