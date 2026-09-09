@@ -11,7 +11,7 @@ Via Composer (exposes `vendor/bin/ecs-go`):
 composer require tomasvotruba/ecs-go --dev
 ```
 
-Or clone and build (requires Go):
+Or clone and build (requires Go 1.27+):
 
 ```bash
 git clone https://github.com/TomasVotruba/ecs-go.git
