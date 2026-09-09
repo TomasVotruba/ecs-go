@@ -84,6 +84,16 @@ rayon, and uses the mimalloc allocator. The upshot: the big early Rust-over-Go
 gap was mostly GC and allocation overhead, not the language - close those and the
 two converge. Exact figures for each change land in that workflow's job summary.
 
+ecs-go builds with Go 1.27. Moving the toolchain from 1.26 to 1.27 left
+throughput unchanged (within run-to-run noise) with byte-for-byte identical
+output; the 1.27 binary is ~15% larger and uses slightly more memory. Measured
+on rector-src (8926 files) over the ported PSR-12 subset:
+
+| toolchain | wall time | binary | peak memory |
+|---|---:|---:|---:|
+| Go 1.26.4 | 0.057s | 4.63 MB | ~35 MB |
+| Go 1.27.1 | 0.059s | 5.33 MB | ~42 MB |
+
 ## PSR-12
 
 The `psr12` set implements the token-safe part of PHP-CS-Fixer's `@PSR-12`:
