@@ -23,8 +23,11 @@ func TestYodaStyle(t *testing.T) {
 	assertFix(t, f, "<?php\nif (-1 === $i) {}", "<?php\nif ($i === -1) {}", true)
 	assertFix(t, f, "<?php\nif ([] === $seq) {}", "<?php\nif ($seq === []) {}", true)
 
-	// default config leaves < > <= >= untouched
-	assertFix(t, f, "<?php\nif (1000 > $x) {}", "<?php\nif (1000 > $x) {}", false)
+	// < > <= >= are de-yoda'd with the operator flipped
+	assertFix(t, f, "<?php\nif (1000 > $x) {}", "<?php\nif ($x < 1000) {}", true)
+	assertFix(t, f, "<?php\n$a = 5 >= $y;", "<?php\n$a = $y <= 5;", true)
+	// match-arm condition (=> boundary) is de-yoda'd too
+	assertFix(t, f, "<?php\n$r = match (true) {\n    null !== $x => 1,\n};", "<?php\n$r = match (true) {\n    $x !== null => 1,\n};", true)
 
 	// already non-yoda - no-op
 	assertFix(t, f, "<?php\nif ($x === null) {}", "<?php\nif ($x === null) {}", false)
