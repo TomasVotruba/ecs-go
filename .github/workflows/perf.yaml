@@ -111,7 +111,7 @@ jobs:
                   export RUST_BIN=ecs-rust/target/release/ecs-rust
                   export CONFIG=/tmp/bench-config.json
                   export ECS_CMD="php /tmp/ecsproj/vendor/bin/ecs check --fix --no-progress-bar --config /tmp/ecs.php"
-                  export RUNS=5
+                  export RUNS=10
                   bash ecs-rust/bench.sh \
                       "laravel/framework (src)" /tmp/laravel/src \
                       "symfony/symfony (src)" /tmp/symfony/src | tee -a "$GITHUB_STEP_SUMMARY"
