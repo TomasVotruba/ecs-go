@@ -9,12 +9,13 @@ import (
 
 // Symplify: https://github.com/symplify/coding-standard/blob/main/src/Fixer/Spacing/MethodChainingNewlineFixer.php
 //
-// MethodChainingNewline puts each chained method call on its own line. This is a
-// deliberately conservative port: it only splits a chain whose root is a plain
-// variable ($x, $this) sitting at a statement boundary and entirely on one line
-// - the unambiguous case symplify always breaks. Chains that are call/array
-// arguments, grouped expressions ((new X)->y()), or already multi-line are left
-// untouched, so the fixer is a no-op on code ECS has already formatted.
+// MethodChainingNewline puts each chained method call on its own line. A "->"
+// that directly follows a method call's ")" starts a new line, indented one
+// level past the chain. The first call after the chain root (a variable or a
+// grouped/constructor expression) stays inline; chains that are call/array
+// arguments on the same line, that follow a "::"/"["/"." on the line, that
+// follow a multi-line call, or that are already split are left untouched - so it
+// is a no-op on code ECS has already formatted.
 type MethodChainingNewline struct{}
 
 func (MethodChainingNewline) Name() string {
@@ -31,29 +32,28 @@ func (MethodChainingNewline) Fix(s *tokens.Stream) bool {
 		if s.At(i).Kind != token.Punct || s.At(i).Value != "->" {
 			continue
 		}
-		// the "->" must follow a call's ")"
 		prev := sigPrev(s, i)
 		if prev < 0 || s.At(prev).Kind != token.Punct || s.At(prev).Value != ")" {
+			continue // "->" must follow a ")"
+		}
+		// the ")" must close a method call, not a grouping/constructor paren -
+		// this keeps the first call after "(new X)" or "(expr)" inline
+		if !chainIsCallClose(s, prev) {
 			continue
 		}
-		// already split across lines between the ")" and the "->": leave it
+		// already split here, or the preceding call spans multiple lines: leave it
 		if rangeHasNewline(s, prev, i) {
 			continue
 		}
-		// the call/group closing at ")" spans multiple lines: leave the chain
 		if open := s.MatchBackward(prev); open >= 0 && rangeHasNewline(s, open, prev) {
 			continue
 		}
-		root, ok := chainRootVariable(s, i)
-		if !ok || rootPrecededByExpression(s, root) {
-			continue
-		}
-		// symplify suppresses the break when a "::", "[", "." or "array" appears
-		// earlier on the line (its isPartOfMethodCallOrArray heuristic)
+		// "::", "[", "." or an enclosing "(" earlier on the line means the chain is
+		// part of a call/array (symplify's isPartOfMethodCallOrArray) - leave it
 		if chainLineHasBreakingChar(s, prev) {
 			continue
 		}
-		nl := "\n" + chainBaseIndent(s, root) + "    "
+		nl := "\n" + chainFirstLineIndent(s, i) + "    "
 		if s.At(i-1).Kind == token.Whitespace {
 			s.SetValue(i-1, nl)
 		} else {
@@ -65,10 +65,61 @@ func (MethodChainingNewline) Fix(s *tokens.Stream) bool {
 	return changed
 }
 
-// chainBaseIndent returns the leading indentation of the statement line holding
-// the chain root, so every continuation aligns to the same column.
-func chainBaseIndent(s *tokens.Stream, root int) string {
-	for i := root - 1; i >= 0; i-- {
+// chainIsCallClose reports whether the ")" at closeIdx closes a function/method
+// call (its "(" follows a name, variable or another call/subscript) rather than
+// a grouping or constructor paren.
+func chainIsCallClose(s *tokens.Stream, closeIdx int) bool {
+	open := s.MatchBackward(closeIdx)
+	if open < 0 {
+		return false
+	}
+	p := sigPrev(s, open)
+	if p < 0 {
+		return false
+	}
+	t := s.At(p)
+	if t.Kind == token.Ident || t.Kind == token.Variable {
+		return true
+	}
+	return t.Kind == token.Punct && (t.Value == ")" || t.Value == "]")
+}
+
+// chainFirstLineIndent returns the indentation of the line the chain starts on,
+// so every continuation aligns to the same column. It walks back over the whole
+// chain expression (jumping across balanced brackets) to its root.
+func chainFirstLineIndent(s *tokens.Stream, opIdx int) string {
+	i := opIdx
+	root := opIdx
+	for i > 0 {
+		t := s.At(i - 1)
+		switch {
+		case t.Kind == token.Whitespace || t.Kind == token.Comment || t.Kind == token.DocComment:
+			i--
+		case t.Kind == token.Ident || t.Kind == token.Variable:
+			root = i - 1
+			i--
+		case t.Kind == token.Punct && (t.Value == "->" || t.Value == "?->" || t.Value == "::"):
+			i--
+		case t.Kind == token.Keyword && strings.ToLower(t.Value) == "new":
+			root = i - 1
+			i--
+		case t.Kind == token.Punct && (t.Value == ")" || t.Value == "]" || t.Value == "}"):
+			m := s.MatchBackward(i - 1)
+			if m < 0 {
+				return chainBaseIndent(s, root)
+			}
+			root = m
+			i = m
+		default:
+			return chainBaseIndent(s, root) // boundary before the chain root
+		}
+	}
+	return chainBaseIndent(s, root)
+}
+
+// chainBaseIndent returns the indentation after the nearest newline before index.
+func chainBaseIndent(s *tokens.Stream, index int) string {
+	for i := index - 1; i >= 0; i-- {
 		if t := s.At(i); t.Kind == token.Whitespace && strings.Contains(t.Value, "\n") {
 			if nl := strings.LastIndexByte(t.Value, '\n'); nl >= 0 {
 				return t.Value[nl+1:]
@@ -76,56 +127,6 @@ func chainBaseIndent(s *tokens.Stream, root int) string {
 		}
 	}
 	return ""
-}
-
-// chainRootVariable walks back from a "->" to the variable a chain is rooted on,
-// stepping over balanced () and [] and over "->name" / "::name" segments. It
-// fails if the chain is enclosed by an unmatched "(" or "[" (i.e. it is a call
-// or array argument) or if the root is anything but a plain variable.
-func chainRootVariable(s *tokens.Stream, opIdx int) (int, bool) {
-	depth := 0
-	for i := opIdx - 1; i >= 0; i-- {
-		t := s.At(i)
-		if t.Kind == token.Punct {
-			switch t.Value {
-			case ")", "]", "}":
-				depth++
-				continue
-			case "(", "[":
-				if depth == 0 {
-					return 0, false // enclosed by an open bracket: it's an argument
-				}
-				depth--
-				continue
-			case "{":
-				if depth == 0 {
-					return 0, false // statement/block start reached, no variable root
-				}
-				depth--
-				continue
-			case ";", ",":
-				if depth == 0 {
-					return 0, false
-				}
-				continue
-			}
-		}
-		if depth > 0 {
-			continue
-		}
-		switch {
-		case t.Kind == token.Variable:
-			return i, true
-		case t.Kind == token.Ident, t.Kind == token.Whitespace,
-			t.Kind == token.Comment, t.Kind == token.DocComment:
-			continue
-		case t.Kind == token.Punct && (t.Value == "->" || t.Value == "?->" || t.Value == "::"):
-			continue
-		default:
-			return 0, false // an operator/keyword/literal: not a plain-variable chain
-		}
-	}
-	return 0, false
 }
 
 // chainLineHasBreakingChar mirrors symplify's isPartOfMethodCallOrArray: walking
@@ -156,33 +157,4 @@ func chainLineHasBreakingChar(s *tokens.Stream, pos int) bool {
 		}
 	}
 	return false
-}
-
-// rootPrecededByExpression reports whether the chain root is part of a larger
-// expression (so breaking it would be unsafe). A safe root directly follows a
-// statement boundary or a simple assignment / return.
-func rootPrecededByExpression(s *tokens.Stream, root int) bool {
-	// a chain root that begins its own line is a safe break point, even inside a
-	// multi-line expression or argument list (symplify breaks these too)
-	if root > 0 && s.At(root-1).Kind == token.Whitespace && strings.Contains(s.At(root-1).Value, "\n") {
-		return false
-	}
-	p := sigPrev(s, root)
-	if p < 0 {
-		return false
-	}
-	t := s.At(p)
-	if t.Kind == token.OpenTag {
-		return false
-	}
-	if t.Kind == token.Keyword && strings.ToLower(t.Value) == "return" {
-		return false
-	}
-	if t.Kind == token.Punct {
-		switch t.Value {
-		case ";", "{", "}", "=":
-			return false
-		}
-	}
-	return true
 }
