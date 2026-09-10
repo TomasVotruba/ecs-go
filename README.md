@@ -3,6 +3,19 @@
 Fast, token-based PHP coding-standard checker and fixer - an [ECS](https://github.com/symplify/easy-coding-standard)-style
 tool written in Go. Runs across all CPU cores by default.
 
+## Rule coverage
+
+How many ECS rules each port implements. Regenerate with `bin/rule-counts.sh`;
+CI keeps it current.
+
+<!-- rule-counts:start -->
+| tool | rules | of ECS |
+|---|---:|---:|
+| [ECS](https://github.com/symplify/easy-coding-standard) (baseline) | 208 | 100% |
+| ecs-go | 134 | 64% |
+| ecs-rust | 84 | 40% |
+<!-- rule-counts:end -->
+
 ## Install
 
 Via Composer (exposes `vendor/bin/ecs-go`):
@@ -66,26 +79,38 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 ## Performance
 
 The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
-(in `ecs-rust/`) over the same PSR-12 rule subset (the 35 fixers both ports
-implement) on real codebases and compares wall time. All three run `--fix` in
-parallel across every core; Go and Rust also produce byte-for-byte identical
-output. Mean of 10 runs on a 24-core Linux box:
+(in `ecs-rust/`) over the same rule subset (the 84 fixers both ports implement)
+on real codebases and compares wall time. All three run `--fix` in parallel
+across every core; Go and Rust also produce byte-for-byte identical output. Mean
+of 10 runs on a 24-core Linux box:
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 4.356s | 0.085s | 0.084s |
-| rectorphp/rector-src | 3422 | 3.753s | 0.104s | 0.092s |
-| symfony/symfony (src) | 11581 | 5.951s | 0.560s | 0.352s |
+| laravel/framework (src) | 1696 | 8.611s | 0.113s | 0.095s |
+| rectorphp/rector-src | 3403 | 5.586s | 0.133s | 0.113s |
+| symfony/symfony (src) | 11581 | 18.729s | 0.708s | 0.471s |
 
-Both compiled tools are far faster than the original PHP ECS - roughly 10-50x - and
-run close to each other: ecs-go is level with the Rust port on the small tree, and
-ecs-rust edges ahead on the large one. All three fix in place with diff rendering
-off (ECS via `--no-diffs`; ecs-go and ecs-rust skip it in `--fix` mode), so each
-does the same work: lex, fix, write.
-ecs-go relaxes the GC for a batch run, presizes the lexer's token slice, and avoids
-allocations in its hottest fixers; ecs-rust lexes into copy-on-write span tokens,
-fixes files in parallel with rayon, and holds bytes as slices. Exact figures for
-each change land in that workflow's job summary.
+Both compiled tools are far faster than the original PHP ECS - roughly 40-90x -
+and run close to each other: ecs-go is level with the Rust port on the smaller
+trees, and ecs-rust pulls ahead on the large one. All three fix in place with
+diff rendering off (ECS via `--no-diffs`; ecs-go and ecs-rust skip it in `--fix`
+mode), so each does the same work: lex, fix, write.
+
+Peak memory (max resident set size, single `--fix` run):
+
+| codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
+|---|---:|---:|---:|---:|
+| laravel/framework (src) | 1696 | 66 MB | 92 MB | 316 MB |
+| rectorphp/rector-src | 3403 | 81 MB | 49 MB | 199 MB |
+| symfony/symfony (src) | 11581 | 152 MB | 458 MB | 536 MB |
+
+The compiled tools trade memory for speed: both fan files across every core, so
+peak RSS scales with how many files are in flight at once, while the PHP ECS
+works through one process and stays lowest. ecs-rust oversubscribes cores (a
+rayon pool of 2x the core count) and holds each in-flight file as copy-on-write
+span tokens, so it has the highest peak; ecs-go relaxes the GC for a batch run,
+presizes the lexer's token slice, and avoids allocations in its hottest fixers.
+Exact figures for each change land in that workflow's job summary.
 
 ## PSR-12
 

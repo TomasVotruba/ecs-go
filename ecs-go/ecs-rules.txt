@@ -4,8 +4,9 @@ ECS rules NOT yet implemented in ecs-go
 Source: every Fixer/Sniff referenced across ecs-src config/set/* and
 src/Config/Level/*, plus the PER-CS rules ecs-go tracks.
 
-Totals: 208 rules configured in ECS - 87 implemented here = ~122 not yet done.
+Totals: 208 rules configured in ECS - 134 implemented here = ~74 not yet done.
 (psr12-left.txt tracks the PSR-12 subset; this is the whole ECS surface.)
+(Counts are tracked in the README via bin/rule-counts.sh.)
 
 A few "missing" below are already covered under a newer PHP-CS-Fixer name:
   NoSpacesInsideParenthesisFixer   -> SpacesInsideParenthesesFixer
