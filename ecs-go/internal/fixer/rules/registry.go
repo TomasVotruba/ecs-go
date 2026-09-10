@@ -95,6 +95,7 @@ func CommonFixers() []fixer.Fixer {
 		EmptyLoopCondition{},
 		NoUselessReturn{},
 		FunctionToConstant{},
+		SelfAccessor{},
 	}
 }
 
