@@ -74,6 +74,7 @@ output. Mean of 10 runs on a 24-core Linux box:
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
 | laravel/framework (src) | 1696 | 4.356s | 0.085s | 0.084s |
+| rectorphp/rector-src | 3422 | 3.753s | 0.104s | 0.092s |
 | symfony/symfony (src) | 11581 | 5.951s | 0.560s | 0.352s |
 
 Both compiled tools are far faster than the original PHP ECS - roughly 10-50x - and
