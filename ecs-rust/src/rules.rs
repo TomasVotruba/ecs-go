@@ -5395,6 +5395,7 @@ struct ImportStmt {
     start: usize,
     semi: usize,
     rank: u8,
+    key: Vec<u8>,
 }
 
 fn indent_before(s: &Stream, i: usize) -> Vec<u8> {
@@ -5420,6 +5421,31 @@ fn trim_ws_tokens(mut toks: Vec<(Kind, Vec<u8>)>) -> Vec<(Kind, Vec<u8>)> {
 
 fn tokens_equal_toks(a: &[(Kind, Vec<u8>)], b: &[(Kind, Vec<u8>)]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.0 == y.0 && x.1 == y.1)
+}
+
+fn import_sort_key(s: &Stream, use_idx: usize, semi: usize) -> Vec<u8> {
+    let mut j = skip_ws(s, use_idx + 1);
+    if j < s.len() && s.kind(j) == Kind::Keyword {
+        let lw = s.bytes(j).to_ascii_lowercase();
+        if lw == b"function" || lw == b"const" {
+            j = skip_ws(s, j + 1);
+        }
+    }
+    let mut out: Vec<u8> = Vec::new();
+    let mut k = j;
+    while k < semi {
+        if s.kind(k) == Kind::Keyword && s.bytes(k).eq_ignore_ascii_case(b"as") {
+            break;
+        }
+        if s.kind(k) != Kind::Whitespace {
+            for &c in s.bytes(k) {
+                // "\" sorts before any other char (segment-wise alpha order)
+                out.push(if c == b'\\' { 0 } else { c.to_ascii_lowercase() });
+            }
+        }
+        k += 1;
+    }
+    out
 }
 
 fn use_rank(s: &Stream, use_idx: usize) -> u8 {
@@ -5470,7 +5496,7 @@ fn collect_import_run(s: &Stream, start: usize) -> Vec<ImportStmt> {
             break;
         }
         let semi = semi as usize;
-        stmts.push(ImportStmt { start: k, semi, rank: use_rank(s, k) });
+        stmts.push(ImportStmt { start: k, semi, rank: use_rank(s, k), key: import_sort_key(s, k, semi) });
         let n = skip_ws(s, semi + 1);
         if n < s.len() && s.kind(n) == Kind::Keyword && s.bytes(n).eq_ignore_ascii_case(b"use") {
             k = n;
@@ -5621,7 +5647,7 @@ fn reorder_imports(s: &mut Stream, run: &[ImportStmt]) -> (usize, bool) {
     let indent = indent_before(s, first);
 
     let mut ordered: Vec<&ImportStmt> = run.iter().collect();
-    ordered.sort_by_key(|st| st.rank);
+    ordered.sort_by(|a, b| a.key.cmp(&b.key));
 
     let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
     for (p, st) in ordered.iter().enumerate() {

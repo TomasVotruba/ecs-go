@@ -62,7 +62,7 @@ func TestSingleClassElementPerStatement(t *testing.T) {
 
 func TestOrderedImports(t *testing.T) {
 	got, changed := apply(t, OrderedImports{}, "<?php\nuse const C\\Z;\nuse B\\Y;\nuse function F\\g;\nuse A\\X;\n")
-	want := "<?php\nuse B\\Y;\nuse A\\X;\nuse function F\\g;\nuse const C\\Z;\n"
+	want := "<?php\nuse A\\X;\nuse B\\Y;\nuse const C\\Z;\nuse function F\\g;\n"
 	if !changed || got != want {
 		t.Fatalf("changed=%v\n got: %q\nwant: %q", changed, got, want)
 	}

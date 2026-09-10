@@ -11,6 +11,33 @@ import (
 type importStmt struct {
 	start, semi int
 	kind        string // "class", "function" or "const"
+	pathKey     string // lowercased imported path, for alphabetical ordering
+}
+
+// importSortKey returns the lowercased imported path of a use statement (after an
+// optional "function"/"const", up to ";" or " as "), used as the alphabetical
+// sort key by ECS's default OrderedImports (sort_algorithm: alpha).
+func importSortKey(s *tokens.Stream, useIdx, semi int) string {
+	j := skipWhitespace(s, useIdx+1)
+	if j < s.Len() && s.At(j).Kind == token.Keyword {
+		if lw := strings.ToLower(s.At(j).Value); lw == "function" || lw == "const" {
+			j = skipWhitespace(s, j+1)
+		}
+	}
+	var b strings.Builder
+	for k := j; k < semi; k++ {
+		t := s.At(k)
+		if t.Kind == token.Keyword && strings.ToLower(t.Value) == "as" {
+			break
+		}
+		if t.Kind == token.Whitespace {
+			continue
+		}
+		b.WriteString(t.Value)
+	}
+	// compare segment by segment: "\" must sort before any other character so
+	// "Rector\Php\X" precedes "Rector\Php71\Y" (ECS's alpha comparator)
+	return strings.ReplaceAll(strings.ToLower(b.String()), `\`, "\x00")
 }
 
 func useKind(s *tokens.Stream, useIdx int) string {
@@ -69,7 +96,7 @@ func collectImportRun(s *tokens.Stream, start int) []importStmt {
 		if group || semi < 0 {
 			break
 		}
-		stmts = append(stmts, importStmt{start: k, semi: semi, kind: useKind(s, k)})
+		stmts = append(stmts, importStmt{start: k, semi: semi, kind: useKind(s, k), pathKey: importSortKey(s, k, semi)})
 		n := skipWhitespace(s, semi+1)
 		if n < s.Len() && s.At(n).Kind == token.Keyword && strings.ToLower(s.At(n).Value) == "use" {
 			k = n
@@ -82,9 +109,9 @@ func collectImportRun(s *tokens.Stream, start int) []importStmt {
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Import/OrderedImportsFixer.php
 //
-// OrderedImports groups a run of use statements as PSR-12 requires: class imports
-// first, then function, then const, preserving the original order within each
-// group (sort_algorithm: none).
+// OrderedImports sorts a run of use statements alphabetically by imported path
+// (case-insensitive), matching ECS's default (sort_algorithm: alpha, no type
+// grouping).
 type OrderedImports struct{}
 
 func (OrderedImports) Name() string {
@@ -124,7 +151,7 @@ func reorderImports(s *tokens.Stream, run []importStmt) (int, bool) {
 
 	ordered := append([]importStmt(nil), run...)
 	sort.SliceStable(ordered, func(a, b int) bool {
-		return importGroupRank(ordered[a].kind) < importGroupRank(ordered[b].kind)
+		return ordered[a].pathKey < ordered[b].pathKey
 	})
 
 	var repl []token.Token
