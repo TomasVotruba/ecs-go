@@ -165,23 +165,48 @@ func (IndentationType) Fix(s *tokens.Stream) bool {
 	changed := false
 	for i := range s.Len() {
 		t := s.At(i)
-		if t.Kind != token.Whitespace || !strings.Contains(t.Value, "\t") {
+		if !strings.Contains(t.Value, "\t") {
 			continue
 		}
-		// segments after a newline are line indentation; the first segment is
-		// trailing whitespace of the previous line and is left alone
-		parts := strings.Split(t.Value, "\n")
-		touched := false
-		for k := 1; k < len(parts); k++ {
-			if strings.Contains(parts[k], "\t") {
-				parts[k] = strings.ReplaceAll(parts[k], "\t", "    ")
-				touched = true
+		switch t.Kind {
+		case token.Whitespace:
+			// segments after a newline are line indentation; the first segment is
+			// trailing whitespace of the previous line and is left alone
+			parts := strings.Split(t.Value, "\n")
+			touched := false
+			for k := 1; k < len(parts); k++ {
+				if strings.Contains(parts[k], "\t") {
+					parts[k] = strings.ReplaceAll(parts[k], "\t", "    ")
+					touched = true
+				}
 			}
-		}
-		if touched {
-			s.SetValue(i, strings.Join(parts, "\n"))
-			changed = true
+			if touched {
+				s.SetValue(i, strings.Join(parts, "\n"))
+				changed = true
+			}
+		case token.Comment, token.DocComment:
+			if v := reindentCommentTabs(t.Value); v != t.Value {
+				s.SetValue(i, v)
+				changed = true
+			}
 		}
 	}
 	return changed
+}
+
+// reindentCommentTabs converts leading-indentation tabs to four spaces on each
+// continuation line of a multi-line comment or docblock, matching ECS.
+func reindentCommentTabs(v string) string {
+	lines := strings.Split(v, "\n")
+	for k := 1; k < len(lines); k++ {
+		line := lines[k]
+		j := 0
+		for j < len(line) && (line[j] == ' ' || line[j] == '\t') {
+			j++
+		}
+		if strings.Contains(line[:j], "\t") {
+			lines[k] = strings.ReplaceAll(line[:j], "\t", "    ") + line[j:]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
