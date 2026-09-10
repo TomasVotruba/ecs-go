@@ -53,17 +53,6 @@ func useKind(s *tokens.Stream, useIdx int) string {
 	return "class"
 }
 
-func importGroupRank(kind string) int {
-	switch kind {
-	case "function":
-		return 1
-	case "const":
-		return 2
-	default:
-		return 0
-	}
-}
-
 // collectImportRun gathers a maximal run of consecutive top-level use statements
 // starting at start, separated only by whitespace. Group imports and closure use
 // stop the run.
