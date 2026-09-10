@@ -5803,6 +5803,9 @@ fn no_unused_imports(s: &mut Stream) -> bool {
         start: usize,
         semi: usize,
         short_lower: Vec<u8>,
+        kind: u8, // 0 class, 1 function, 2 const
+        full_lower: Vec<u8>,
+        aliased: bool,
     }
     let mut imports: Vec<II> = Vec::new();
     let mut i = 0;
@@ -5814,15 +5817,18 @@ fn no_unused_imports(s: &mut Stream) -> bool {
             i += 1;
             continue;
         }
-        let mut j = skip_ws(s, i + 1);
-        if j < s.len() && s.kind(j) == Kind::Punct && s.bytes(j) == b"(" {
+        let j0 = skip_ws(s, i + 1);
+        if j0 < s.len() && s.kind(j0) == Kind::Punct && s.bytes(j0) == b"(" {
             i += 1;
             continue;
         }
-        if j < s.len() && s.kind(j) == Kind::Keyword {
-            let lw = s.bytes(j).to_ascii_lowercase();
-            if lw == b"function" || lw == b"const" {
-                j = skip_ws(s, j + 1);
+        let mut kind = 0u8;
+        if j0 < s.len() && s.kind(j0) == Kind::Keyword {
+            let lw = s.bytes(j0).to_ascii_lowercase();
+            if lw == b"function" {
+                kind = 1;
+            } else if lw == b"const" {
+                kind = 2;
             }
         }
         let mut semi: isize = -1;
@@ -5846,37 +5852,38 @@ fn no_unused_imports(s: &mut Stream) -> bool {
             continue;
         }
         let semi = semi as usize;
-        let short = match import_short_name(s, j, semi) {
-            Some(x) if !x.is_empty() => x,
-            _ => {
-                i += 1;
-                continue;
-            }
-        };
-        imports.push(II { start: i, semi, short_lower: short.to_ascii_lowercase() });
+        let (short, full, aliased) = nui_import_parts(s, i, semi, kind);
+        if short.is_empty() {
+            i += 1;
+            continue;
+        }
+        imports.push(II {
+            start: i,
+            semi,
+            short_lower: short.to_ascii_lowercase(),
+            kind,
+            full_lower: full.to_ascii_lowercase(),
+            aliased,
+        });
         i = semi + 1;
     }
     if imports.is_empty() {
         return false;
     }
 
-    let in_import = |idx: usize| -> bool {
-        imports.iter().any(|im| idx >= im.start && idx <= im.semi)
-    };
-    let mut used: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
-    let mut comment_text: Vec<u8> = Vec::new();
-    for k in 0..s.len() {
-        if s.kind(k) == Kind::Ident && !in_import(k) {
-            used.insert(s.bytes(k).to_ascii_lowercase());
-        }
-        if s.kind(k) == Kind::Comment || s.kind(k) == Kind::DocComment {
-            comment_text.extend_from_slice(&s.bytes(k).to_ascii_lowercase());
-        }
-    }
+    let ns_lower = nui_file_namespace(s).to_ascii_lowercase();
+    let ranges: Vec<(usize, usize)> = imports.iter().map(|im| (im.start, im.semi)).collect();
+    let in_import = |idx: usize| ranges.iter().any(|&(a, b)| idx >= a && idx <= b);
 
     let mut changed = false;
     for im in imports.iter().rev() {
-        if used.contains(&im.short_lower) || contains_subslice(&comment_text, &im.short_lower) {
+        let redundant = !im.aliased
+            && !ns_lower.is_empty()
+            && im.full_lower.starts_with(&ns_lower)
+            && im.full_lower.len() > ns_lower.len()
+            && im.full_lower[ns_lower.len()] == b'\\'
+            && !im.full_lower[ns_lower.len() + 1..].contains(&b'\\');
+        if !redundant && nui_import_used(s, im.short_lower.as_slice(), im.kind, &in_import) {
             continue;
         }
         let mut r = im.semi;
@@ -5899,6 +5906,168 @@ fn no_unused_imports(s: &mut Stream) -> bool {
     changed
 }
 
+fn nui_import_used<F: Fn(usize) -> bool>(s: &Stream, short_lower: &[u8], kind: u8, in_import: &F) -> bool {
+    for k in 0..s.len() {
+        let kd = s.kind(k);
+        if kd == Kind::Ident && !in_import(k) && s.bytes(k).to_ascii_lowercase() == short_lower {
+            if nui_usage_matches_kind(s, k, kind) {
+                return true;
+            }
+            continue;
+        }
+        if kd == Kind::Keyword && kind == 0 && !in_import(k)
+            && s.bytes(k).to_ascii_lowercase() == short_lower && nui_keyword_is_class_ref(s, k)
+        {
+            return true;
+        }
+        if (kd == Kind::Comment || kd == Kind::DocComment) && nui_comment_references(s.bytes(k), short_lower) {
+            return true;
+        }
+    }
+    false
+}
+
+fn nui_usage_matches_kind(s: &Stream, k: usize, kind: u8) -> bool {
+    let prev = prev_significant_index(s, k);
+    if let Some(p) = prev {
+        if s.kind(p) == Kind::Punct {
+            match s.bytes(p) {
+                b"\\" | b"->" | b"?->" | b"::" => return false,
+                _ => {}
+            }
+        }
+        if s.kind(p) == Kind::Keyword {
+            let lw = s.bytes(p).to_ascii_lowercase();
+            if lw == b"namespace" || lw == b"function" {
+                return false;
+            }
+            if lw == b"const" && next_significant_value(s, k) == b"=" {
+                return false;
+            }
+        }
+    }
+    let prev_new = matches!(prev, Some(p) if s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"new"));
+    let fn_call = next_significant_value(s, k) == b"(" && !prev_new;
+    if kind == 1 {
+        return fn_call;
+    }
+    !fn_call
+}
+
+fn nui_keyword_is_class_ref(s: &Stream, k: usize) -> bool {
+    if let Some(p) = prev_significant_index(s, k) {
+        if s.kind(p) == Kind::Keyword {
+            match s.bytes(p).to_ascii_lowercase().as_slice() {
+                b"extends" | b"implements" | b"new" | b"instanceof" => return true,
+                _ => {}
+            }
+        }
+        if s.kind(p) == Kind::Punct {
+            match s.bytes(p) {
+                b"(" | b"," | b":" | b"|" | b"&" | b"?" => return true,
+                _ => {}
+            }
+        }
+    }
+    if let Some(n) = next_significant_index(s, k) {
+        if s.kind(n) == Kind::Punct && s.bytes(n) == b"::" {
+            return true;
+        }
+        if s.kind(n) == Kind::Variable {
+            return true;
+        }
+    }
+    false
+}
+
+fn nui_ident_byte(c: u8) -> bool {
+    c == b'_' || c.is_ascii_alphanumeric()
+}
+
+fn nui_comment_references(v: &[u8], short_lower: &[u8]) -> bool {
+    if short_lower.is_empty() {
+        return false;
+    }
+    let lv = v.to_ascii_lowercase();
+    let mut from = 0;
+    while from + short_lower.len() <= lv.len() {
+        if let Some(idx) = lv[from..].windows(short_lower.len()).position(|w| w == short_lower) {
+            let p = from + idx;
+            let before = if p > 0 { lv[p - 1] } else { b' ' };
+            let after = if p + short_lower.len() < lv.len() { lv[p + short_lower.len()] } else { b' ' };
+            if !nui_ident_byte(before) && before != b'$' && before != b'\\' && !nui_ident_byte(after) {
+                return true;
+            }
+            from = p + 1;
+        } else {
+            break;
+        }
+    }
+    false
+}
+
+fn nui_import_parts(s: &Stream, use_idx: usize, semi: usize, kind: u8) -> (Vec<u8>, Vec<u8>, bool) {
+    let mut j = skip_ws(s, use_idx + 1);
+    if kind != 0 {
+        j = skip_ws(s, j + 1);
+    }
+    let mut path: Vec<u8> = Vec::new();
+    let mut alias: Vec<u8> = Vec::new();
+    let mut in_alias = false;
+    let mut aliased = false;
+    let mut k = j;
+    while k < semi {
+        let t = s.kind(k);
+        if t == Kind::Keyword && s.bytes(k).eq_ignore_ascii_case(b"as") {
+            in_alias = true;
+            aliased = true;
+            k += 1;
+            continue;
+        }
+        if t == Kind::Whitespace {
+            k += 1;
+            continue;
+        }
+        if in_alias {
+            if t == Kind::Ident {
+                alias = s.bytes(k).to_vec();
+            }
+        } else {
+            path.extend_from_slice(s.bytes(k));
+        }
+        k += 1;
+    }
+    let full: Vec<u8> = if path.first() == Some(&b'\\') { path[1..].to_vec() } else { path };
+    let short = if !alias.is_empty() {
+        alias
+    } else if let Some(p) = full.iter().rposition(|&c| c == b'\\') {
+        full[p + 1..].to_vec()
+    } else {
+        full.clone()
+    };
+    (short, full, aliased)
+}
+
+fn nui_file_namespace(s: &Stream) -> Vec<u8> {
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Keyword || !s.bytes(i).eq_ignore_ascii_case(b"namespace") || member_prev(s, i) {
+            continue;
+        }
+        let mut b: Vec<u8> = Vec::new();
+        let mut k = i + 1;
+        while k < s.len() {
+            if s.kind(k) == Kind::Punct && (s.bytes(k) == b";" || s.bytes(k) == b"{") {
+                break;
+            }
+            if s.kind(k) != Kind::Whitespace {
+                b.extend_from_slice(s.bytes(k));
+            }
+            k += 1;
+        }
+        return if b.first() == Some(&b'\\') { b[1..].to_vec() } else { b };
+    }
+    Vec::new()
+}
 // --- ported batch 9: functions / arrays / yoda -----------------------------
 
 fn copy_range(s: &Stream, a: usize, b: usize) -> Vec<(Kind, Vec<u8>)> {
