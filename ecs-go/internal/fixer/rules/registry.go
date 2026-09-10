@@ -98,6 +98,7 @@ func CommonFixers() []fixer.Fixer {
 		SelfAccessor{},
 		RemoveUselessDefaultComment{},
 		ProtectedToPrivate{},
+		AddMissingParamName{},
 	}
 }
 
