@@ -96,6 +96,7 @@ func CommonFixers() []fixer.Fixer {
 		NoUselessReturn{},
 		FunctionToConstant{},
 		SelfAccessor{},
+		RemoveUselessDefaultComment{},
 	}
 }
 
