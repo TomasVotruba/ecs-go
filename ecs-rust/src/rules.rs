@@ -28,6 +28,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\StringNotation\SingleQuoteFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\TrimArraySpacesFixer",
     r"PhpCsFixer\Fixer\Operator\NoSpaceAroundDoubleColonFixer",
+    r"PhpCsFixer\Fixer\AttributeNotation\AttributeBlockNoSpacesFixer",
     r"PhpCsFixer\Fixer\StringNotation\HeredocToNowdocFixer",
     r"PhpCsFixer\Fixer\StringNotation\NoBinaryStringFixer",
     r"PhpCsFixer\Fixer\Operator\NoUselessConcatOperatorFixer",
@@ -44,8 +45,12 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Comment\MultilineCommentOpeningClosingFixer",
     r"PhpCsFixer\Fixer\Basic\EncodingFixer",
     r"PhpCsFixer\Fixer\LanguageConstruct\DeclareParenthesesFixer",
+    r"PhpCsFixer\Fixer\Whitespace\TypeDeclarationSpacesFixer",
+    r"PhpCsFixer\Fixer\Whitespace\CompactNullableTypeDeclarationFixer",
+    r"PhpCsFixer\Fixer\Whitespace\TypesSpacesFixer",
     r"PhpCsFixer\Fixer\Phpdoc\AlignMultilineCommentFixer",
     r"PhpCsFixer\Fixer\Operator\AssignNullCoalescingToCoalesceEqualFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\NullableTypeDeclarationForDefaultNullValueFixer",
     r"PhpCsFixer\Fixer\Comment\SingleLineCommentStyleFixer",
     r"PhpCsFixer\Fixer\LanguageConstruct\ExplicitIndirectVariableFixer",
     r"PhpCsFixer\Fixer\StringNotation\ExplicitStringVariableFixer",
@@ -62,6 +67,8 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Casing\MagicMethodCasingFixer",
     r"PhpCsFixer\Fixer\Casing\NativeFunctionCasingFixer",
     r"PhpCsFixer\Fixer\Casing\IntegerLiteralCaseFixer",
+    r"PhpCsFixer\Fixer\Casing\NativeTypeDeclarationCasingFixer",
+    r"PhpCsFixer\Fixer\Casing\NativeFunctionTypeDeclarationCasingFixer",
     r"PhpCsFixer\Fixer\Casing\ClassReferenceNameCasingFixer",
     r"PhpCsFixer\Fixer\NamespaceNotation\NoLeadingNamespaceWhitespaceFixer",
     r"PhpCsFixer\Fixer\Semicolon\NoSinglelineWhitespaceBeforeSemicolonsFixer",
@@ -118,6 +125,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_quote(s);
     changed |= trim_array_spaces(s);
     changed |= no_space_around_double_colon(s);
+    changed |= attribute_block_no_spaces(s);
     changed |= heredoc_to_nowdoc(s);
     changed |= no_binary_string(s);
     changed |= no_useless_concat_operator(s);
@@ -134,8 +142,12 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= multiline_comment_opening_closing(s);
     changed |= encoding(s);
     changed |= declare_parentheses(s);
+    changed |= type_declaration_spaces(s);
+    changed |= compact_nullable_type_declaration(s);
+    changed |= types_spaces(s);
     changed |= align_multiline_comment(s);
     changed |= assign_null_coalescing_to_coalesce_equal(s);
+    changed |= nullable_type_declaration_for_default_null_value(s);
     changed |= single_line_comment_style(s);
     changed |= explicit_indirect_variable(s);
     changed |= explicit_string_variable(s);
@@ -152,6 +164,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= magic_method_casing(s);
     changed |= native_function_casing(s);
     changed |= integer_literal_case(s);
+    changed |= native_type_declaration_casing(s);
+    changed |= native_function_type_declaration_casing(s);
     changed |= class_reference_name_casing(s);
     changed |= no_leading_namespace_whitespace(s);
     changed |= no_singleline_whitespace_before_semicolons(s);
@@ -4696,6 +4710,517 @@ fn new_with_parentheses(s: &mut Stream) -> bool {
         s.insert_owned(k + 1, Kind::Punct, b")".to_vec());
         changed = true;
         i += 1;
+    }
+    changed
+}
+
+// --- ported batch 5: type / casing / attribute -----------------------------
+
+fn is_native_type_name(b: &[u8]) -> bool {
+    matches!(
+        b,
+        b"int" | b"string" | b"bool" | b"float" | b"void"
+            | b"array" | b"iterable" | b"object" | b"mixed" | b"null"
+            | b"false" | b"true" | b"never" | b"callable" | b"self"
+            | b"parent" | b"static"
+    )
+}
+
+fn is_visibility_modifier(v: &[u8]) -> bool {
+    matches!(
+        v.to_ascii_lowercase().as_slice(),
+        b"public" | b"private" | b"protected" | b"readonly" | b"static" | b"var"
+    )
+}
+
+fn is_type_name_token(s: &Stream, i: usize) -> bool {
+    match s.kind(i) {
+        Kind::Ident => true,
+        Kind::Keyword => is_native_type_name(s.bytes(i).to_ascii_lowercase().as_slice()),
+        _ => false,
+    }
+}
+
+fn type_context_prev(s: &Stream, i: usize) -> bool {
+    let p = match prev_significant_index(s, i) {
+        Some(p) => p,
+        None => return false,
+    };
+    match s.kind(p) {
+        Kind::Punct => matches!(s.bytes(p), b"(" | b"," | b"|" | b"?" | b"&" | b":"),
+        Kind::Keyword => matches!(
+            s.bytes(p).to_ascii_lowercase().as_slice(),
+            b"public" | b"private" | b"protected" | b"static" | b"readonly" | b"var"
+        ),
+        _ => false,
+    }
+}
+
+fn type_context_next(s: &Stream, i: usize) -> bool {
+    let n = match next_significant_index(s, i) {
+        Some(n) => n,
+        None => return false,
+    };
+    match s.kind(n) {
+        Kind::Variable => true,
+        Kind::Punct => matches!(s.bytes(n), b"|" | b"&" | b"{" | b";"),
+        _ => false,
+    }
+}
+
+fn is_function_param_open(s: &Stream, open: usize) -> bool {
+    if s.kind(open) != Kind::Punct || s.bytes(open) != b"(" {
+        return false;
+    }
+    let p = match prev_significant_index(s, open) {
+        Some(p) => p,
+        None => return false,
+    };
+    match s.kind(p) {
+        Kind::Keyword => {
+            let v = s.bytes(p).to_ascii_lowercase();
+            v == b"function" || v == b"fn"
+        }
+        Kind::Ident => {
+            let mut q = prev_significant_index(s, p);
+            if let Some(qi) = q {
+                if s.kind(qi) == Kind::Punct && s.bytes(qi) == b"&" {
+                    q = prev_significant_index(s, qi);
+                }
+            }
+            matches!(q, Some(qi)
+                if s.kind(qi) == Kind::Keyword
+                    && s.bytes(qi).eq_ignore_ascii_case(b"function"))
+        }
+        _ => false,
+    }
+}
+
+fn enclosing_func_param_open(s: &Stream, i: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    for j in (0..i).rev() {
+        if s.kind(j) != Kind::Punct {
+            continue;
+        }
+        match s.bytes(j) {
+            b")" => depth += 1,
+            b"(" => {
+                if depth == 0 {
+                    return if is_function_param_open(s, j) { Some(j) } else { None };
+                }
+                depth -= 1;
+            }
+            b"{" | b"}" | b";" => {
+                if depth == 0 {
+                    return None;
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn is_nullable_type_pos(s: &Stream, i: usize) -> bool {
+    let p = match prev_significant_index(s, i) {
+        Some(p) => p,
+        None => return false,
+    };
+    match s.kind(p) {
+        Kind::Punct => matches!(s.bytes(p), b":" | b"(" | b"," | b"|"),
+        Kind::Keyword => matches!(
+            s.bytes(p).to_ascii_lowercase().as_slice(),
+            b"public" | b"private" | b"protected" | b"readonly" | b"static" | b"var"
+        ),
+        _ => false,
+    }
+}
+
+fn in_return_type(s: &Stream, i: usize) -> bool {
+    let mut j = i;
+    loop {
+        let p = match prev_significant_index(s, j) {
+            Some(p) => p,
+            None => return false,
+        };
+        if s.kind(p) == Kind::Punct && s.bytes(p) == b":" {
+            return is_return_type_colon(s, p);
+        }
+        if s.kind(p) == Kind::Ident
+            || (s.kind(p) == Kind::Punct
+                && matches!(s.bytes(p), b"?" | b"|" | b"&" | b"\\"))
+        {
+            j = p;
+            continue;
+        }
+        return false;
+    }
+}
+
+fn is_function_signature_type(s: &Stream, i: usize) -> bool {
+    if enclosing_func_param_open(s, i).is_some()
+        && type_context_prev(s, i)
+        && type_context_next(s, i)
+    {
+        return true;
+    }
+    in_return_type(s, i)
+}
+
+fn is_type_union_part(s: &Stream, i: usize) -> bool {
+    if is_type_name_token(s, i) {
+        return true;
+    }
+    s.kind(i) == Kind::Punct && matches!(s.bytes(i), b"?" | b"\\" | b"|" | b"&")
+}
+
+fn type_run_boundary_prev(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i;
+    loop {
+        let p = prev_significant_index(s, j)?;
+        if is_type_union_part(s, p) {
+            j = p;
+            continue;
+        }
+        return Some(p);
+    }
+}
+
+fn type_run_boundary_next(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i;
+    loop {
+        let n = next_significant_index(s, j)?;
+        if is_type_union_part(s, n) {
+            j = n;
+            continue;
+        }
+        return Some(n);
+    }
+}
+
+fn is_type_union_operator(s: &Stream, i: usize) -> bool {
+    let p = match prev_significant_index(s, i) {
+        Some(p) => p,
+        None => return false,
+    };
+    let n = match next_significant_index(s, i) {
+        Some(n) => n,
+        None => return false,
+    };
+    if !is_type_name_token(s, p) {
+        return false;
+    }
+    if !is_type_name_token(s, n)
+        && (s.kind(n) != Kind::Punct || (s.bytes(n) != b"?" && s.bytes(n) != b"\\"))
+    {
+        return false;
+    }
+    if in_return_type(s, i) {
+        return true;
+    }
+    let end = match type_run_boundary_next(s, i) {
+        Some(e) => e,
+        None => return false,
+    };
+    if s.kind(end) != Kind::Variable {
+        return false;
+    }
+    let start = match type_run_boundary_prev(s, i) {
+        Some(st) => st,
+        None => return false,
+    };
+    if enclosing_func_param_open(s, i).is_some() {
+        if s.kind(start) == Kind::Punct && matches!(s.bytes(start), b"(" | b",") {
+            return true;
+        }
+        return s.kind(start) == Kind::Keyword && is_visibility_modifier(s.bytes(start));
+    }
+    s.kind(start) == Kind::Keyword && is_visibility_modifier(s.bytes(start))
+}
+
+fn is_type_declaration_variable(s: &Stream, v: usize, p: usize) -> bool {
+    if enclosing_func_param_open(s, v).is_some() {
+        return true;
+    }
+    let boundary = match type_run_boundary_prev(s, p) {
+        Some(b) => b,
+        None => return false,
+    };
+    s.kind(boundary) == Kind::Keyword && is_visibility_modifier(s.bytes(boundary))
+}
+
+fn has_null_default(s: &Stream, v: usize) -> bool {
+    let eq = match next_significant_index(s, v) {
+        Some(e) => e,
+        None => return false,
+    };
+    if s.kind(eq) != Kind::Punct || s.bytes(eq) != b"=" {
+        return false;
+    }
+    let nv = match next_significant_index(s, eq) {
+        Some(n) => n,
+        None => return false,
+    };
+    if s.kind(nv) != Kind::Ident || !s.bytes(nv).eq_ignore_ascii_case(b"null") {
+        return false;
+    }
+    let after = match next_significant_index(s, nv) {
+        Some(a) => a,
+        None => return false,
+    };
+    s.kind(after) == Kind::Punct && matches!(s.bytes(after), b"," | b")")
+}
+
+fn type_run_start(s: &Stream, end: usize) -> (usize, bool, bool) {
+    let mut start = end;
+    let mut has_union = false;
+    let mut has_nullable = false;
+    loop {
+        let pp = match prev_significant_index(s, start) {
+            Some(p) => p,
+            None => break,
+        };
+        if s.kind(pp) == Kind::Punct {
+            match s.bytes(pp) {
+                b"|" | b"&" => {
+                    has_union = true;
+                    start = pp;
+                    continue;
+                }
+                b"?" => {
+                    has_nullable = true;
+                    start = pp;
+                    continue;
+                }
+                b"\\" => {
+                    start = pp;
+                    continue;
+                }
+                _ => {}
+            }
+            break;
+        }
+        if is_type_name_token(s, pp) {
+            start = pp;
+            continue;
+        }
+        break;
+    }
+    (start, has_union, has_nullable)
+}
+
+fn attribute_block_no_spaces(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Comment {
+            continue;
+        }
+        let b = s.bytes(i);
+        if !b.starts_with(b"#[") || !b.ends_with(b"]") || b.len() < 3 {
+            continue;
+        }
+        let inner = &b[2..b.len() - 1];
+        let lo = inner
+            .iter()
+            .position(|&c| c != b' ' && c != b'\t')
+            .unwrap_or(inner.len());
+        let hi = inner
+            .iter()
+            .rposition(|&c| c != b' ' && c != b'\t')
+            .map(|p| p + 1)
+            .unwrap_or(lo);
+        let trimmed = &inner[lo..hi];
+        if trimmed.len() == inner.len() {
+            continue;
+        }
+        let mut v = Vec::with_capacity(trimmed.len() + 3);
+        v.extend_from_slice(b"#[");
+        v.extend_from_slice(trimmed);
+        v.push(b']');
+        s.set_owned(i, v);
+        changed = true;
+    }
+    changed
+}
+
+fn type_declaration_spaces(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Variable {
+            continue;
+        }
+        let p = match prev_significant_index(s, i) {
+            Some(p) if is_type_name_token(s, p) => p,
+            _ => continue,
+        };
+        if !is_type_declaration_variable(s, i, p) {
+            continue;
+        }
+        if p == i - 1 {
+            s.insert_owned(i, Kind::Whitespace, b" ".to_vec());
+            changed = true;
+            continue;
+        }
+        if p == i - 2 && s.kind(i - 1) == Kind::Whitespace {
+            let ws = s.bytes(i - 1);
+            if ws != b" " && !has_newline(ws) {
+                s.set_owned(i - 1, b" ".to_vec());
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+fn compact_nullable_type_declaration(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct || s.bytes(i) != b"?" {
+            i += 1;
+            continue;
+        }
+        if !is_nullable_type_pos(s, i) {
+            i += 1;
+            continue;
+        }
+        let n = match next_significant_index(s, i) {
+            Some(n) if is_type_name_token(s, n) => n,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        let mut j = n - 1;
+        while j > i {
+            if s.kind(j) == Kind::Whitespace && !has_newline(s.bytes(j)) {
+                s.remove_at(j);
+                changed = true;
+            }
+            j -= 1;
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn types_spaces(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct || (s.bytes(i) != b"|" && s.bytes(i) != b"&") {
+            i += 1;
+            continue;
+        }
+        if !is_type_union_operator(s, i) {
+            i += 1;
+            continue;
+        }
+        if i + 1 < s.len() && s.kind(i + 1) == Kind::Whitespace && !has_newline(s.bytes(i + 1)) {
+            s.remove_at(i + 1);
+            changed = true;
+        }
+        if i > 0 && s.kind(i - 1) == Kind::Whitespace && !has_newline(s.bytes(i - 1)) {
+            s.remove_at(i - 1);
+            i -= 1;
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn nullable_type_declaration_for_default_null_value(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = s.len() as isize - 1;
+    while i >= 0 {
+        let idx = i as usize;
+        if s.kind(idx) != Kind::Variable {
+            i -= 1;
+            continue;
+        }
+        if enclosing_func_param_open(s, idx).is_none() {
+            i -= 1;
+            continue;
+        }
+        if !has_null_default(s, idx) {
+            i -= 1;
+            continue;
+        }
+        let mut p = match prev_significant_index(s, idx) {
+            Some(p) => p,
+            None => {
+                i -= 1;
+                continue;
+            }
+        };
+        if s.kind(p) == Kind::Punct && s.bytes(p) == b"&" {
+            p = match prev_significant_index(s, p) {
+                Some(p) => p,
+                None => {
+                    i -= 1;
+                    continue;
+                }
+            };
+        }
+        if !is_type_name_token(s, p) {
+            i -= 1;
+            continue;
+        }
+        let (start, has_union, has_nullable) = type_run_start(s, p);
+        if has_nullable || has_union {
+            i -= 1;
+            continue;
+        }
+        if start == p {
+            let lo = s.bytes(p).to_ascii_lowercase();
+            if lo == b"mixed" || lo == b"null" {
+                i -= 1;
+                continue;
+            }
+        }
+        s.insert_owned(start, Kind::Punct, b"?".to_vec());
+        changed = true;
+        i = start as isize;
+        i -= 1;
+    }
+    changed
+}
+
+fn native_type_declaration_casing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Ident && s.kind(i) != Kind::Keyword {
+            continue;
+        }
+        let lower = s.bytes(i).to_ascii_lowercase();
+        if !is_native_type_name(lower.as_slice()) || lower.as_slice() == s.bytes(i) {
+            continue;
+        }
+        if !type_context_prev(s, i) || !type_context_next(s, i) {
+            continue;
+        }
+        s.set_owned(i, lower);
+        changed = true;
+    }
+    changed
+}
+
+fn native_function_type_declaration_casing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Ident && s.kind(i) != Kind::Keyword {
+            continue;
+        }
+        let lower = s.bytes(i).to_ascii_lowercase();
+        if !is_native_type_name(lower.as_slice()) || lower.as_slice() == s.bytes(i) {
+            continue;
+        }
+        if !is_function_signature_type(s, i) {
+            continue;
+        }
+        s.set_owned(i, lower);
+        changed = true;
     }
     changed
 }
