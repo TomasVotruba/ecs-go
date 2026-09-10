@@ -70,6 +70,16 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocTrimConsecutiveBlankLineSeparationFixer",
     r"PhpCsFixer\Fixer\Phpdoc\NoEmptyPhpdocFixer",
     r"PhpCsFixer\Fixer\Phpdoc\NoBlankLinesAfterPhpdocFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocTagCasingFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocInlineTagNormalizerFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoDuplicateTypesFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocVarWithoutNameFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocIndentFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocOrderByValueFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocLineSpanFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocTypesOrderFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocVarAnnotationCorrectOrderFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocReturnSelfReferenceFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseKeywordsFixer",
     r"PhpCsFixer\Fixer\Casing\ConstantCaseFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseStaticReferenceFixer",
@@ -198,6 +208,16 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= phpdoc_trim_consecutive_blank_line_separation(s);
     changed |= no_empty_phpdoc(s);
     changed |= no_blank_lines_after_phpdoc(s);
+    changed |= phpdoc_tag_casing(s);
+    changed |= phpdoc_inline_tag_normalizer(s);
+    changed |= phpdoc_no_duplicate_types(s);
+    changed |= phpdoc_var_without_name(s);
+    changed |= phpdoc_indent(s);
+    changed |= phpdoc_order_by_value(s);
+    changed |= phpdoc_line_span(s);
+    changed |= phpdoc_types_order(s);
+    changed |= phpdoc_var_annotation_correct_order(s);
+    changed |= phpdoc_return_self_reference(s);
     changed |= lowercase_keywords(s);
     changed |= constant_case(s);
     changed |= lowercase_static_reference(s);
@@ -8113,4 +8133,759 @@ fn no_blank_lines_after_phpdoc(s: &mut Stream) -> bool {
         }
     }
     changed
+}
+
+// --- ported batch: phpdoc structural rules ---------------------------------
+
+fn is_word_byte(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_'
+}
+
+// phpdoc_tag_casing: replace @inheritdoc (any case, \b) with @inheritDoc.
+fn replace_inheritdoc(content: &[u8]) -> Vec<u8> {
+    let needle = b"inheritdoc";
+    let mut out = Vec::with_capacity(content.len());
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b'@'
+            && i + 1 + needle.len() <= content.len()
+            && content[i + 1..i + 1 + needle.len()].eq_ignore_ascii_case(needle)
+        {
+            let after = i + 1 + needle.len();
+            let boundary = after >= content.len() || !is_word_byte(content[after]);
+            if boundary {
+                out.extend_from_slice(b"@inheritDoc");
+                i = after;
+                continue;
+            }
+        }
+        out.push(content[i]);
+        i += 1;
+    }
+    out
+}
+
+fn phpdoc_tag_casing(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            let fixed = replace_inheritdoc(&l.content);
+            if fixed != l.content {
+                l.content = fixed;
+                changed = true;
+            }
+        }
+        changed
+    })
+}
+
+fn is_inline_tag_word(low: &[u8]) -> bool {
+    matches!(
+        low,
+        b"example" | b"id" | b"internal" | b"inheritdoc" | b"inheritdocs"
+            | b"link" | b"source" | b"toc" | b"tutorial" | b"see"
+    )
+}
+
+// phpdoc_inline_tag_normalizer: normalize "@{tag ...}" / "{ @tag ... }" -> "{@tag doc}".
+fn normalize_inline_tags(content: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(content.len());
+    let mut i = 0;
+    while i < content.len() {
+        // try to match at i
+        let start = i;
+        let mut j = i;
+        let mut matched_prefix = false;
+        if content[j] == b'@' {
+            // @\{+
+            let mut k = j + 1;
+            let bs = k;
+            while k < content.len() && content[k] == b'{' {
+                k += 1;
+            }
+            if k > bs {
+                j = k;
+                matched_prefix = true;
+            }
+        }
+        if !matched_prefix && content[j] == b'{' {
+            // \{+[ \t]*@
+            let mut k = j;
+            while k < content.len() && content[k] == b'{' {
+                k += 1;
+            }
+            let mut m = k;
+            while m < content.len() && (content[m] == b' ' || content[m] == b'\t') {
+                m += 1;
+            }
+            if k > j && m < content.len() && content[m] == b'@' {
+                j = m + 1;
+                matched_prefix = true;
+            }
+        }
+        if matched_prefix {
+            // [ \t]*
+            while j < content.len() && (content[j] == b' ' || content[j] == b'\t') {
+                j += 1;
+            }
+            // tag word
+            let tw = j;
+            while j < content.len() && content[j].is_ascii_alphabetic() {
+                j += 1;
+            }
+            let tag = &content[tw..j];
+            let boundary = j >= content.len() || !is_word_byte(content[j]);
+            if !tag.is_empty() && is_inline_tag_word(tag.to_ascii_lowercase().as_slice()) && boundary {
+                // [^}]*
+                let is = j;
+                while j < content.len() && content[j] != b'}' {
+                    j += 1;
+                }
+                let inner = &content[is..j];
+                // \}+
+                if j < content.len() && content[j] == b'}' {
+                    while j < content.len() && content[j] == b'}' {
+                        j += 1;
+                    }
+                    let doc = trim_go_space(inner);
+                    out.extend_from_slice(b"{@");
+                    out.extend_from_slice(tag);
+                    if !doc.is_empty() {
+                        out.push(b' ');
+                        out.extend_from_slice(doc);
+                    }
+                    out.push(b'}');
+                    i = j;
+                    continue;
+                }
+            }
+            // no full match: emit the single starting byte, retry from start+1
+        }
+        out.push(content[start]);
+        i = start + 1;
+    }
+    out
+}
+
+fn phpdoc_inline_tag_normalizer(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            let fixed = normalize_inline_tags(&l.content);
+            if fixed != l.content {
+                l.content = fixed;
+                changed = true;
+            }
+        }
+        changed
+    })
+}
+
+fn dedupe_union(typ: &[u8]) -> Vec<u8> {
+    let nullable = typ.first() == Some(&b'?');
+    let body = if nullable { &typ[1..] } else { typ };
+    if body.iter().any(|&c| matches!(c, b'<' | b'>' | b'(' | b')' | b'{' | b'}' | b'[' | b']')) {
+        return typ.to_vec();
+    }
+    let parts: Vec<&[u8]> = body.split(|&c| c == b'|').collect();
+    if parts.len() < 2 {
+        return typ.to_vec();
+    }
+    let mut seen: Vec<Vec<u8>> = Vec::new();
+    let mut kept: Vec<&[u8]> = Vec::new();
+    for p in parts {
+        let key = p.to_ascii_lowercase();
+        if seen.iter().any(|x| x == &key) {
+            continue;
+        }
+        seen.push(key);
+        kept.push(p);
+    }
+    let mut out = Vec::new();
+    if nullable {
+        out.push(b'?');
+    }
+    for (i, p) in kept.iter().enumerate() {
+        if i > 0 {
+            out.push(b'|');
+        }
+        out.extend_from_slice(p);
+    }
+    out
+}
+
+fn phpdoc_no_duplicate_types(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            let lead = l.content.len() - trim_left_space(&l.content).len();
+            let trimmed = l.content[lead..].to_vec();
+            let (m1, ts, te) = match match_type_tag(&trimmed) {
+                Some(x) => x,
+                None => continue,
+            };
+            let old = &trimmed[ts..te];
+            let new = dedupe_union(old);
+            if new.as_slice() == old {
+                continue;
+            }
+            let mut nc = l.content[..lead].to_vec();
+            nc.extend_from_slice(&trimmed[..m1]);
+            nc.extend_from_slice(&new);
+            nc.extend_from_slice(&trimmed[te..]);
+            l.content = nc;
+            changed = true;
+        }
+        changed
+    })
+}
+
+// phpdoc_var_without_name -----
+fn is_prop_modifier_kw(low: &[u8]) -> bool {
+    matches!(low, b"private" | b"protected" | b"public" | b"var" | b"readonly")
+}
+
+fn doc_has_braces(d: &Doc) -> bool {
+    d.inner.iter().any(|l| l.content.iter().any(|&c| c == b'{' || c == b'}'))
+}
+
+// strip " $name" (not " $this") occurrences from content
+fn strip_var_names(content: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(content.len());
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b' ' && i + 1 < content.len() && content[i + 1] == b'$' {
+            let mut j = i + 2;
+            // first name char: letter/_/0x80-0xFF
+            if j < content.len() && (content[j].is_ascii_alphabetic() || content[j] == b'_' || content[j] >= 0x80) {
+                j += 1;
+                while j < content.len()
+                    && (content[j].is_ascii_alphanumeric() || content[j] == b'_' || content[j] >= 0x80)
+                {
+                    j += 1;
+                }
+                let m = &content[i..j];
+                if m == b" $this" {
+                    out.extend_from_slice(m);
+                } // else drop
+                i = j;
+                continue;
+            }
+        }
+        out.push(content[i]);
+        i += 1;
+    }
+    out
+}
+
+fn var_without_name_tag(trimmed: &[u8]) -> bool {
+    // (?i)^@(?:var|type)(?:\s|$)
+    for tag in [b"@var".as_slice(), b"@type".as_slice()] {
+        if trimmed.len() >= tag.len() && trimmed[..tag.len()].eq_ignore_ascii_case(tag) {
+            let after = tag.len();
+            if after == trimmed.len() || trimmed[after].is_ascii_whitespace() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn phpdoc_var_without_name(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::DocComment {
+            continue;
+        }
+        let mut next = match sig_next(s, i) {
+            Some(n) => n,
+            None => continue,
+        };
+        if s.kind(next) == Kind::Keyword && s.bytes(next).eq_ignore_ascii_case(b"static") {
+            next = match sig_next(s, next) {
+                Some(n) => n,
+                None => continue,
+            };
+        }
+        if s.kind(next) != Kind::Keyword || !is_prop_modifier_kw(&s.bytes(next).to_ascii_lowercase()) {
+            continue;
+        }
+        let mut d = match parse_doc(s.bytes(i)) {
+            Some(d) => d,
+            None => continue,
+        };
+        if doc_has_braces(&d) {
+            continue;
+        }
+        let mut ch = false;
+        for l in d.inner.iter_mut() {
+            if !var_without_name_tag(trim_go_space(&l.content)) {
+                continue;
+            }
+            let nc = strip_var_names(&l.content);
+            if nc != l.content {
+                l.content = nc;
+                ch = true;
+            }
+        }
+        if ch {
+            let r = doc_render(&d);
+            s.set_owned(i, r);
+            changed = true;
+        }
+    }
+    changed
+}
+
+// phpdoc_indent -----
+fn docblock_line_indent(s: &Stream, i: usize) -> Option<Vec<u8>> {
+    if i == 0 || s.kind(i - 1) != Kind::Whitespace {
+        return None;
+    }
+    let v = s.bytes(i - 1);
+    let nl = v.iter().rposition(|&c| c == b'\n')?;
+    Some(v[nl + 1..].to_vec())
+}
+
+fn phpdoc_indent(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::DocComment {
+            continue;
+        }
+        let indent = match docblock_line_indent(s, i) {
+            Some(x) => x,
+            None => continue,
+        };
+        let mut d = match parse_doc(s.bytes(i)) {
+            Some(d) if !d.single => d,
+            _ => continue,
+        };
+        let mut ch = false;
+        for l in d.inner.iter_mut() {
+            let star = match l.prefix.iter().position(|&c| c == b'*') {
+                Some(x) => x,
+                None => continue,
+            };
+            let mut np = indent.clone();
+            np.extend_from_slice(b" *");
+            np.extend_from_slice(&l.prefix[star + 1..]);
+            if np != l.prefix {
+                l.prefix = np;
+                ch = true;
+            }
+        }
+        if trim_go_space(&d.close) == b"*/" {
+            let mut nc = indent.clone();
+            nc.extend_from_slice(b" */");
+            if nc != d.close {
+                d.close = nc;
+                ch = true;
+            }
+        }
+        if ch {
+            let r = doc_render(&d);
+            s.set_owned(i, r);
+            changed = true;
+        }
+    }
+    changed
+}
+
+// phpdoc_order_by_value (@covers) -----
+fn covers_value(content: &[u8]) -> Option<Vec<u8>> {
+    let t = trim_go_space(content);
+    let p = b"@covers";
+    if t.len() < p.len() || &t[..p.len()] != p {
+        return None;
+    }
+    let mut i = p.len();
+    let ws = i;
+    while i < t.len() && t[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ws {
+        return None;
+    }
+    let val = trim_go_space(&t[i..]);
+    if val.is_empty() {
+        return None;
+    }
+    Some(val.to_ascii_lowercase())
+}
+
+fn phpdoc_order_by_value(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        let n = d.inner.len();
+        let mut start = 0;
+        while start < n {
+            if covers_value(&d.inner[start].content).is_none() {
+                start += 1;
+                continue;
+            }
+            let mut end = start + 1;
+            while end < n && covers_value(&d.inner[end].content).is_some() {
+                end += 1;
+            }
+            if end - start > 1 {
+                let mut idx: Vec<usize> = (start..end).collect();
+                let keys: Vec<Vec<u8>> = (start..end)
+                    .map(|k| covers_value(&d.inner[k].content).unwrap())
+                    .collect();
+                let sorted = {
+                    let mut w = idx.clone();
+                    w.sort_by(|&a, &b| keys[a - start].cmp(&keys[b - start]));
+                    w
+                };
+                if sorted != idx {
+                    let moved: Vec<DocLine> = sorted
+                        .iter()
+                        .map(|&k| DocLine {
+                            prefix: d.inner[k].prefix.clone(),
+                            content: d.inner[k].content.clone(),
+                        })
+                        .collect();
+                    for (off, l) in moved.into_iter().enumerate() {
+                        d.inner[start + off] = l;
+                    }
+                    changed = true;
+                }
+                let _ = &mut idx;
+            }
+            start = end;
+        }
+        changed
+    })
+}
+
+// phpdoc_line_span -----
+fn documents_member(s: &Stream, i: usize) -> bool {
+    let j = skip_ws(s, i + 1);
+    if j >= s.len() || s.kind(j) != Kind::Keyword {
+        return false;
+    }
+    let lw = s.bytes(j).to_ascii_lowercase();
+    matches!(lw.as_slice(), b"public" | b"private" | b"protected" | b"var")
+}
+
+fn phpdoc_line_span(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::DocComment {
+            continue;
+        }
+        let d0 = match parse_doc(s.bytes(i)) {
+            Some(d) if d.single => d,
+            _ => continue,
+        };
+        if !documents_member(s, i) {
+            continue;
+        }
+        let indent = match docblock_line_indent(s, i) {
+            Some(x) => x,
+            None => continue,
+        };
+        let content = if d0.inner.is_empty() { Vec::new() } else { d0.inner[0].content.clone() };
+        let mut prefix = indent.clone();
+        prefix.extend_from_slice(b" * ");
+        let mut close = indent.clone();
+        close.extend_from_slice(b" */");
+        let d = Doc {
+            open: b"/**".to_vec(),
+            inner: vec![DocLine { prefix, content }],
+            close,
+            single: false,
+        };
+        let r = doc_render(&d);
+        s.set_owned(i, r);
+        changed = true;
+    }
+    changed
+}
+
+// phpdoc_types_order -----
+fn split_top_level_union(typ: &[u8]) -> Vec<Vec<u8>> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    let mut i = 0;
+    while i < typ.len() {
+        match typ[i] {
+            b'<' | b'(' | b'[' | b'{' => depth += 1,
+            b'>' | b')' | b']' | b'}' => {
+                if depth > 0 {
+                    depth -= 1;
+                }
+            }
+            b'|' => {
+                if depth == 0 {
+                    parts.push(typ[start..i].to_vec());
+                    start = i + 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    parts.push(typ[start..].to_vec());
+    parts
+}
+
+fn normalize_phpdoc_compare(t: &[u8]) -> Vec<u8> {
+    let mut x = t;
+    while x.first() == Some(&b'(') {
+        x = &x[1..];
+    }
+    if x.first() == Some(&b'?') {
+        x = &x[1..];
+    }
+    if x.first() == Some(&b'\\') {
+        x = &x[1..];
+    }
+    x.to_vec()
+}
+
+fn sort_phpdoc_union(typ: &[u8]) -> Option<Vec<u8>> {
+    if typ.iter().any(|&c| matches!(c, b'<' | b'(' | b'{')) {
+        return None;
+    }
+    let members = split_top_level_union(typ);
+    if members.len() < 2 {
+        return None;
+    }
+    let mut non_null: Vec<Vec<u8>> = Vec::new();
+    let mut nulls: Vec<Vec<u8>> = Vec::new();
+    for m in &members {
+        if normalize_phpdoc_compare(m).eq_ignore_ascii_case(b"null") {
+            nulls.push(m.clone());
+        } else {
+            non_null.push(m.clone());
+        }
+    }
+    if nulls.is_empty() {
+        return None;
+    }
+    let mut all = non_null;
+    all.extend(nulls);
+    let mut out = Vec::new();
+    for (i, p) in all.iter().enumerate() {
+        if i > 0 {
+            out.push(b'|');
+        }
+        out.extend_from_slice(p);
+    }
+    Some(out)
+}
+
+fn phpdoc_types_order(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            let lead = l.content.len() - trim_left_space(&l.content).len();
+            let trimmed = l.content[lead..].to_vec();
+            let (m1, ts, te) = match match_type_tag(&trimmed) {
+                Some(x) => x,
+                None => continue,
+            };
+            let old = &trimmed[ts..te];
+            let sorted = match sort_phpdoc_union(old) {
+                Some(x) if x.as_slice() != old => x,
+                _ => continue,
+            };
+            let mut nc = l.content[..lead].to_vec();
+            nc.extend_from_slice(&trimmed[..m1]);
+            nc.extend_from_slice(&sorted);
+            nc.extend_from_slice(&trimmed[te..]);
+            l.content = nc;
+            changed = true;
+        }
+        changed
+    })
+}
+
+// phpdoc_var_annotation_correct_order -----
+// (?i)(@(?:type|var)\s*)(\$\S+)([ \t]+)([^$](?:[^<\s]|<[^>]*>)*)(\s|\*) -> g1 g4 g3 g2 g5
+fn var_order_replace(v: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(v.len());
+    let mut i = 0;
+    while i < v.len() {
+        let start = i;
+        // g1: @type|@var then \s*
+        let mut j = i;
+        let mut is_tag = false;
+        for tag in [b"@type".as_slice(), b"@var".as_slice()] {
+            if j + tag.len() <= v.len() && v[j..j + tag.len()].eq_ignore_ascii_case(tag) {
+                j += tag.len();
+                is_tag = true;
+                break;
+            }
+        }
+        if is_tag {
+            let g1s = start;
+            while j < v.len() && v[j].is_ascii_whitespace() {
+                j += 1;
+            }
+            let g1 = &v[g1s..j];
+            // g2: \$\S+
+            if j < v.len() && v[j] == b'$' {
+                let g2s = j;
+                j += 1;
+                while j < v.len() && !v[j].is_ascii_whitespace() {
+                    j += 1;
+                }
+                let g2 = &v[g2s..j];
+                if g2.len() > 1 {
+                    // g3: [ \t]+
+                    let g3s = j;
+                    while j < v.len() && (v[j] == b' ' || v[j] == b'\t') {
+                        j += 1;
+                    }
+                    if j > g3s {
+                        let g3 = &v[g3s..j];
+                        // g4: [^$] (?:[^<\s]|<[^>]*>)*
+                        let g4s = j;
+                        if j < v.len() && v[j] != b'$' {
+                            j += 1;
+                            loop {
+                                if j >= v.len() {
+                                    break;
+                                }
+                                let c = v[j];
+                                if c == b'<' {
+                                    // <[^>]*>
+                                    let mut k = j + 1;
+                                    while k < v.len() && v[k] != b'>' {
+                                        k += 1;
+                                    }
+                                    if k < v.len() && v[k] == b'>' {
+                                        j = k + 1;
+                                        continue;
+                                    }
+                                    break;
+                                }
+                                if c == b'<' || c.is_ascii_whitespace() {
+                                    break;
+                                }
+                                j += 1;
+                            }
+                            let g4 = &v[g4s..j];
+                            // g5: (\s|\*)
+                            if j < v.len() && (v[j].is_ascii_whitespace() || v[j] == b'*') {
+                                let g5 = &v[j..j + 1];
+                                // emit g1 g4 g3 g2 g5
+                                out.extend_from_slice(g1);
+                                out.extend_from_slice(g4);
+                                out.extend_from_slice(g3);
+                                out.extend_from_slice(g2);
+                                out.extend_from_slice(g5);
+                                i = j + 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out.push(v[start]);
+        i = start + 1;
+    }
+    out
+}
+
+fn phpdoc_var_annotation_correct_order(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::DocComment {
+            continue;
+        }
+        let lower = s.bytes(i).to_ascii_lowercase();
+        if !contains_subslice(&lower, b"@var") && !contains_subslice(&lower, b"@type") {
+            continue;
+        }
+        let nv = var_order_replace(s.bytes(i));
+        if nv.as_slice() != s.bytes(i) {
+            s.set_owned(i, nv);
+            changed = true;
+        }
+    }
+    changed
+}
+
+// phpdoc_return_self_reference -----
+fn return_self_map(low: &[u8]) -> Option<Vec<u8>> {
+    match low {
+        b"this" | b"@this" => Some(b"$this".to_vec()),
+        b"$self" | b"@self" => Some(b"self".to_vec()),
+        b"$static" | b"@static" => Some(b"static".to_vec()),
+        _ => None,
+    }
+}
+
+fn match_return_tag(t: &[u8]) -> Option<(usize, usize, usize)> {
+    // (?i)^(@return\s+)(\S+)(.*)$
+    let p = b"@return";
+    if t.len() < p.len() || !t[..p.len()].eq_ignore_ascii_case(p) {
+        return None;
+    }
+    let mut i = p.len();
+    let ws = i;
+    while i < t.len() && t[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ws {
+        return None;
+    }
+    let m1 = i;
+    let ts = i;
+    while i < t.len() && !t[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ts {
+        return None;
+    }
+    Some((m1, ts, i))
+}
+
+fn phpdoc_return_self_reference(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            let lead = l.content.len() - trim_left_space(&l.content).len();
+            let trimmed = l.content[lead..].to_vec();
+            let (m1, ts, te) = match match_return_tag(&trimmed) {
+                Some(x) => x,
+                None => continue,
+            };
+            let old = &trimmed[ts..te];
+            let parts: Vec<&[u8]> = old.split(|&c| c == b'|').collect();
+            let mut ch = false;
+            let mut newparts: Vec<Vec<u8>> = Vec::new();
+            for p in &parts {
+                if let Some(r) = return_self_map(p.to_ascii_lowercase().as_slice()) {
+                    newparts.push(r);
+                    ch = true;
+                } else {
+                    newparts.push(p.to_vec());
+                }
+            }
+            if !ch {
+                continue;
+            }
+            let mut newtype = Vec::new();
+            for (k, p) in newparts.iter().enumerate() {
+                if k > 0 {
+                    newtype.push(b'|');
+                }
+                newtype.extend_from_slice(p);
+            }
+            let mut nc = l.content[..lead].to_vec();
+            nc.extend_from_slice(&trimmed[..m1]);
+            nc.extend_from_slice(&newtype);
+            nc.extend_from_slice(&trimmed[te..]);
+            l.content = nc;
+            changed = true;
+        }
+        changed
+    })
 }
