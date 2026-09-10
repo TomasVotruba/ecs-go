@@ -15,6 +15,7 @@ func SpacingFixers() []fixer.Fixer {
 		ConcatSpace{},
 		CastSpaces{},
 		BlankLineAfterOpeningTag{},
+		BlankLineAfterStrictTypes{},
 		NoTrailingWhitespace{},
 		NoTrailingWhitespaceInComment{},
 		SingleBlankLineAtEndOfFile{},
@@ -92,6 +93,12 @@ func CommonFixers() []fixer.Fixer {
 		Include{},
 		EmptyLoopBody{},
 		EmptyLoopCondition{},
+		NoUselessReturn{},
+		FunctionToConstant{},
+		SelfAccessor{},
+		RemoveUselessDefaultComment{},
+		ProtectedToPrivate{},
+		AddMissingParamName{},
 	}
 }
 
@@ -133,6 +140,7 @@ func ConstructFixers() []fixer.Fixer {
 		NoSpacesAfterFunctionName{},
 		NoSpacesInsideParenthesis{},
 		UnaryOperatorSpaces{},
+		NotOperatorWithSuccessorSpace{},
 		NoLeadingImportSlash{},
 		Elseif{},
 		SwitchCaseSemicolonToColon{},
