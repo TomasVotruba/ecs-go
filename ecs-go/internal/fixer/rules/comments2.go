@@ -82,6 +82,23 @@ func (SingleLineCommentSpacing) Fix(s *tokens.Stream) bool {
 			continue
 		}
 		v := t.Value
+		// single-line block comment: ensure one space inside "/* ... */"
+		if strings.HasPrefix(v, "/*") && !strings.HasPrefix(v, "/**") &&
+			strings.HasSuffix(v, "*/") && len(v) >= 4 && !strings.ContainsAny(v, "\n\r") {
+			inner := v[2 : len(v)-2]
+			nv := inner
+			if len(nv) > 0 && nv[0] != ' ' && nv[0] != '\t' {
+				nv = " " + nv
+			}
+			if len(nv) > 0 && nv[len(nv)-1] != ' ' && nv[len(nv)-1] != '\t' {
+				nv = nv + " "
+			}
+			if nv != inner {
+				s.SetValue(i, "/*"+nv+"*/")
+				changed = true
+			}
+			continue
+		}
 		var marker string
 		switch {
 		case strings.HasPrefix(v, "//"):

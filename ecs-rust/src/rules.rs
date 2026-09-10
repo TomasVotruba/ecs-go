@@ -1997,12 +1997,28 @@ fn integer_literal_case(s: &mut Stream) -> bool {
         if b.len() < 2 || b[0] != b'0' {
             continue;
         }
-        if matches!(b[1], b'x' | b'X' | b'b' | b'B' | b'o' | b'O') {
-            let lower = b.to_ascii_lowercase();
-            if lower.as_slice() != s.bytes(i) {
-                s.set_owned(i, lower);
-                changed = true;
+        let fixed: Vec<u8> = match b[1] {
+            b'x' | b'X' => {
+                // prefix lowercase, hex digits uppercase ("0Xff" -> "0xFF")
+                let mut out = b"0x".to_vec();
+                out.extend(b[2..].iter().map(|c| c.to_ascii_uppercase()));
+                out
             }
+            b'b' | b'B' => {
+                let mut out = b"0b".to_vec();
+                out.extend_from_slice(&b[2..]);
+                out
+            }
+            b'o' | b'O' => {
+                let mut out = b"0o".to_vec();
+                out.extend_from_slice(&b[2..]);
+                out
+            }
+            _ => continue,
+        };
+        if fixed.as_slice() != s.bytes(i) {
+            s.set_owned(i, fixed);
+            changed = true;
         }
     }
     changed
@@ -2021,8 +2037,11 @@ fn native_function_casing(s: &mut Stream) -> bool {
         // must be a function call, not a method or a namespaced name
         if let Some(p) = prev_significant_index(s, i) {
             match s.bytes(p) {
-                b"->" | b"?->" | b"::" | b"\\" | b"function" => continue,
+                b"->" | b"?->" | b"::" | b"\\" => continue,
                 _ => {}
+            }
+            if s.bytes(p).eq_ignore_ascii_case(b"function") || s.bytes(p).eq_ignore_ascii_case(b"new") {
+                continue;
             }
         }
         if next_significant_value(s, i) != b"(" {
@@ -3260,6 +3279,27 @@ fn single_line_comment_spacing(s: &mut Stream) -> bool {
             continue;
         }
         let v = s.bytes(i);
+        // single-line block comment: ensure one space inside "/* ... */"
+        if v.starts_with(b"/*") && !v.starts_with(b"/**") && v.ends_with(b"*/")
+            && v.len() >= 4 && !v.iter().any(|&c| c == b'\n' || c == b'\r')
+        {
+            let inner = &v[2..v.len() - 2];
+            let mut nv = inner.to_vec();
+            if !nv.is_empty() && nv[0] != b' ' && nv[0] != b'\t' {
+                nv.insert(0, b' ');
+            }
+            if !nv.is_empty() && *nv.last().unwrap() != b' ' && *nv.last().unwrap() != b'\t' {
+                nv.push(b' ');
+            }
+            if nv.as_slice() != inner {
+                let mut out = b"/*".to_vec();
+                out.extend_from_slice(&nv);
+                out.extend_from_slice(b"*/");
+                s.set_owned(i, out);
+                changed = true;
+            }
+            continue;
+        }
         let marker: &[u8] = if v.starts_with(b"//") {
             b"//"
         } else if v.starts_with(b"#") && !v.starts_with(b"#[") {
