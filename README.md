@@ -3,6 +3,19 @@
 Fast, token-based PHP coding-standard checker and fixer - an [ECS](https://github.com/symplify/easy-coding-standard)-style
 tool written in Go. Runs across all CPU cores by default.
 
+## Rule coverage
+
+How many ECS rules each port implements. Regenerate with `bin/rule-counts.sh`;
+CI keeps it current.
+
+<!-- rule-counts:start -->
+| tool | rules | of ECS |
+|---|---:|---:|
+| [ECS](https://github.com/symplify/easy-coding-standard) (baseline) | 208 | 100% |
+| ecs-go | 134 | 64% |
+| ecs-rust | 35 | 16% |
+<!-- rule-counts:end -->
+
 ## Install
 
 Via Composer (exposes `vendor/bin/ecs-go`):
