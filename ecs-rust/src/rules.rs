@@ -95,8 +95,14 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\FunctionNotation\ReturnTypeDeclarationFixer",
     r"PhpCsFixer\Fixer\Operator\NewWithParenthesesFixer",
     r"PhpCsFixer\Fixer\Whitespace\IndentationTypeFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer",
     r"PhpCsFixer\Fixer\NamespaceNotation\BlankLinesBeforeNamespaceFixer",
     r"PhpCsFixer\Fixer\NamespaceNotation\BlankLineAfterNamespaceFixer",
+    r"PhpCsFixer\Fixer\Import\NoUnusedImportsFixer",
+    r"PhpCsFixer\Fixer\Import\SingleImportPerStatementFixer",
+    r"PhpCsFixer\Fixer\Import\OrderedImportsFixer",
+    r"PhpCsFixer\Fixer\Whitespace\BlankLineBetweenImportGroupsFixer",
+    r"PhpCsFixer\Fixer\Import\SingleLineAfterImportsFixer",
     r"PhpCsFixer\Fixer\ClassNotation\NoBlankLinesAfterClassOpeningFixer",
     r"PhpCsFixer\Fixer\Whitespace\NoExtraBlankLinesFixer",
     r"PhpCsFixer\Fixer\PhpTag\NoClosingTagFixer",
@@ -192,8 +198,14 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= return_type_declaration(s);
     changed |= new_with_parentheses(s);
     changed |= indentation_type(s);
+    changed |= single_trait_insert_per_statement(s);
     changed |= blank_lines_before_namespace(s);
     changed |= blank_line_after_namespace(s);
+    changed |= no_unused_imports(s);
+    changed |= single_import_per_statement(s);
+    changed |= ordered_imports(s);
+    changed |= blank_line_between_import_groups(s);
+    changed |= single_line_after_imports(s);
     changed |= no_blank_lines_after_class_opening(s);
     changed |= no_extra_blank_lines(s);
     changed |= no_closing_tag(s);
@@ -5220,6 +5232,490 @@ fn native_function_type_declaration_casing(s: &mut Stream) -> bool {
             continue;
         }
         s.set_owned(i, lower);
+        changed = true;
+    }
+    changed
+}
+
+// --- ported batch 7: imports ------------------------------------------------
+
+struct ImportStmt {
+    start: usize,
+    semi: usize,
+    rank: u8,
+}
+
+fn indent_before(s: &Stream, i: usize) -> Vec<u8> {
+    if i == 0 || s.kind(i - 1) != Kind::Whitespace {
+        return Vec::new();
+    }
+    let v = s.bytes(i - 1);
+    match v.iter().rposition(|&c| c == b'\n') {
+        Some(idx) => v[idx + 1..].to_vec(),
+        None => Vec::new(),
+    }
+}
+
+fn trim_ws_tokens(mut toks: Vec<(Kind, Vec<u8>)>) -> Vec<(Kind, Vec<u8>)> {
+    while toks.first().map_or(false, |t| t.0 == Kind::Whitespace) {
+        toks.remove(0);
+    }
+    while toks.last().map_or(false, |t| t.0 == Kind::Whitespace) {
+        toks.pop();
+    }
+    toks
+}
+
+fn tokens_equal_toks(a: &[(Kind, Vec<u8>)], b: &[(Kind, Vec<u8>)]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.0 == y.0 && x.1 == y.1)
+}
+
+fn use_rank(s: &Stream, use_idx: usize) -> u8 {
+    let j = skip_ws(s, use_idx + 1);
+    if j < s.len() && s.kind(j) == Kind::Keyword {
+        let lw = s.bytes(j).to_ascii_lowercase();
+        if lw == b"function" {
+            return 1;
+        }
+        if lw == b"const" {
+            return 2;
+        }
+    }
+    0
+}
+
+fn collect_import_run(s: &Stream, start: usize) -> Vec<ImportStmt> {
+    let mut stmts = Vec::new();
+    let mut k = start;
+    while k < s.len() {
+        if s.kind(k) != Kind::Keyword
+            || !s.bytes(k).eq_ignore_ascii_case(b"use")
+            || in_class_like_body(s, k)
+        {
+            break;
+        }
+        let j = skip_ws(s, k + 1);
+        if j < s.len() && s.kind(j) == Kind::Punct && s.bytes(j) == b"(" {
+            break;
+        }
+        let mut semi: isize = -1;
+        let mut group = false;
+        let mut m = k + 1;
+        while m < s.len() {
+            if s.kind(m) == Kind::Punct {
+                if s.bytes(m) == b"{" {
+                    group = true;
+                    break;
+                }
+                if s.bytes(m) == b";" {
+                    semi = m as isize;
+                    break;
+                }
+            }
+            m += 1;
+        }
+        if group || semi < 0 {
+            break;
+        }
+        let semi = semi as usize;
+        stmts.push(ImportStmt { start: k, semi, rank: use_rank(s, k) });
+        let n = skip_ws(s, semi + 1);
+        if n < s.len() && s.kind(n) == Kind::Keyword && s.bytes(n).eq_ignore_ascii_case(b"use") {
+            k = n;
+            continue;
+        }
+        break;
+    }
+    stmts
+}
+
+fn split_import_parts(
+    s: &Stream,
+    j: usize,
+    semi: usize,
+    commas: &[usize],
+) -> Vec<Vec<(Kind, Vec<u8>)>> {
+    let mut bounds: Vec<isize> = vec![j as isize - 1];
+    for &c in commas {
+        bounds.push(c as isize);
+    }
+    bounds.push(semi as isize);
+    let mut parts = Vec::new();
+    for b in 0..bounds.len() - 1 {
+        let mut part = Vec::new();
+        let mut k = (bounds[b] + 1) as usize;
+        while (k as isize) < bounds[b + 1] {
+            part.push((s.kind(k), s.bytes(k).to_vec()));
+            k += 1;
+        }
+        parts.push(trim_ws_tokens(part));
+    }
+    parts
+}
+
+fn split_use_at(s: &mut Stream, i: usize, in_class: bool) -> (usize, bool) {
+    if in_class_like_body(s, i) != in_class {
+        return (i + 1, false);
+    }
+    let mut j = skip_ws(s, i + 1);
+    let mut modifier: Option<Vec<u8>> = None;
+    if j < s.len() && s.kind(j) == Kind::Keyword {
+        let lw = s.bytes(j).to_ascii_lowercase();
+        if lw == b"function" || lw == b"const" {
+            modifier = Some(s.bytes(j).to_vec());
+            j = skip_ws(s, j + 1);
+        }
+    }
+    if j < s.len() && s.kind(j) == Kind::Punct && s.bytes(j) == b"(" {
+        return (i + 1, false);
+    }
+    let mut semi: isize = -1;
+    let mut group = false;
+    let mut commas: Vec<usize> = Vec::new();
+    let mut k = j;
+    while k < s.len() {
+        if s.kind(k) == Kind::Punct {
+            match s.bytes(k) {
+                b"{" => group = true,
+                b";" => semi = k as isize,
+                b"," => commas.push(k),
+                _ => {}
+            }
+            if group || semi >= 0 {
+                break;
+            }
+        }
+        k += 1;
+    }
+    if group || semi < 0 || commas.is_empty() {
+        return (i + 1, false);
+    }
+    let semi = semi as usize;
+    let indent = indent_before(s, i);
+    let parts = split_import_parts(s, j, semi, &commas);
+
+    let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
+    for (p, part) in parts.iter().enumerate() {
+        if p > 0 {
+            let mut nl = vec![b'\n'];
+            nl.extend_from_slice(&indent);
+            repl.push((Kind::Whitespace, nl));
+        }
+        repl.push((Kind::Keyword, b"use".to_vec()));
+        repl.push((Kind::Whitespace, b" ".to_vec()));
+        if let Some(m) = &modifier {
+            repl.push((Kind::Keyword, m.clone()));
+            repl.push((Kind::Whitespace, b" ".to_vec()));
+        }
+        for t in part {
+            repl.push(t.clone());
+        }
+        repl.push((Kind::Punct, b";".to_vec()));
+    }
+    let n = repl.len();
+    replace_range(s, i, semi, repl);
+    (i + n, true)
+}
+
+fn split_use_statements(s: &mut Stream, in_class: bool) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Keyword || !s.bytes(i).eq_ignore_ascii_case(b"use") {
+            i += 1;
+            continue;
+        }
+        let (next, c) = split_use_at(s, i, in_class);
+        i = next;
+        if c {
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn import_short_name(s: &Stream, from: usize, semi: usize) -> Option<Vec<u8>> {
+    let mut k = from;
+    while k < semi {
+        if s.kind(k) == Kind::Keyword && s.bytes(k).eq_ignore_ascii_case(b"as") {
+            let a = skip_ws(s, k + 1);
+            if a < semi && s.kind(a) == Kind::Ident {
+                return Some(s.bytes(a).to_vec());
+            }
+        }
+        k += 1;
+    }
+    let mut k = semi as isize - 1;
+    while k >= from as isize {
+        if s.kind(k as usize) == Kind::Ident {
+            return Some(s.bytes(k as usize).to_vec());
+        }
+        k -= 1;
+    }
+    None
+}
+
+fn single_import_per_statement(s: &mut Stream) -> bool {
+    split_use_statements(s, false)
+}
+
+fn single_trait_insert_per_statement(s: &mut Stream) -> bool {
+    split_use_statements(s, true)
+}
+
+fn reorder_imports(s: &mut Stream, run: &[ImportStmt]) -> (usize, bool) {
+    let first = run[0].start;
+    let last = run[run.len() - 1].semi;
+    let indent = indent_before(s, first);
+
+    let mut ordered: Vec<&ImportStmt> = run.iter().collect();
+    ordered.sort_by_key(|st| st.rank);
+
+    let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
+    for (p, st) in ordered.iter().enumerate() {
+        if p > 0 {
+            let mut nl = vec![b'\n'];
+            nl.extend_from_slice(&indent);
+            repl.push((Kind::Whitespace, nl));
+        }
+        let mut k = st.start;
+        while k <= st.semi {
+            repl.push((s.kind(k), s.bytes(k).to_vec()));
+            k += 1;
+        }
+    }
+
+    let mut orig: Vec<(Kind, Vec<u8>)> = Vec::new();
+    let mut k = first;
+    while k <= last {
+        orig.push((s.kind(k), s.bytes(k).to_vec()));
+        k += 1;
+    }
+    let changed = !tokens_equal_toks(&orig, &repl);
+    let n = repl.len();
+    replace_range(s, first, last, repl);
+    (first + n, changed)
+}
+
+fn ordered_imports(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Keyword
+            || !s.bytes(i).eq_ignore_ascii_case(b"use")
+            || in_class_like_body(s, i)
+        {
+            i += 1;
+            continue;
+        }
+        let run = collect_import_run(s, i);
+        if run.len() < 2 {
+            i += 1;
+            continue;
+        }
+        let (new_end, c) = reorder_imports(s, &run);
+        if c {
+            changed = true;
+        }
+        i = new_end;
+    }
+    changed
+}
+
+fn blank_line_between_import_groups(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Keyword
+            || !s.bytes(i).eq_ignore_ascii_case(b"use")
+            || in_class_like_body(s, i)
+        {
+            i += 1;
+            continue;
+        }
+        let run = collect_import_run(s, i);
+        if run.len() >= 2 {
+            for p in 1..run.len() {
+                if run[p].rank == run[p - 1].rank {
+                    continue;
+                }
+                if run[p].start >= 1 {
+                    let ws = run[p].start - 1;
+                    if s.kind(ws) == Kind::Whitespace
+                        && has_newline(s.bytes(ws))
+                        && s.bytes(ws) != b"\n\n"
+                    {
+                        s.set_owned(ws, b"\n\n".to_vec());
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !run.is_empty() {
+            i = run[run.len() - 1].semi + 1;
+        } else {
+            i += 1;
+        }
+    }
+    changed
+}
+
+fn single_line_after_imports(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Keyword || !s.bytes(i).eq_ignore_ascii_case(b"use") {
+            i += 1;
+            continue;
+        }
+        if in_class_like_body(s, i) {
+            i += 1;
+            continue;
+        }
+        let j = skip_ws(s, i + 1);
+        if j < s.len() && s.kind(j) == Kind::Punct && s.bytes(j) == b"(" {
+            i += 1;
+            continue;
+        }
+        let mut semi: isize = -1;
+        let mut k = i + 1;
+        while k < s.len() {
+            if s.kind(k) == Kind::Punct && s.bytes(k) == b";" {
+                semi = k as isize;
+                break;
+            }
+            k += 1;
+        }
+        if semi < 0 {
+            i += 1;
+            continue;
+        }
+        let semi = semi as usize;
+        if semi + 1 >= s.len() {
+            i += 1;
+            continue;
+        }
+        let nx = skip_ws(s, semi + 1);
+        if nx >= s.len() {
+            i += 1;
+            continue;
+        }
+        if s.kind(nx) == Kind::Keyword && s.bytes(nx).eq_ignore_ascii_case(b"use") {
+            i += 1;
+            continue;
+        }
+        if s.kind(nx) == Kind::Punct && s.bytes(nx) == b"}" {
+            i += 1;
+            continue;
+        }
+        if s.kind(semi + 1) == Kind::Whitespace
+            && has_newline(s.bytes(semi + 1))
+            && s.bytes(semi + 1) != b"\n\n"
+        {
+            s.set_owned(semi + 1, b"\n\n".to_vec());
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn no_unused_imports(s: &mut Stream) -> bool {
+    struct II {
+        start: usize,
+        semi: usize,
+        short_lower: Vec<u8>,
+    }
+    let mut imports: Vec<II> = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Keyword
+            || !s.bytes(i).eq_ignore_ascii_case(b"use")
+            || in_class_like_body(s, i)
+        {
+            i += 1;
+            continue;
+        }
+        let mut j = skip_ws(s, i + 1);
+        if j < s.len() && s.kind(j) == Kind::Punct && s.bytes(j) == b"(" {
+            i += 1;
+            continue;
+        }
+        if j < s.len() && s.kind(j) == Kind::Keyword {
+            let lw = s.bytes(j).to_ascii_lowercase();
+            if lw == b"function" || lw == b"const" {
+                j = skip_ws(s, j + 1);
+            }
+        }
+        let mut semi: isize = -1;
+        let mut group = false;
+        let mut k = i + 1;
+        while k < s.len() {
+            if s.kind(k) == Kind::Punct {
+                if s.bytes(k) == b"{" {
+                    group = true;
+                    break;
+                }
+                if s.bytes(k) == b";" {
+                    semi = k as isize;
+                    break;
+                }
+            }
+            k += 1;
+        }
+        if group || semi < 0 {
+            i += 1;
+            continue;
+        }
+        let semi = semi as usize;
+        let short = match import_short_name(s, j, semi) {
+            Some(x) if !x.is_empty() => x,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        imports.push(II { start: i, semi, short_lower: short.to_ascii_lowercase() });
+        i = semi + 1;
+    }
+    if imports.is_empty() {
+        return false;
+    }
+
+    let in_import = |idx: usize| -> bool {
+        imports.iter().any(|im| idx >= im.start && idx <= im.semi)
+    };
+    let mut used: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
+    let mut comment_text: Vec<u8> = Vec::new();
+    for k in 0..s.len() {
+        if s.kind(k) == Kind::Ident && !in_import(k) {
+            used.insert(s.bytes(k).to_ascii_lowercase());
+        }
+        if s.kind(k) == Kind::Comment || s.kind(k) == Kind::DocComment {
+            comment_text.extend_from_slice(&s.bytes(k).to_ascii_lowercase());
+        }
+    }
+
+    let mut changed = false;
+    for im in imports.iter().rev() {
+        if used.contains(&im.short_lower) || contains_subslice(&comment_text, &im.short_lower) {
+            continue;
+        }
+        let mut r = im.semi;
+        loop {
+            s.remove_at(r);
+            if r == im.start {
+                break;
+            }
+            r -= 1;
+        }
+        if im.start < s.len() && s.kind(im.start) == Kind::Whitespace {
+            let v = s.bytes(im.start);
+            if v.first() == Some(&b'\n') {
+                let nv = v[1..].to_vec();
+                s.set_owned(im.start, nv);
+            }
+        }
         changed = true;
     }
     changed
