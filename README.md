@@ -66,23 +66,26 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 ## Performance
 
 The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
-(in `ecs-rust/`) over the same PSR-12 rule subset on real codebases and compares
-wall time. All three run `--fix` in parallel across every core; Go and Rust also
-produce byte-for-byte identical output. Mean of 10 runs on a 24-core Linux box:
+(in `ecs-rust/`) over the same PSR-12 rule subset (the 35 fixers both ports
+implement) on real codebases and compares wall time. All three run `--fix` in
+parallel across every core; Go and Rust also produce byte-for-byte identical
+output. Mean of 10 runs on a 24-core Linux box:
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 1.016s | 0.076s | 0.087s |
-| symfony/symfony (src) | 11434 | 7.893s | 0.572s | 0.521s |
+| laravel/framework (src) | 1696 | 4.356s | 0.085s | 0.084s |
+| rectorphp/rector-src | 3422 | 3.753s | 0.104s | 0.092s |
+| symfony/symfony (src) | 11581 | 5.951s | 0.560s | 0.352s |
 
-Both compiled tools are ~13-15x faster than the original PHP ECS on average, and
-they run neck-and-neck with each other: ecs-go edges the small tree (lower
-startup), the Rust port edges the large one. ecs-go relaxes the GC for a batch run,
-presizes the lexer's token slice, and avoids allocations in its hottest fixers;
-ecs-rust lexes into copy-on-write span tokens, fixes files in parallel with
-rayon, and uses the mimalloc allocator. The upshot: the big early Rust-over-Go
-gap was mostly GC and allocation overhead, not the language - close those and the
-two converge. Exact figures for each change land in that workflow's job summary.
+Both compiled tools are far faster than the original PHP ECS - roughly 10-50x - and
+run close to each other: ecs-go is level with the Rust port on the small tree, and
+ecs-rust edges ahead on the large one. All three fix in place with diff rendering
+off (ECS via `--no-diffs`; ecs-go and ecs-rust skip it in `--fix` mode), so each
+does the same work: lex, fix, write.
+ecs-go relaxes the GC for a batch run, presizes the lexer's token slice, and avoids
+allocations in its hottest fixers; ecs-rust lexes into copy-on-write span tokens,
+fixes files in parallel with rayon, and holds bytes as slices. Exact figures for
+each change land in that workflow's job summary.
 
 ## PSR-12
 
