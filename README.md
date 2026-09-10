@@ -73,13 +73,14 @@ output. Mean of 10 runs on a 24-core Linux box:
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 4.071s | 0.082s | 0.083s |
-| symfony/symfony (src) | 11581 | 5.636s | 0.564s | 0.348s |
+| laravel/framework (src) | 1696 | 4.356s | 0.085s | 0.084s |
+| symfony/symfony (src) | 11581 | 5.951s | 0.560s | 0.352s |
 
 Both compiled tools are far faster than the original PHP ECS - roughly 10-50x - and
 run close to each other: ecs-go is level with the Rust port on the small tree, and
-ecs-rust edges ahead on the large one. In `--fix` mode neither renders a per-file
-diff (that is a check/dry-run concern), so both do the same work: lex, fix, write.
+ecs-rust edges ahead on the large one. All three fix in place with diff rendering
+off (ECS via `--no-diffs`; ecs-go and ecs-rust skip it in `--fix` mode), so each
+does the same work: lex, fix, write.
 ecs-go relaxes the GC for a batch run, presizes the lexer's token slice, and avoids
 allocations in its hottest fixers; ecs-rust lexes into copy-on-write span tokens,
 fixes files in parallel with rayon, and holds bytes as slices. Exact figures for
