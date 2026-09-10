@@ -22,8 +22,13 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Operator\StandardizeNotEqualsFixer",
     r"PhpCsFixer\Fixer\Operator\TernaryToNullCoalescingFixer",
     r"PhpCsFixer\Fixer\Semicolon\NoEmptyStatementFixer",
+    r"PhpCsFixer\Fixer\Comment\NoEmptyCommentFixer",
+    r"PhpCsFixer\Fixer\Comment\SingleLineCommentSpacingFixer",
+    r"PhpCsFixer\Fixer\StringNotation\SingleQuoteFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\TrimArraySpacesFixer",
     r"PhpCsFixer\Fixer\Operator\NoSpaceAroundDoubleColonFixer",
+    r"PhpCsFixer\Fixer\StringNotation\HeredocToNowdocFixer",
+    r"PhpCsFixer\Fixer\StringNotation\NoBinaryStringFixer",
     r"PhpCsFixer\Fixer\Operator\NoUselessConcatOperatorFixer",
     r"PhpCsFixer\Fixer\CastNotation\NoShortBoolCastFixer",
     r"PhpCsFixer\Fixer\CastNotation\NoUnsetCastFixer",
@@ -32,7 +37,12 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ArrayNotation\NoMultilineWhitespaceAroundDoubleArrowFixer",
     r"PhpCsFixer\Fixer\Operator\StandardizeIncrementFixer",
     r"PhpCsFixer\Fixer\Operator\LongToShorthandOperatorFixer",
+    r"PhpCsFixer\Fixer\Comment\MultilineCommentOpeningClosingFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\AlignMultilineCommentFixer",
     r"PhpCsFixer\Fixer\Operator\AssignNullCoalescingToCoalesceEqualFixer",
+    r"PhpCsFixer\Fixer\Comment\SingleLineCommentStyleFixer",
+    r"PhpCsFixer\Fixer\LanguageConstruct\ExplicitIndirectVariableFixer",
+    r"PhpCsFixer\Fixer\StringNotation\ExplicitStringVariableFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseKeywordsFixer",
     r"PhpCsFixer\Fixer\Casing\ConstantCaseFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseStaticReferenceFixer",
@@ -91,8 +101,13 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= standardize_not_equals(s);
     changed |= ternary_to_null_coalescing(s);
     changed |= no_empty_statement(s);
+    changed |= no_empty_comment(s);
+    changed |= single_line_comment_spacing(s);
+    changed |= single_quote(s);
     changed |= trim_array_spaces(s);
     changed |= no_space_around_double_colon(s);
+    changed |= heredoc_to_nowdoc(s);
+    changed |= no_binary_string(s);
     changed |= no_useless_concat_operator(s);
     changed |= no_short_bool_cast(s);
     changed |= no_unset_cast(s);
@@ -101,7 +116,12 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_multiline_whitespace_around_double_arrow(s);
     changed |= standardize_increment(s);
     changed |= long_to_shorthand_operator(s);
+    changed |= multiline_comment_opening_closing(s);
+    changed |= align_multiline_comment(s);
     changed |= assign_null_coalescing_to_coalesce_equal(s);
+    changed |= single_line_comment_style(s);
+    changed |= explicit_indirect_variable(s);
+    changed |= explicit_string_variable(s);
     changed |= lowercase_keywords(s);
     changed |= constant_case(s);
     changed |= lowercase_static_reference(s);
@@ -2992,6 +3012,661 @@ fn assign_null_coalescing_to_coalesce_equal(s: &mut Stream) -> bool {
         }
         changed = true;
         i += 1;
+    }
+    changed
+}
+
+// --- ported batch 4: string / comment rules --------------------------------
+
+fn is_go_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
+}
+
+fn trim_go_space(b: &[u8]) -> &[u8] {
+    let mut st = 0;
+    let mut en = b.len();
+    while st < en && is_go_space(b[st]) {
+        st += 1;
+    }
+    while en > st && is_go_space(b[en - 1]) {
+        en -= 1;
+    }
+    &b[st..en]
+}
+
+fn trim_set<'a>(b: &'a [u8], set: &[u8]) -> &'a [u8] {
+    let mut st = 0;
+    let mut en = b.len();
+    while st < en && set.contains(&b[st]) {
+        st += 1;
+    }
+    while en > st && set.contains(&b[en - 1]) {
+        en -= 1;
+    }
+    &b[st..en]
+}
+
+fn contains_subslice(hay: &[u8], needle: &[u8]) -> bool {
+    !needle.is_empty() && hay.windows(needle.len()).any(|w| w == needle)
+}
+
+fn comment_body(v: &[u8]) -> &[u8] {
+    if v.starts_with(b"//") {
+        trim_go_space(&v[2..])
+    } else if v.starts_with(b"#") {
+        trim_go_space(&v[1..])
+    } else if v.starts_with(b"/*") {
+        let mut x = &v[2..];
+        if x.ends_with(b"*/") {
+            x = &x[..x.len() - 2];
+        }
+        trim_go_space(x)
+    } else {
+        trim_go_space(v)
+    }
+}
+
+fn no_empty_comment(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Comment
+            && !s.bytes(i).starts_with(b"#[")
+            && comment_body(s.bytes(i)).is_empty()
+        {
+            s.remove_at(i);
+            changed = true;
+            if i >= 1
+                && i < s.len()
+                && s.kind(i - 1) == Kind::Whitespace
+                && s.kind(i) == Kind::Whitespace
+            {
+                let mut merged = s.bytes(i - 1).to_vec();
+                merged.extend_from_slice(s.bytes(i));
+                s.set_owned(i - 1, merged);
+                s.remove_at(i);
+            }
+            continue;
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn single_line_comment_spacing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Comment {
+            continue;
+        }
+        let v = s.bytes(i);
+        let marker: &[u8] = if v.starts_with(b"//") {
+            b"//"
+        } else if v.starts_with(b"#") && !v.starts_with(b"#[") {
+            b"#"
+        } else {
+            continue;
+        };
+        let rest = &v[marker.len()..];
+        if rest.is_empty() || rest[0] == b' ' || rest[0] == b'\t' {
+            continue;
+        }
+        let mut nv = Vec::with_capacity(v.len() + 1);
+        nv.extend_from_slice(marker);
+        nv.push(b' ');
+        nv.extend_from_slice(rest);
+        s.set_owned(i, nv);
+        changed = true;
+    }
+    changed
+}
+
+fn single_quote(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::String {
+            continue;
+        }
+        let v = s.bytes(i);
+        if v.len() < 2 {
+            continue;
+        }
+        if v[0] != b'"' || v[v.len() - 1] != b'"' {
+            continue;
+        }
+        let content = v[1..v.len() - 1].to_vec();
+        if content.iter().any(|&c| c == b'$' || c == b'\\' || c == b'\'') {
+            continue;
+        }
+        let mut nv = Vec::with_capacity(content.len() + 2);
+        nv.push(b'\'');
+        nv.extend_from_slice(&content);
+        nv.push(b'\'');
+        s.set_owned(i, nv);
+        changed = true;
+    }
+    changed
+}
+
+fn heredoc_is_label_byte(c: u8) -> bool {
+    c == b'_' || c.is_ascii_alphanumeric()
+}
+
+fn heredoc_to_nowdoc_value(v: &[u8]) -> Option<Vec<u8>> {
+    if !v.starts_with(b"<<<") {
+        return None;
+    }
+    let mut i = 3;
+    while i < v.len() && (v[i] == b' ' || v[i] == b'\t') {
+        i += 1;
+    }
+    if i < v.len() && (v[i] == b'\'' || v[i] == b'"') {
+        return None;
+    }
+    let label_start = i;
+    while i < v.len() && heredoc_is_label_byte(v[i]) {
+        i += 1;
+    }
+    if i == label_start {
+        return None;
+    }
+    let label_end = i;
+    let nl = v.iter().position(|&c| c == b'\n')?;
+    let body = &v[nl + 1..];
+    if body.iter().any(|&c| c == b'$' || c == b'\\') || body.contains(&b'{') {
+        return None;
+    }
+    let mut out = Vec::with_capacity(v.len() + 2);
+    out.extend_from_slice(&v[..label_start]);
+    out.push(b'\'');
+    out.extend_from_slice(&v[label_start..label_end]);
+    out.push(b'\'');
+    out.extend_from_slice(&v[label_end..]);
+    Some(out)
+}
+
+fn heredoc_to_nowdoc(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::String || !s.bytes(i).starts_with(b"<<<") {
+            continue;
+        }
+        if let Some(out) = heredoc_to_nowdoc_value(s.bytes(i)) {
+            s.set_owned(i, out);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn no_binary_string(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if !(s.kind(i) == Kind::Ident && (s.bytes(i) == b"b" || s.bytes(i) == b"B")) {
+            i += 1;
+            continue;
+        }
+        if i + 1 >= s.len() || s.kind(i + 1) != Kind::String {
+            i += 1;
+            continue;
+        }
+        let skip = if let Some(p) = prev_significant_index(s, i) {
+            matches!(s.bytes(p), b"->" | b"?->" | b"::" | b"\\")
+        } else {
+            false
+        };
+        if skip {
+            i += 1;
+            continue;
+        }
+        s.remove_at(i);
+        changed = true;
+        continue;
+    }
+    changed
+}
+
+fn is_doc_block_opening(v: &[u8]) -> bool {
+    v.len() >= 4 && &v[..3] == b"/**" && v[3] != b'*' && v[3] != b'/'
+}
+
+fn fix_comment_opening(v: &[u8]) -> Vec<u8> {
+    if !v.starts_with(b"/*") {
+        return v.to_vec();
+    }
+    let mut a = 0;
+    while 1 + a < v.len() && v[1 + a] == b'*' {
+        a += 1;
+    }
+    if a < 2 {
+        return v.to_vec();
+    }
+    let next = if 1 + a < v.len() { v[1 + a] } else { 0 };
+    if next != b'/' {
+        let mut out = b"/*".to_vec();
+        out.extend_from_slice(&v[1 + a..]);
+        return out;
+    }
+    if a >= 3 {
+        let mut out = b"/*".to_vec();
+        out.extend_from_slice(&v[a..]);
+        return out;
+    }
+    v.to_vec()
+}
+
+fn fix_comment_closing(v: &[u8]) -> Vec<u8> {
+    if !v.ends_with(b"/") {
+        return v.to_vec();
+    }
+    let mut k: isize = v.len() as isize - 2;
+    let mut b = 0;
+    while k >= 0 && v[k as usize] == b'*' {
+        b += 1;
+        k -= 1;
+    }
+    if b < 2 {
+        return v.to_vec();
+    }
+    let prev = if k >= 0 { v[k as usize] } else { 0 };
+    if prev != b'/' {
+        let mut out = v[..(k + 1) as usize].to_vec();
+        out.extend_from_slice(b"*/");
+        return out;
+    }
+    if b >= 3 {
+        let mut out = v[..(k + 2) as usize].to_vec();
+        out.extend_from_slice(b"*/");
+        return out;
+    }
+    v.to_vec()
+}
+
+fn multiline_comment_opening_closing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        let k = s.kind(i);
+        if k != Kind::Comment && k != Kind::DocComment {
+            continue;
+        }
+        let v = s.bytes(i).to_vec();
+        if !v.starts_with(b"/*") {
+            continue;
+        }
+        let mut nv = v.clone();
+        if !is_doc_block_opening(&nv) {
+            nv = fix_comment_opening(&nv);
+        }
+        nv = fix_comment_closing(&nv);
+        if nv != v {
+            s.set_owned(i, nv);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn comment_opening_indent(s: &Stream, i: usize) -> Option<Vec<u8>> {
+    let whitespace: &[u8] = if i >= 1 && s.kind(i - 1) == Kind::Whitespace {
+        s.bytes(i - 1)
+    } else {
+        b""
+    };
+    let mut cut: isize = -1;
+    for j in 0..whitespace.len() {
+        if whitespace[j] == b'\n' || whitespace[j] == b'\r' {
+            cut = j as isize;
+        }
+    }
+    if cut < 0 {
+        return None;
+    }
+    Some(whitespace[(cut as usize) + 1..].to_vec())
+}
+
+fn realign_comment_lines(v: &[u8], indent: &[u8]) -> Vec<u8> {
+    let mut lines: Vec<Vec<u8>> = v.split(|&c| c == b'\n').map(|l| l.to_vec()).collect();
+    for k in 1..lines.len() {
+        let line = &lines[k];
+        let mut st = 0;
+        while st < line.len() && (line[st] == b' ' || line[st] == b'\t') {
+            st += 1;
+        }
+        let trimmed = &line[st..];
+        if !trimmed.starts_with(b"*") {
+            continue;
+        }
+        let mut nl = indent.to_vec();
+        nl.push(b' ');
+        nl.extend_from_slice(trimmed);
+        lines[k] = nl;
+    }
+    let mut out = Vec::with_capacity(v.len());
+    for (idx, l) in lines.iter().enumerate() {
+        if idx > 0 {
+            out.push(b'\n');
+        }
+        out.extend_from_slice(l);
+    }
+    out
+}
+
+fn align_multiline_comment(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        let k = s.kind(i);
+        if k != Kind::Comment && k != Kind::DocComment {
+            continue;
+        }
+        if !s.bytes(i).contains(&b'\n') {
+            continue;
+        }
+        let indent = match comment_opening_indent(s, i) {
+            Some(x) => x,
+            None => continue,
+        };
+        let v = s.bytes(i).to_vec();
+        let nv = realign_comment_lines(&v, &indent);
+        if nv != v {
+            s.set_owned(i, nv);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn single_line_comment_style(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Comment {
+            continue;
+        }
+        let v = s.bytes(i).to_vec();
+
+        if v.starts_with(b"#") {
+            if v.len() >= 2 && v[1] == b'[' {
+                continue;
+            }
+            let mut nv = b"//".to_vec();
+            nv.extend_from_slice(&v[1..]);
+            s.set_owned(i, nv);
+            changed = true;
+            continue;
+        }
+
+        if !v.starts_with(b"/*") || v.len() < 4 {
+            continue;
+        }
+        if v.iter().any(|&c| c == b'\n' || c == b'\r') {
+            continue;
+        }
+        let content = &v[2..v.len() - 2];
+        if contains_subslice(content, b"?>") {
+            continue;
+        }
+        if i + 1 < s.len()
+            && (s.kind(i + 1) != Kind::Whitespace
+                || !s.bytes(i + 1).iter().any(|&c| c == b'\n' || c == b'\r'))
+        {
+            continue;
+        }
+
+        let inner = trim_set(content, b" \t\r\n\x0c\x0b*");
+        let mut nv = b"//".to_vec();
+        if !inner.is_empty() {
+            nv = b"// ".to_vec();
+            nv.extend_from_slice(inner);
+        }
+        s.set_owned(i, nv);
+        changed = true;
+
+        if i + 1 < s.len() {
+            let nt = s.bytes(i + 1);
+            let mut st = 0;
+            while st < nt.len() && (nt[st] == b' ' || nt[st] == b'\t') {
+                st += 1;
+            }
+            if st > 0 {
+                let trimmed = nt[st..].to_vec();
+                s.set_owned(i + 1, trimmed);
+            }
+        }
+    }
+    changed
+}
+
+fn interp_is_name_start(c: u8) -> bool {
+    c == b'_' || c.is_ascii_lowercase() || c.is_ascii_uppercase() || c >= 0x80
+}
+
+fn interp_is_name_byte(c: u8) -> bool {
+    interp_is_name_start(c) || c.is_ascii_digit()
+}
+
+fn quote_index(idx: &[u8]) -> Vec<u8> {
+    if idx.is_empty() {
+        return idx.to_vec();
+    }
+    if idx[0] == b'$' {
+        return idx.to_vec();
+    }
+    let mut numeric = true;
+    let mut ss = idx;
+    if ss[0] == b'-' {
+        ss = &ss[1..];
+    }
+    if ss.is_empty() {
+        numeric = false;
+    }
+    for &c in ss {
+        if !c.is_ascii_digit() {
+            numeric = false;
+            break;
+        }
+    }
+    if numeric {
+        return idx.to_vec();
+    }
+    let mut out = Vec::with_capacity(idx.len() + 2);
+    out.push(b'\'');
+    out.extend_from_slice(idx);
+    out.push(b'\'');
+    out
+}
+
+fn parse_simple_var(b: &[u8], i: usize) -> (Vec<u8>, usize) {
+    let mut j = i + 1;
+    while j < b.len() && interp_is_name_byte(b[j]) {
+        j += 1;
+    }
+    let mut expr: Vec<u8> = Vec::with_capacity(j - i + 4);
+    expr.extend_from_slice(&b[i..j]);
+
+    if j + 2 < b.len() && b[j] == b'-' && b[j + 1] == b'>' && interp_is_name_start(b[j + 2]) {
+        let mut k = j + 2;
+        while k < b.len() && interp_is_name_byte(b[k]) {
+            k += 1;
+        }
+        expr.extend_from_slice(&b[j..k]);
+        return (expr, k);
+    } else if j < b.len() && b[j] == b'[' {
+        let mut k = j + 1;
+        while k < b.len() && b[k] != b']' {
+            k += 1;
+        }
+        if k < b.len() && b[k] == b']' {
+            let idx = &b[j + 1..k];
+            expr.push(b'[');
+            expr.extend_from_slice(&quote_index(idx));
+            expr.push(b']');
+            return (expr, k + 1);
+        }
+    }
+    (expr, j)
+}
+
+fn wrap_interpolations(b: &[u8]) -> (Vec<u8>, bool) {
+    let mut out = Vec::with_capacity(b.len() + 8);
+    let mut changed = false;
+    let mut i = 0;
+    while i < b.len() {
+        let c = b[i];
+        if c == b'\\' && i + 1 < b.len() {
+            out.push(c);
+            out.push(b[i + 1]);
+            i += 2;
+            continue;
+        }
+        if c == b'{' && i + 1 < b.len() && b[i + 1] == b'$' {
+            let mut depth = 0i32;
+            let mut j = i;
+            while j < b.len() {
+                if b[j] == b'{' {
+                    depth += 1;
+                } else if b[j] == b'}' {
+                    depth -= 1;
+                    if depth == 0 {
+                        j += 1;
+                        break;
+                    }
+                }
+                j += 1;
+            }
+            out.extend_from_slice(&b[i..j]);
+            i = j;
+            continue;
+        }
+        if c == b'$' && i + 1 < b.len() {
+            if b[i + 1] == b'{' {
+                out.push(b'$');
+                out.push(b'{');
+                i += 2;
+                continue;
+            }
+            if i > 0 && b[i - 1] == b'$' {
+                out.push(c);
+                i += 1;
+                continue;
+            }
+            if interp_is_name_start(b[i + 1]) {
+                let (expr, end) = parse_simple_var(b, i);
+                out.push(b'{');
+                out.extend_from_slice(&expr);
+                out.push(b'}');
+                i = end;
+                changed = true;
+                continue;
+            }
+        }
+        out.push(c);
+        i += 1;
+    }
+    (out, changed)
+}
+
+fn interpolated_body(v: &[u8]) -> Option<usize> {
+    if !v.is_empty() && v[0] == b'"' {
+        return Some(1);
+    }
+    if v.len() >= 3 && v[0] == b'<' && v[1] == b'<' && v[2] == b'<' {
+        let mut p = 3;
+        while p < v.len() && (v[p] == b' ' || v[p] == b'\t') {
+            p += 1;
+        }
+        if p < v.len() && v[p] == b'\'' {
+            return None;
+        }
+        while p < v.len() && v[p] != b'\n' {
+            p += 1;
+        }
+        if p < v.len() {
+            return Some(p + 1);
+        }
+    }
+    None
+}
+
+fn suffix_len(v: &[u8], body_start: usize) -> usize {
+    if v[0] == b'"' {
+        return 1;
+    }
+    let mut last: isize = -1;
+    for i in body_start..v.len() {
+        if v[i] == b'\n' {
+            last = i as isize;
+        }
+    }
+    if last < 0 {
+        return 0;
+    }
+    v.len() - last as usize
+}
+
+fn explicit_string_variable(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::String {
+            continue;
+        }
+        let v = s.bytes(i).to_vec();
+        let start = match interpolated_body(&v) {
+            Some(x) => x,
+            None => continue,
+        };
+        let end = v.len() - suffix_len(&v, start);
+        if end < start {
+            continue;
+        }
+        let (body, hit) = wrap_interpolations(&v[start..end]);
+        if hit {
+            let mut nv = Vec::with_capacity(v.len() + 8);
+            nv.extend_from_slice(&v[..start]);
+            nv.extend_from_slice(&body);
+            nv.extend_from_slice(&v[end..]);
+            s.set_owned(i, nv);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn is_lone_dollar(s: &Stream, i: usize) -> bool {
+    s.kind(i) == Kind::Variable && s.bytes(i) == b"$"
+}
+
+fn is_real_variable(s: &Stream, i: usize) -> bool {
+    s.kind(i) == Kind::Variable && s.bytes(i).len() > 1
+}
+
+fn is_dynamic_var_prefix(s: &Stream, i: usize) -> bool {
+    if is_lone_dollar(s, i) {
+        return true;
+    }
+    s.kind(i) == Kind::Punct && (s.bytes(i) == b"->" || s.bytes(i) == b"?->")
+}
+
+fn explicit_indirect_variable(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i: isize = s.len() as isize - 1;
+    while i >= 0 {
+        let idx = i as usize;
+        if !is_real_variable(s, idx) {
+            i -= 1;
+            continue;
+        }
+        let is_prefix = match prev_significant_index(s, idx) {
+            Some(p) => is_dynamic_var_prefix(s, p),
+            None => false,
+        };
+        if !is_prefix {
+            i -= 1;
+            continue;
+        }
+        s.insert_owned(idx + 1, Kind::Punct, b"}".to_vec());
+        s.insert_owned(idx, Kind::Punct, b"{".to_vec());
+        changed = true;
+        i -= 1;
     }
     changed
 }
