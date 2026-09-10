@@ -12,6 +12,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\PhpTag\FullOpeningTagFixer",
     r"PhpCsFixer\Fixer\Whitespace\LineEndingFixer",
     r"PhpCsFixer\Fixer\LanguageConstruct\IsNullFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\YodaStyleFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\ArraySyntaxFixer",
     r"PhpCsFixer\Fixer\ListNotation\ListSyntaxFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NoWhitespaceBeforeCommaInArrayFixer",
@@ -92,8 +93,10 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ControlStructure\SwitchCaseSemicolonToColonFixer",
     r"PhpCsFixer\Fixer\ControlStructure\SwitchCaseSpaceFixer",
     r"PhpCsFixer\Fixer\Basic\NoMultipleStatementsPerLineFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\MethodArgumentSpaceFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\ReturnTypeDeclarationFixer",
     r"PhpCsFixer\Fixer\Operator\NewWithParenthesesFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\FunctionDeclarationFixer",
     r"PhpCsFixer\Fixer\Whitespace\IndentationTypeFixer",
     r"PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer",
     r"PhpCsFixer\Fixer\NamespaceNotation\BlankLinesBeforeNamespaceFixer",
@@ -104,6 +107,8 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Whitespace\BlankLineBetweenImportGroupsFixer",
     r"PhpCsFixer\Fixer\Import\SingleLineAfterImportsFixer",
     r"PhpCsFixer\Fixer\ClassNotation\NoBlankLinesAfterClassOpeningFixer",
+    r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
+    r"PhpCsFixer\Fixer\Whitespace\ArrayIndentationFixer",
     r"PhpCsFixer\Fixer\Whitespace\NoExtraBlankLinesFixer",
     r"PhpCsFixer\Fixer\PhpTag\NoClosingTagFixer",
 ];
@@ -115,6 +120,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= full_opening_tag(s);
     changed |= line_ending(s);
     changed |= is_null(s);
+    changed |= yoda_style(s);
     changed |= array_syntax(s);
     changed |= list_syntax(s);
     changed |= no_whitespace_before_comma_in_array(s);
@@ -195,8 +201,10 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= switch_case_semicolon_to_colon(s);
     changed |= switch_case_space(s);
     changed |= no_multiple_statements_per_line(s);
+    changed |= method_argument_space(s);
     changed |= return_type_declaration(s);
     changed |= new_with_parentheses(s);
+    changed |= function_declaration(s);
     changed |= indentation_type(s);
     changed |= single_trait_insert_per_statement(s);
     changed |= blank_lines_before_namespace(s);
@@ -207,6 +215,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= blank_line_between_import_groups(s);
     changed |= single_line_after_imports(s);
     changed |= no_blank_lines_after_class_opening(s);
+    changed |= array_list_item_newline(s);
+    changed |= array_indentation(s);
     changed |= no_extra_blank_lines(s);
     changed |= no_closing_tag(s);
     changed
@@ -5717,6 +5727,856 @@ fn no_unused_imports(s: &mut Stream) -> bool {
             }
         }
         changed = true;
+    }
+    changed
+}
+
+// --- ported batch 9: functions / arrays / yoda -----------------------------
+
+fn copy_range(s: &Stream, a: usize, b: usize) -> Vec<(Kind, Vec<u8>)> {
+    let mut out = Vec::new();
+    let mut j = a;
+    while j <= b {
+        out.push((s.kind(j), s.bytes(j).to_vec()));
+        j += 1;
+    }
+    out
+}
+
+fn is_array_literal_open(s: &Stream, open: usize) -> bool {
+    let p = match sig_prev(s, open) {
+        Some(p) => p,
+        None => return true,
+    };
+    match s.kind(p) {
+        Kind::Variable | Kind::Ident | Kind::String | Kind::Number => false,
+        Kind::Punct => !matches!(s.bytes(p), b")" | b"]" | b"}"),
+        _ => true,
+    }
+}
+
+fn line_indent_before(s: &Stream, idx: usize) -> Vec<u8> {
+    let mut i = idx as isize - 1;
+    while i >= 0 {
+        let k = i as usize;
+        if s.kind(k) == Kind::Whitespace && s.bytes(k).contains(&b'\n') {
+            let b = s.bytes(k);
+            if let Some(nl) = b.iter().rposition(|&c| c == b'\n') {
+                return b[nl + 1..].to_vec();
+            }
+        }
+        i -= 1;
+    }
+    Vec::new()
+}
+
+fn edit_slot_after(s: &mut Stream, idx: usize, val: &[u8]) -> bool {
+    if idx + 1 < s.len() && s.kind(idx + 1) == Kind::Whitespace {
+        if s.bytes(idx + 1) != val {
+            s.set_owned(idx + 1, val.to_vec());
+            return true;
+        }
+        return false;
+    }
+    s.insert_owned(idx + 1, Kind::Whitespace, val.to_vec());
+    true
+}
+
+fn edit_slot_before(s: &mut Stream, idx: usize, val: &[u8]) -> bool {
+    if idx > 0 && s.kind(idx - 1) == Kind::Whitespace {
+        if s.bytes(idx - 1) != val {
+            s.set_owned(idx - 1, val.to_vec());
+            return true;
+        }
+        return false;
+    }
+    s.insert_owned(idx, Kind::Whitespace, val.to_vec());
+    true
+}
+
+fn is_call_or_decl_paren(s: &Stream, open: usize) -> bool {
+    let p = match sig_prev(s, open) {
+        Some(p) => p,
+        None => return false,
+    };
+    match s.kind(p) {
+        Kind::Ident | Kind::Variable => true,
+        Kind::Punct => s.bytes(p) == b")" || s.bytes(p) == b"]",
+        Kind::Keyword => {
+            let lv = s.bytes(p).to_ascii_lowercase();
+            lv == b"function" || lv == b"fn"
+        }
+        _ => false,
+    }
+}
+
+fn reflow_paren(s: &mut Stream, open: usize, close_idx: usize) -> bool {
+    let mut changed = false;
+    let base = line_indent_before(s, open);
+    let mut arg_nl = vec![b'\n'];
+    arg_nl.extend_from_slice(&base);
+    arg_nl.extend_from_slice(b"    ");
+
+    let mut commas: Vec<usize> = Vec::new();
+    let mut depth = 0i32;
+    let mut j = open + 1;
+    while j < close_idx {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b"," => {
+                    if depth == 0 && sig_next(s, j) != Some(close_idx) {
+                        commas.push(j);
+                    }
+                }
+                _ => {}
+            }
+        }
+        j += 1;
+    }
+
+    let mut close_nl = vec![b'\n'];
+    close_nl.extend_from_slice(&base);
+    if edit_slot_before(s, close_idx, &close_nl) {
+        changed = true;
+    }
+    for &c in commas.iter().rev() {
+        if edit_slot_after(s, c, &arg_nl) {
+            changed = true;
+        }
+    }
+    if edit_slot_after(s, open, &arg_nl) {
+        changed = true;
+    }
+    changed
+}
+
+fn yoda_op(v: &[u8]) -> bool {
+    matches!(v, b"==" | b"===" | b"!=" | b"!==" | b"<" | b">" | b"<=" | b">=")
+}
+
+fn yoda_mirror(v: &[u8]) -> Vec<u8> {
+    match v {
+        b"<" => b">".to_vec(),
+        b">" => b"<".to_vec(),
+        b"<=" => b">=".to_vec(),
+        b">=" => b"<=".to_vec(),
+        _ => v.to_vec(),
+    }
+}
+
+fn is_yoda_literal(s: &Stream, i: usize) -> bool {
+    match s.kind(i) {
+        Kind::Number | Kind::String | Kind::Ident => true,
+        Kind::Keyword => matches!(
+            s.bytes(i).to_ascii_lowercase().as_slice(),
+            b"true" | b"false" | b"null"
+        ),
+        _ => false,
+    }
+}
+
+fn is_primary_start(s: &Stream, i: usize) -> bool {
+    match s.kind(i) {
+        Kind::Variable | Kind::Ident => true,
+        Kind::Keyword => matches!(
+            s.bytes(i).to_ascii_lowercase().as_slice(),
+            b"static" | b"self" | b"parent"
+        ),
+        Kind::Punct => s.bytes(i) == b"\\",
+        _ => false,
+    }
+}
+
+fn is_left_boundary(s: &Stream, p: Option<usize>) -> bool {
+    let p = match p {
+        Some(p) => p,
+        None => return true,
+    };
+    match s.kind(p) {
+        Kind::Punct => matches!(
+            s.bytes(p),
+            b"(" | b"[" | b"{" | b"," | b";" | b"&&" | b"||" | b"?" | b"??" | b":" | b"=" | b"!" | b"=>" | b"."
+        ),
+        Kind::Keyword => matches!(
+            s.bytes(p).to_ascii_lowercase().as_slice(),
+            b"return" | b"and" | b"or" | b"xor" | b"echo" | b"print" | b"case" | b"if" | b"elseif" | b"while"
+        ),
+        _ => false,
+    }
+}
+
+fn is_right_boundary(s: &Stream, j: Option<usize>) -> bool {
+    let j = match j {
+        Some(j) => j,
+        None => return true,
+    };
+    match s.kind(j) {
+        Kind::Punct => matches!(
+            s.bytes(j),
+            b")" | b"]" | b"}" | b";" | b"," | b":" | b"&&" | b"||" | b"?" | b"??" | b"." | b"=>"
+        ),
+        Kind::Keyword => matches!(
+            s.bytes(j).to_ascii_lowercase().as_slice(),
+            b"and" | b"or" | b"xor"
+        ),
+        _ => false,
+    }
+}
+
+fn left_literal_operand(s: &Stream, op: usize) -> Option<(usize, usize)> {
+    let le = prev_significant_index(s, op)?;
+    if s.kind(le) == Kind::Punct && s.bytes(le) == b"]" {
+        if let Some(o) = match_backward(s, le) {
+            if next_significant_index(s, o) == Some(le) {
+                return Some((o, le));
+            }
+        }
+        return None;
+    }
+    if s.kind(le) == Kind::Ident && s.bytes(le).eq_ignore_ascii_case(b"class") {
+        if let Some(p) = prev_significant_index(s, le) {
+            if s.bytes(p) == b"::" {
+                if let Some(n) = prev_significant_index(s, p) {
+                    if s.kind(n) == Kind::Ident {
+                        return Some((n, le));
+                    }
+                }
+            }
+        }
+        return None;
+    }
+    if is_yoda_literal(s, le) {
+        if s.kind(le) == Kind::Number {
+            if let Some(p) = prev_significant_index(s, le) {
+                if s.kind(p) == Kind::Punct && (s.bytes(p) == b"-" || s.bytes(p) == b"+") {
+                    if is_left_boundary(s, prev_significant_index(s, p)) {
+                        return Some((p, le));
+                    }
+                }
+            }
+        }
+        return Some((le, le));
+    }
+    None
+}
+
+fn right_primary_end(s: &Stream, rs: usize) -> Option<usize> {
+    if !is_primary_start(s, rs) {
+        return None;
+    }
+    let mut end = rs;
+    loop {
+        let n = match next_significant_index(s, end) {
+            Some(n) => n,
+            None => return Some(end),
+        };
+        if s.kind(n) == Kind::Punct {
+            match s.bytes(n) {
+                b"->" | b"?->" | b"::" | b"\\" => {
+                    let m = match next_significant_index(s, n) {
+                        Some(m) => m,
+                        None => return Some(end),
+                    };
+                    end = m;
+                    continue;
+                }
+                b"(" | b"[" => {
+                    let c = match match_forward(s, n) {
+                        Some(c) => c,
+                        None => return Some(end),
+                    };
+                    end = c;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        return Some(end);
+    }
+}
+
+fn yoda_style(s: &mut Stream) -> bool {
+    let mut swaps: Vec<(usize, usize, usize, usize)> = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct || !yoda_op(s.bytes(i)) {
+            i += 1;
+            continue;
+        }
+        let (ls, le) = match left_literal_operand(s, i) {
+            Some(x) => x,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        if !is_left_boundary(s, prev_significant_index(s, ls)) {
+            i += 1;
+            continue;
+        }
+        let rs = match next_significant_index(s, i) {
+            Some(r) => r,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let re = match right_primary_end(s, rs) {
+            Some(r) => r,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        if rs == re && is_yoda_literal(s, rs) {
+            i += 1;
+            continue;
+        }
+        if !is_right_boundary(s, next_significant_index(s, re)) {
+            i += 1;
+            continue;
+        }
+        swaps.push((ls, le, rs, re));
+        i += 1;
+    }
+    if swaps.is_empty() {
+        return false;
+    }
+    for &(ls, le, rs, re) in swaps.iter().rev() {
+        let left = copy_range(s, ls, le);
+        let mut mid = if rs > le + 1 { copy_range(s, le + 1, rs - 1) } else { Vec::new() };
+        let right = copy_range(s, rs, re);
+        for m in mid.iter_mut() {
+            if m.0 == Kind::Punct {
+                m.1 = yoda_mirror(&m.1);
+            }
+        }
+        let mut repl = right;
+        repl.extend(mid);
+        repl.extend(left);
+        replace_range(s, ls, re, repl);
+    }
+    true
+}
+
+fn arg_list_is_multiline(s: &Stream, open: usize, close_idx: usize) -> bool {
+    let n = open + 1;
+    if n < close_idx && s.kind(n) == Kind::Whitespace && has_newline(s.bytes(n)) {
+        return true;
+    }
+    let mut depth = 0i32;
+    let mut j = open + 1;
+    while j < close_idx {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b"," => {
+                    if depth == 0
+                        && j + 1 < close_idx
+                        && s.kind(j + 1) == Kind::Whitespace
+                        && has_newline(s.bytes(j + 1))
+                    {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        j += 1;
+    }
+    false
+}
+
+fn reflow_multiline_args(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut open = 0;
+    while open < s.len() {
+        if s.kind(open) == Kind::Punct && s.bytes(open) == b"(" {
+            if let Some(close_idx) = match_forward(s, open) {
+                if arg_list_is_multiline(s, open, close_idx)
+                    && is_call_or_decl_paren(s, open)
+                    && sig_next(s, open) != Some(close_idx)
+                {
+                    if reflow_paren(s, open, close_idx) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        open += 1;
+    }
+    changed
+}
+
+fn method_argument_space(s: &mut Stream) -> bool {
+    let mut changed = reflow_multiline_args(s);
+    let mut stack: Vec<u8> = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct {
+            i += 1;
+            continue;
+        }
+        match s.bytes(i) {
+            b"(" | b"[" | b"{" => {
+                stack.push(s.bytes(i)[0]);
+                i += 1;
+                continue;
+            }
+            b")" | b"]" | b"}" => {
+                stack.pop();
+                i += 1;
+                continue;
+            }
+            b"," => {
+                if stack.last() != Some(&b'(') {
+                    i += 1;
+                    continue;
+                }
+                if i + 1 < s.len() && s.kind(i + 1) == Kind::Whitespace && has_newline(s.bytes(i + 1)) {
+                    i += 1;
+                    continue;
+                }
+                if i > 0 && s.kind(i - 1) == Kind::Whitespace && !has_newline(s.bytes(i - 1)) {
+                    s.remove_at(i - 1);
+                    i -= 1;
+                    changed = true;
+                }
+                if i + 1 < s.len() {
+                    if s.kind(i + 1) == Kind::Whitespace {
+                        if s.bytes(i + 1) != b" " {
+                            s.set_owned(i + 1, b" ".to_vec());
+                            changed = true;
+                        }
+                    } else if s.kind(i + 1) != Kind::Punct || s.bytes(i + 1) != b")" {
+                        s.insert_owned(i + 1, Kind::Whitespace, b" ".to_vec());
+                        i += 1;
+                        changed = true;
+                    }
+                }
+                i += 1;
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    changed
+}
+
+fn fn_ensure_single_space_after(s: &mut Stream, i: usize) -> bool {
+    if i + 1 >= s.len() {
+        return false;
+    }
+    if s.kind(i + 1) == Kind::Whitespace {
+        if has_newline(s.bytes(i + 1)) || s.bytes(i + 1) == b" " {
+            return false;
+        }
+        s.set_owned(i + 1, b" ".to_vec());
+        return true;
+    }
+    s.insert_owned(i + 1, Kind::Whitespace, b" ".to_vec());
+    true
+}
+
+fn fn_ensure_single_space_before(s: &mut Stream, i: usize) -> bool {
+    if i == 0 {
+        return false;
+    }
+    if s.kind(i - 1) == Kind::Whitespace {
+        if has_newline(s.bytes(i - 1)) || s.bytes(i - 1) == b" " {
+            return false;
+        }
+        s.set_owned(i - 1, b" ".to_vec());
+        return true;
+    }
+    s.insert_owned(i, Kind::Whitespace, b" ".to_vec());
+    true
+}
+
+fn fn_glue_after(s: &mut Stream, i: usize) -> bool {
+    if i + 1 < s.len() && s.kind(i + 1) == Kind::Whitespace && !has_newline(s.bytes(i + 1)) {
+        s.remove_at(i + 1);
+        return true;
+    }
+    false
+}
+
+fn find_function_param_open(s: &Stream, fi: usize) -> Option<usize> {
+    let mut j = fi + 1;
+    while j < s.len() {
+        match s.kind(j) {
+            Kind::Whitespace | Kind::Ident => {
+                j += 1;
+                continue;
+            }
+            Kind::Punct => match s.bytes(j) {
+                b"(" => return Some(j),
+                b"&" => {
+                    j += 1;
+                    continue;
+                }
+                _ => return None,
+            },
+            _ => return None,
+        }
+    }
+    None
+}
+
+fn fix_function_declaration(s: &mut Stream, fi: usize) -> bool {
+    let start_paren = match find_function_param_open(s, fi) {
+        Some(p) => p,
+        None => return false,
+    };
+    let mut a = next_significant_index(s, fi);
+    let mut amp_index: Option<usize> = None;
+    if let Some(ai) = a {
+        if s.kind(ai) == Kind::Punct && s.bytes(ai) == b"&" {
+            amp_index = Some(ai);
+            a = next_significant_index(s, ai);
+        }
+    }
+    let mut name_index: Option<usize> = None;
+    if let Some(ai) = a {
+        if ai < start_paren {
+            if s.kind(ai) == Kind::Ident && next_significant_index(s, ai) == Some(start_paren) {
+                name_index = Some(ai);
+            } else {
+                return false;
+            }
+        }
+    }
+    let named = name_index.is_some();
+    let mut changed = false;
+
+    if !named {
+        if let Some(close_paren) = match_forward(s, start_paren) {
+            if let Some(u) = next_significant_index(s, close_paren) {
+                if s.kind(u) == Kind::Keyword && s.bytes(u).eq_ignore_ascii_case(b"use") {
+                    if fn_ensure_single_space_after(s, u) {
+                        changed = true;
+                    }
+                    if fn_ensure_single_space_before(s, u) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    if named {
+        let ni = name_index.unwrap();
+        if fn_glue_after(s, ni) {
+            changed = true;
+        }
+        if let Some(ai) = amp_index {
+            if fn_glue_after(s, ai) {
+                changed = true;
+            }
+        }
+    }
+
+    if fn_ensure_single_space_after(s, fi) {
+        changed = true;
+    }
+
+    if !named {
+        if let Some(p) = prev_significant_index(s, fi) {
+            if s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"static") {
+                if fi >= 1
+                    && s.kind(fi - 1) == Kind::Whitespace
+                    && !has_newline(s.bytes(fi - 1))
+                    && s.bytes(fi - 1) != b" "
+                {
+                    s.set_owned(fi - 1, b" ".to_vec());
+                    changed = true;
+                }
+            }
+        }
+    }
+    changed
+}
+
+fn function_declaration(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"function") {
+            if fix_function_declaration(s, i) {
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn array_top_level_multiline(s: &Stream, open: usize, close_idx: usize) -> bool {
+    let mut depth = 0i32;
+    let mut j = open + 1;
+    while j < close_idx {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => {
+                    depth += 1;
+                    j += 1;
+                    continue;
+                }
+                b")" | b"]" | b"}" => {
+                    depth -= 1;
+                    j += 1;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        if depth == 0 && s.kind(j) == Kind::Whitespace && has_newline(s.bytes(j)) {
+            return true;
+        }
+        j += 1;
+    }
+    false
+}
+
+fn array_has_top_level_arrow(s: &Stream, open: usize, close_idx: usize) -> bool {
+    let mut depth = 0i32;
+    let mut j = open + 1;
+    while j < close_idx {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b"=>" => {
+                    if depth == 0 {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        j += 1;
+    }
+    false
+}
+
+fn array_list_item_newline(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut open = 0;
+    while open < s.len() {
+        if s.kind(open) == Kind::Punct && s.bytes(open) == b"[" && is_array_literal_open(s, open) {
+            if let Some(mut close_idx) = match_forward(s, open) {
+                if sig_next(s, open) != Some(close_idx)
+                    && !array_top_level_multiline(s, open, close_idx)
+                    && array_has_top_level_arrow(s, open, close_idx)
+                {
+                    if let Some(last) = sig_prev(s, close_idx) {
+                        if last > open && s.bytes(last) != b"," {
+                            s.insert_owned(last + 1, Kind::Punct, b",".to_vec());
+                            close_idx += 1;
+                            changed = true;
+                        }
+                    }
+                    if reflow_paren(s, open, close_idx) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        open += 1;
+    }
+    changed
+}
+
+struct AiScope {
+    kind_array: bool,
+    end_index: usize,
+    initial_indent: Vec<u8>,
+    new_indent: Vec<u8>,
+}
+
+fn ai_extract_indent(ws: &[u8]) -> Vec<u8> {
+    if let Some(i) = ws.iter().rposition(|&c| c == b'\n') {
+        ws[i + 1..].to_vec()
+    } else {
+        ws.to_vec()
+    }
+}
+
+fn ai_reindent_array(ws: &[u8], target: &[u8]) -> Vec<u8> {
+    if let Some(i) = ws.iter().rposition(|&c| c == b'\n') {
+        let mut out = ws[..=i].to_vec();
+        out.extend_from_slice(target);
+        out
+    } else {
+        ws.to_vec()
+    }
+}
+
+fn ai_reindent_expression(ws: &[u8], initial_indent: &[u8], new_indent: &[u8]) -> Vec<u8> {
+    let i = match ws.iter().rposition(|&c| c == b'\n') {
+        Some(i) => i,
+        None => return ws.to_vec(),
+    };
+    let line = &ws[i + 1..];
+    if !line.starts_with(initial_indent) {
+        return ws.to_vec();
+    }
+    let mut out = ws[..=i].to_vec();
+    out.extend_from_slice(new_indent);
+    out.extend_from_slice(&line[initial_indent.len()..]);
+    out
+}
+
+fn ai_array_open(s: &Stream, index: usize) -> Option<usize> {
+    if s.kind(index) != Kind::Punct {
+        return None;
+    }
+    match s.bytes(index) {
+        b"[" => {
+            if !is_array_literal_open(s, index) {
+                return None;
+            }
+            match_forward(s, index)
+        }
+        b"(" => {
+            if let Some(p) = sig_prev(s, index) {
+                if s.kind(p) == Kind::Keyword {
+                    let lv = s.bytes(p).to_ascii_lowercase();
+                    if lv == b"array" || lv == b"list" {
+                        return match_forward(s, index);
+                    }
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn ai_expression_end(s: &Stream, index: usize, parent_end: usize) -> usize {
+    let mut end: isize = -1;
+    let mut k = index + 1;
+    while k < parent_end {
+        if s.kind(k) == Kind::Punct && matches!(s.bytes(k), b"(" | b"{" | b"[") {
+            if let Some(be) = match_forward(s, k) {
+                k = be;
+            }
+        } else if s.kind(k) == Kind::Punct && s.bytes(k) == b"," {
+            end = match sig_prev(s, k) {
+                Some(p) => p as isize,
+                None => -1,
+            };
+            break;
+        }
+        k += 1;
+    }
+    if end >= 0 {
+        return end as usize;
+    }
+    sig_prev(s, parent_end).unwrap_or(parent_end)
+}
+
+fn array_indentation(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut last_indent: Vec<u8> = Vec::new();
+    let mut scopes: Vec<AiScope> = Vec::new();
+    let mut prev_line_initial_indent: Vec<u8> = Vec::new();
+    let mut prev_line_new_indent: Vec<u8> = Vec::new();
+    let unit: &[u8] = b"    ";
+
+    let n = s.len();
+    for index in 0..n {
+        let cur = scopes.len() as isize - 1;
+        let k = s.kind(index);
+        if k == Kind::Comment || k == Kind::DocComment {
+            continue;
+        }
+
+        if let Some(end) = ai_array_open(s, index) {
+            scopes.push(AiScope {
+                kind_array: true,
+                end_index: end,
+                initial_indent: last_indent.clone(),
+                new_indent: Vec::new(),
+            });
+            continue;
+        }
+
+        if k == Kind::Whitespace && has_newline(s.bytes(index)) {
+            last_indent = ai_extract_indent(s.bytes(index));
+        }
+
+        if cur < 0 {
+            continue;
+        }
+        let ci = cur as usize;
+
+        if k == Kind::Whitespace {
+            if !has_newline(s.bytes(index)) {
+                continue;
+            }
+            let content: Vec<u8>;
+            if scopes[ci].kind_array {
+                let end_index = scopes[ci].end_index;
+                let mut indent = false;
+                let mut kk = index + 1;
+                while kk < end_index {
+                    let kt = s.kind(kk);
+                    let non_trivia = kt != Kind::Whitespace && kt != Kind::Comment && kt != Kind::DocComment;
+                    if non_trivia || (kt == Kind::Whitespace && has_newline(s.bytes(kk))) {
+                        indent = true;
+                        break;
+                    }
+                    kk += 1;
+                }
+                let mut target = scopes[ci].initial_indent.clone();
+                if indent {
+                    target.extend_from_slice(unit);
+                }
+                content = ai_reindent_array(s.bytes(index), &target);
+                prev_line_initial_indent = ai_extract_indent(s.bytes(index));
+                prev_line_new_indent = ai_extract_indent(&content);
+            } else {
+                content = ai_reindent_expression(
+                    s.bytes(index),
+                    &scopes[ci].initial_indent,
+                    &scopes[ci].new_indent,
+                );
+            }
+            if content.as_slice() != s.bytes(index) {
+                s.set_owned(index, content.clone());
+                changed = true;
+            }
+            last_indent = ai_extract_indent(&content);
+            continue;
+        }
+
+        if index == scopes[ci].end_index {
+            while !scopes.is_empty() && index == scopes[scopes.len() - 1].end_index {
+                scopes.pop();
+            }
+            continue;
+        }
+
+        if s.kind(index) == Kind::Punct && s.bytes(index) == b"," {
+            continue;
+        }
+
+        if scopes[ci].kind_array {
+            let end = ai_expression_end(s, index, scopes[ci].end_index);
+            if end != index {
+                scopes.push(AiScope {
+                    kind_array: false,
+                    end_index: end,
+                    initial_indent: prev_line_initial_indent.clone(),
+                    new_indent: prev_line_new_indent.clone(),
+                });
+            }
+        }
     }
     changed
 }
