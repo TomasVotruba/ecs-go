@@ -59,6 +59,8 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ControlStructure\IncludeFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopConditionFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\NoSuperfluousPhpdocTagsFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoUselessInheritdocFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocScalarFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocTypesFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoAliasTagFixer",
@@ -197,6 +199,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= include(s);
     changed |= empty_loop_body(s);
     changed |= empty_loop_condition(s);
+    changed |= no_superfluous_phpdoc_tags(s);
+    changed |= phpdoc_no_useless_inheritdoc(s);
     changed |= phpdoc_scalar(s);
     changed |= phpdoc_types(s);
     changed |= phpdoc_no_alias_tag(s);
@@ -8888,4 +8892,514 @@ fn phpdoc_return_self_reference(s: &mut Stream) -> bool {
         }
         changed
     })
+}
+
+// --- ported: phpdoc_no_useless_inheritdoc + no_superfluous_phpdoc_tags ------
+
+fn is_inheritdoc_line(content: &[u8]) -> bool {
+    let c = trim_go_space(content).to_ascii_lowercase();
+    c == b"{@inheritdoc}" || c == b"@inheritdoc"
+}
+
+fn all_blank_lines(lines: &[DocLine]) -> bool {
+    lines.iter().all(|l| trim_go_space(&l.content).is_empty())
+}
+
+fn phpdoc_no_useless_inheritdoc(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        let mut d = match parse_doc(s.bytes(i)) {
+            Some(d) => d,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let mut kept: Vec<DocLine> = Vec::new();
+        let mut removed = false;
+        for l in d.inner.drain(..) {
+            if is_inheritdoc_line(&l.content) {
+                removed = true;
+                continue;
+            }
+            kept.push(l);
+        }
+        if !removed {
+            i += 1;
+            continue;
+        }
+        changed = true;
+        if all_blank_lines(&kept) {
+            s.remove_at(i);
+            if i > 0 && s.kind(i - 1) == Kind::Whitespace {
+                s.remove_at(i - 1);
+                i -= 1;
+            }
+            // i stays (Go i--; loop ++)
+            continue;
+        }
+        d.inner = kept;
+        let r = doc_render(&d);
+        s.set_owned(i, r);
+        i += 1;
+    }
+    changed
+}
+
+fn nsp_is_func_modifier(v: &[u8]) -> bool {
+    matches!(v, b"public" | b"private" | b"protected" | b"static" | b"final" | b"abstract")
+}
+
+fn nsp_is_param_modifier(v: &[u8]) -> bool {
+    matches!(v, b"public" | b"private" | b"protected" | b"readonly")
+}
+
+fn normalize_type(t: &[u8]) -> Vec<u8> {
+    let t = trim_go_space(t);
+    if t.is_empty() {
+        return Vec::new();
+    }
+    let nullable = t.first() == Some(&b'?');
+    let body = if nullable { &t[1..] } else { t };
+    let mut set: Vec<Vec<u8>> = Vec::new();
+    let mut cur: Vec<u8> = Vec::new();
+    let mut push = |cur: &mut Vec<u8>, set: &mut Vec<Vec<u8>>| {
+        let m = trim_go_space(cur).to_ascii_lowercase();
+        cur.clear();
+        if m.is_empty() {
+            return;
+        }
+        let short = match m.iter().rposition(|&c| c == b'\\') {
+            Some(p) => m[p + 1..].to_vec(),
+            None => m,
+        };
+        if !short.is_empty() && !set.contains(&short) {
+            set.push(short);
+        }
+    };
+    for &c in body {
+        if c == b'|' || c == b'&' {
+            push(&mut cur, &mut set);
+        } else {
+            cur.push(c);
+        }
+    }
+    push(&mut cur, &mut set);
+    if nullable {
+        let n = b"null".to_vec();
+        if !set.contains(&n) {
+            set.push(n);
+        }
+    }
+    set.sort();
+    let mut out = Vec::new();
+    for (i, m) in set.iter().enumerate() {
+        if i > 0 {
+            out.push(b'|');
+        }
+        out.extend_from_slice(m);
+    }
+    out
+}
+
+struct FuncSig {
+    params: Vec<(Vec<u8>, Vec<u8>)>, // name (no $) -> normalized native type
+    ret: Vec<u8>,
+    has_ret: bool,
+    var_type: Vec<u8>,
+    has_var: bool,
+}
+
+fn nsp_parse_property(s: &Stream, start: usize) -> Option<FuncSig> {
+    let mut type_toks: Vec<u8> = Vec::new();
+    let mut k = start;
+    while k < s.len() {
+        match s.kind(k) {
+            Kind::Whitespace | Kind::Comment => {}
+            Kind::Variable => {
+                return Some(FuncSig {
+                    params: Vec::new(),
+                    ret: Vec::new(),
+                    has_ret: false,
+                    var_type: normalize_type(&type_toks),
+                    has_var: true,
+                });
+            }
+            Kind::Ident | Kind::Keyword => type_toks.extend_from_slice(s.bytes(k)),
+            Kind::Punct => {
+                if matches!(s.bytes(k), b"?" | b"|" | b"&" | b"\\") {
+                    type_toks.extend_from_slice(s.bytes(k));
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+        k += 1;
+    }
+    None
+}
+
+fn nsp_parse_params(s: &Stream, open: usize, close: usize, sig: &mut FuncSig) {
+    let mut type_toks: Vec<u8> = Vec::new();
+    let mut var_name: Vec<u8> = Vec::new();
+    let mut depth = 0i32;
+    let mut in_default = false;
+    let flush = |type_toks: &mut Vec<u8>, var_name: &mut Vec<u8>, in_default: &mut bool, sig: &mut FuncSig| {
+        if !var_name.is_empty() {
+            sig.params.push((var_name.clone(), normalize_type(type_toks)));
+        }
+        type_toks.clear();
+        var_name.clear();
+        *in_default = false;
+    };
+    let mut k = open + 1;
+    while k < close {
+        match s.kind(k) {
+            Kind::Whitespace | Kind::Comment | Kind::DocComment => {
+                k += 1;
+                continue;
+            }
+            _ => {}
+        }
+        if s.kind(k) == Kind::Punct {
+            match s.bytes(k) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b"," => {
+                    if depth == 0 {
+                        flush(&mut type_toks, &mut var_name, &mut in_default, sig);
+                        k += 1;
+                        continue;
+                    }
+                }
+                b"=" => {
+                    if depth == 0 {
+                        in_default = true;
+                        k += 1;
+                        continue;
+                    }
+                }
+                _ => {}
+            }
+            if !in_default && depth == 0 && matches!(s.bytes(k), b"?" | b"|" | b"&" | b"\\") {
+                type_toks.extend_from_slice(s.bytes(k));
+            }
+            k += 1;
+            continue;
+        }
+        if in_default {
+            k += 1;
+            continue;
+        }
+        match s.kind(k) {
+            Kind::Variable => {
+                if depth == 0 {
+                    var_name = s.bytes(k).strip_prefix(b"$").unwrap_or(s.bytes(k)).to_vec();
+                }
+            }
+            Kind::Ident | Kind::Keyword => {
+                if depth == 0 && !nsp_is_param_modifier(&s.bytes(k).to_ascii_lowercase()) {
+                    type_toks.extend_from_slice(s.bytes(k));
+                }
+            }
+            _ => {}
+        }
+        k += 1;
+    }
+    flush(&mut type_toks, &mut var_name, &mut in_default, sig);
+}
+
+fn nsp_parse_signature(s: &Stream, fnx: usize) -> Option<FuncSig> {
+    let mut open = next_significant_index(s, fnx);
+    while let Some(o) = open {
+        if s.kind(o) != Kind::Punct {
+            open = next_significant_index(s, o);
+        } else {
+            break;
+        }
+    }
+    let mut o = open?;
+    if s.bytes(o) == b"&" {
+        o = next_significant_index(s, o)?;
+    }
+    if s.kind(o) != Kind::Punct || s.bytes(o) != b"(" {
+        return None;
+    }
+    let close = match_forward(s, o)?;
+    let mut sig = FuncSig {
+        params: Vec::new(),
+        ret: Vec::new(),
+        has_ret: false,
+        var_type: Vec::new(),
+        has_var: false,
+    };
+    nsp_parse_params(s, o, close, &mut sig);
+    if let Some(c) = next_significant_index(s, close) {
+        if s.kind(c) == Kind::Punct && s.bytes(c) == b":" {
+            let mut parts: Vec<u8> = Vec::new();
+            let mut k = c + 1;
+            while k < s.len() {
+                if s.kind(k) == Kind::Whitespace {
+                    k += 1;
+                    continue;
+                }
+                if s.kind(k) == Kind::Punct && (s.bytes(k) == b"{" || s.bytes(k) == b";") {
+                    break;
+                }
+                parts.extend_from_slice(s.bytes(k));
+                k += 1;
+            }
+            sig.ret = normalize_type(&parts);
+            sig.has_ret = true;
+        }
+    }
+    Some(sig)
+}
+
+fn nsp_signature_after(s: &Stream, doc: usize) -> Option<FuncSig> {
+    let mut j = doc + 1;
+    while j < s.len() {
+        match s.kind(j) {
+            Kind::Whitespace | Kind::Comment => {
+                j += 1;
+                continue;
+            }
+            Kind::Keyword => {
+                let lv = s.bytes(j).to_ascii_lowercase();
+                if lv == b"function" {
+                    return nsp_parse_signature(s, j);
+                }
+                if lv == b"const" {
+                    return None;
+                }
+                if lv == b"var" || nsp_is_func_modifier(&lv) || lv == b"readonly" {
+                    j += 1;
+                    continue;
+                }
+                return nsp_parse_property(s, j);
+            }
+            Kind::Ident | Kind::Punct | Kind::Variable => return nsp_parse_property(s, j),
+            _ => return None,
+        }
+    }
+    None
+}
+
+fn type_is_superfluous(php_type: &[u8], native: &[u8]) -> bool {
+    if php_type.iter().any(|&c| matches!(c, b'<' | b'{' | b'(')) {
+        return false;
+    }
+    if native.is_empty() {
+        return false;
+    }
+    normalize_type(php_type) == native
+}
+
+// @param: ^@param\s+(\S+)\s+(&?\.{0,3}\$name)\s*(.*)$
+fn nsp_match_param(c: &[u8]) -> Option<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+    let p = b"@param";
+    if c.len() < p.len() || !c[..p.len()].eq_ignore_ascii_case(p) {
+        return None;
+    }
+    let mut i = p.len();
+    let ws = i;
+    while i < c.len() && c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ws {
+        return None;
+    }
+    let ts = i;
+    while i < c.len() && !c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ts {
+        return None;
+    }
+    let phptype = c[ts..i].to_vec();
+    let ws2 = i;
+    while i < c.len() && c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ws2 {
+        return None;
+    }
+    // (&?\.{0,3}\$name)
+    let ns = i;
+    if i < c.len() && c[i] == b'&' {
+        i += 1;
+    }
+    let mut dots = 0;
+    while i < c.len() && c[i] == b'.' && dots < 3 {
+        i += 1;
+        dots += 1;
+    }
+    if i >= c.len() || c[i] != b'$' {
+        return None;
+    }
+    i += 1;
+    if i >= c.len() || !(c[i].is_ascii_alphabetic() || c[i] == b'_') {
+        return None;
+    }
+    i += 1;
+    while i < c.len() && (c[i].is_ascii_alphanumeric() || c[i] == b'_') {
+        i += 1;
+    }
+    let name_full = &c[ns..i];
+    let dollar = name_full.iter().position(|&x| x == b'$').unwrap();
+    let varname = name_full[dollar + 1..].to_vec();
+    while i < c.len() && c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    let desc = trim_go_space(&c[i..]).to_vec();
+    Some((phptype, varname, desc))
+}
+
+fn nsp_match_return(c: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
+    let p = b"@return";
+    if c.len() < p.len() || !c[..p.len()].eq_ignore_ascii_case(p) {
+        return None;
+    }
+    let mut i = p.len();
+    let ws = i;
+    while i < c.len() && c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ws {
+        return None;
+    }
+    let ts = i;
+    while i < c.len() && !c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ts {
+        return None;
+    }
+    let phptype = c[ts..i].to_vec();
+    while i < c.len() && c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    Some((phptype, trim_go_space(&c[i..]).to_vec()))
+}
+
+fn nsp_match_var(c: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
+    let p = b"@var";
+    if c.len() < p.len() || !c[..p.len()].eq_ignore_ascii_case(p) {
+        return None;
+    }
+    let mut i = p.len();
+    let ws = i;
+    while i < c.len() && c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ws {
+        return None;
+    }
+    let ts = i;
+    while i < c.len() && !c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == ts {
+        return None;
+    }
+    let phptype = c[ts..i].to_vec();
+    // optional \s+\$name
+    let mut j = i;
+    while j < c.len() && c[j].is_ascii_whitespace() {
+        j += 1;
+    }
+    if j < c.len() && c[j] == b'$' {
+        let mut k = j + 1;
+        if k < c.len() && (c[k].is_ascii_alphabetic() || c[k] == b'_') {
+            k += 1;
+            while k < c.len() && (c[k].is_ascii_alphanumeric() || c[k] == b'_') {
+                k += 1;
+            }
+            i = k;
+        }
+    }
+    while i < c.len() && c[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    Some((phptype, trim_go_space(&c[i..]).to_vec()))
+}
+
+// returns (drop, matched)
+fn nsp_superfluous_tag(content: &[u8], sig: &FuncSig) -> (bool, bool) {
+    if let Some((phptype, varname, desc)) = nsp_match_param(content) {
+        if !desc.is_empty() {
+            return (false, true);
+        }
+        match sig.params.iter().find(|(n, _)| n == &varname) {
+            Some((_, native)) => return (type_is_superfluous(&phptype, native), true),
+            None => return (false, true),
+        }
+    }
+    if let Some((phptype, desc)) = nsp_match_return(content) {
+        if !desc.is_empty() {
+            return (false, true);
+        }
+        return (type_is_superfluous(&phptype, &sig.ret), true);
+    }
+    if sig.has_var {
+        if let Some((phptype, desc)) = nsp_match_var(content) {
+            if !desc.is_empty() {
+                return (false, true);
+            }
+            return (type_is_superfluous(&phptype, &sig.var_type), true);
+        }
+    }
+    (false, false)
+}
+
+fn nsp_has_continuation(inner: &[DocLine], idx: usize) -> bool {
+    if idx + 1 >= inner.len() {
+        return false;
+    }
+    let next = trim_go_space(&inner[idx + 1].content);
+    !next.is_empty() && next.first() != Some(&b'@')
+}
+
+fn no_superfluous_phpdoc_tags(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::DocComment {
+            continue;
+        }
+        let sig = match nsp_signature_after(s, i) {
+            Some(x) => x,
+            None => continue,
+        };
+        let mut d = match parse_doc(s.bytes(i)) {
+            Some(d) if !d.single => d,
+            _ => continue,
+        };
+        let mut kept: Vec<DocLine> = Vec::new();
+        let mut removed = false;
+        for idx in 0..d.inner.len() {
+            let content = trim_left_space(&d.inner[idx].content).to_vec();
+            let (drop, ok) = nsp_superfluous_tag(&content, &sig);
+            if ok && drop && !nsp_has_continuation(&d.inner, idx) {
+                removed = true;
+                continue;
+            }
+            kept.push(DocLine {
+                prefix: d.inner[idx].prefix.clone(),
+                content: d.inner[idx].content.clone(),
+            });
+        }
+        if removed {
+            d.inner = kept;
+            let r = doc_render(&d);
+            s.set_owned(i, r);
+            changed = true;
+        }
+    }
+    changed
 }
