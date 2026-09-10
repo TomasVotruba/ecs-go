@@ -1997,12 +1997,28 @@ fn integer_literal_case(s: &mut Stream) -> bool {
         if b.len() < 2 || b[0] != b'0' {
             continue;
         }
-        if matches!(b[1], b'x' | b'X' | b'b' | b'B' | b'o' | b'O') {
-            let lower = b.to_ascii_lowercase();
-            if lower.as_slice() != s.bytes(i) {
-                s.set_owned(i, lower);
-                changed = true;
+        let fixed: Vec<u8> = match b[1] {
+            b'x' | b'X' => {
+                // prefix lowercase, hex digits uppercase ("0Xff" -> "0xFF")
+                let mut out = b"0x".to_vec();
+                out.extend(b[2..].iter().map(|c| c.to_ascii_uppercase()));
+                out
             }
+            b'b' | b'B' => {
+                let mut out = b"0b".to_vec();
+                out.extend_from_slice(&b[2..]);
+                out
+            }
+            b'o' | b'O' => {
+                let mut out = b"0o".to_vec();
+                out.extend_from_slice(&b[2..]);
+                out
+            }
+            _ => continue,
+        };
+        if fixed.as_slice() != s.bytes(i) {
+            s.set_owned(i, fixed);
+            changed = true;
         }
     }
     changed
@@ -2021,8 +2037,11 @@ fn native_function_casing(s: &mut Stream) -> bool {
         // must be a function call, not a method or a namespaced name
         if let Some(p) = prev_significant_index(s, i) {
             match s.bytes(p) {
-                b"->" | b"?->" | b"::" | b"\\" | b"function" => continue,
+                b"->" | b"?->" | b"::" | b"\\" => continue,
                 _ => {}
+            }
+            if s.bytes(p).eq_ignore_ascii_case(b"function") || s.bytes(p).eq_ignore_ascii_case(b"new") {
+                continue;
             }
         }
         if next_significant_value(s, i) != b"(" {
@@ -3260,6 +3279,27 @@ fn single_line_comment_spacing(s: &mut Stream) -> bool {
             continue;
         }
         let v = s.bytes(i);
+        // single-line block comment: ensure one space inside "/* ... */"
+        if v.starts_with(b"/*") && !v.starts_with(b"/**") && v.ends_with(b"*/")
+            && v.len() >= 4 && !v.iter().any(|&c| c == b'\n' || c == b'\r')
+        {
+            let inner = &v[2..v.len() - 2];
+            let mut nv = inner.to_vec();
+            if !nv.is_empty() && nv[0] != b' ' && nv[0] != b'\t' {
+                nv.insert(0, b' ');
+            }
+            if !nv.is_empty() && *nv.last().unwrap() != b' ' && *nv.last().unwrap() != b'\t' {
+                nv.push(b' ');
+            }
+            if nv.as_slice() != inner {
+                let mut out = b"/*".to_vec();
+                out.extend_from_slice(&nv);
+                out.extend_from_slice(b"*/");
+                s.set_owned(i, out);
+                changed = true;
+            }
+            continue;
+        }
         let marker: &[u8] = if v.starts_with(b"//") {
             b"//"
         } else if v.starts_with(b"#") && !v.starts_with(b"#[") {
@@ -5355,6 +5395,7 @@ struct ImportStmt {
     start: usize,
     semi: usize,
     rank: u8,
+    key: Vec<u8>,
 }
 
 fn indent_before(s: &Stream, i: usize) -> Vec<u8> {
@@ -5380,6 +5421,31 @@ fn trim_ws_tokens(mut toks: Vec<(Kind, Vec<u8>)>) -> Vec<(Kind, Vec<u8>)> {
 
 fn tokens_equal_toks(a: &[(Kind, Vec<u8>)], b: &[(Kind, Vec<u8>)]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.0 == y.0 && x.1 == y.1)
+}
+
+fn import_sort_key(s: &Stream, use_idx: usize, semi: usize) -> Vec<u8> {
+    let mut j = skip_ws(s, use_idx + 1);
+    if j < s.len() && s.kind(j) == Kind::Keyword {
+        let lw = s.bytes(j).to_ascii_lowercase();
+        if lw == b"function" || lw == b"const" {
+            j = skip_ws(s, j + 1);
+        }
+    }
+    let mut out: Vec<u8> = Vec::new();
+    let mut k = j;
+    while k < semi {
+        if s.kind(k) == Kind::Keyword && s.bytes(k).eq_ignore_ascii_case(b"as") {
+            break;
+        }
+        if s.kind(k) != Kind::Whitespace {
+            for &c in s.bytes(k) {
+                // "\" sorts before any other char (segment-wise alpha order)
+                out.push(if c == b'\\' { 0 } else { c.to_ascii_lowercase() });
+            }
+        }
+        k += 1;
+    }
+    out
 }
 
 fn use_rank(s: &Stream, use_idx: usize) -> u8 {
@@ -5430,7 +5496,7 @@ fn collect_import_run(s: &Stream, start: usize) -> Vec<ImportStmt> {
             break;
         }
         let semi = semi as usize;
-        stmts.push(ImportStmt { start: k, semi, rank: use_rank(s, k) });
+        stmts.push(ImportStmt { start: k, semi, rank: use_rank(s, k), key: import_sort_key(s, k, semi) });
         let n = skip_ws(s, semi + 1);
         if n < s.len() && s.kind(n) == Kind::Keyword && s.bytes(n).eq_ignore_ascii_case(b"use") {
             k = n;
@@ -5581,7 +5647,7 @@ fn reorder_imports(s: &mut Stream, run: &[ImportStmt]) -> (usize, bool) {
     let indent = indent_before(s, first);
 
     let mut ordered: Vec<&ImportStmt> = run.iter().collect();
-    ordered.sort_by_key(|st| st.rank);
+    ordered.sort_by(|a, b| a.key.cmp(&b.key));
 
     let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
     for (p, st) in ordered.iter().enumerate() {

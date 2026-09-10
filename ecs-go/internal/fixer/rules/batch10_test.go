@@ -62,7 +62,7 @@ func TestNativeFunctionCasing(t *testing.T) {
 
 func TestIntegerLiteralCase(t *testing.T) {
 	got, changed := apply(t, IntegerLiteralCase{}, "<?php $a = 0XFF; $b = 0B101;")
-	if want := "<?php $a = 0xff; $b = 0b101;"; !changed || got != want {
+	if want := "<?php $a = 0xFF; $b = 0b101;"; !changed || got != want {
 		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
 	}
 	if _, changed := apply(t, IntegerLiteralCase{}, "<?php $a = 255;"); changed {

@@ -71,8 +71,8 @@ func (NativeFunctionCasing) Fix(s *tokens.Stream) bool {
 		}
 		// must be a function call, not a method or a namespaced name
 		if prev, ok := prevSignificant(s, i); ok {
-			switch prev.Value {
-			case "->", "?->", "::", `\`, "function":
+			switch strings.ToLower(prev.Value) {
+			case "->", "?->", "::", `\`, "function", "new":
 				continue
 			}
 		}
@@ -106,12 +106,21 @@ func (IntegerLiteralCase) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.Number || len(t.Value) < 2 || t.Value[0] != '0' {
 			continue
 		}
+		var fixed string
 		switch t.Value[1] {
-		case 'x', 'X', 'b', 'B', 'o', 'O':
-			if lower := strings.ToLower(t.Value); lower != t.Value {
-				s.SetValue(i, lower)
-				changed = true
-			}
+		case 'x', 'X':
+			// prefix lowercase, hex digits uppercase ("0Xff" -> "0xFF")
+			fixed = "0x" + strings.ToUpper(t.Value[2:])
+		case 'b', 'B':
+			fixed = "0b" + t.Value[2:]
+		case 'o', 'O':
+			fixed = "0o" + t.Value[2:]
+		default:
+			continue
+		}
+		if fixed != t.Value {
+			s.SetValue(i, fixed)
+			changed = true
 		}
 	}
 	return changed
