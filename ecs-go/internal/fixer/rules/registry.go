@@ -93,6 +93,7 @@ func CommonFixers() []fixer.Fixer {
 		Include{},
 		EmptyLoopBody{},
 		EmptyLoopCondition{},
+		NoUselessReturn{},
 	}
 }
 
