@@ -10,11 +10,20 @@ use crate::token::Kind;
 // `--rules` subset for a fair, identical-work comparison.
 pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\PhpTag\FullOpeningTagFixer",
+    r"PhpCsFixer\Fixer\Whitespace\LineEndingFixer",
+    r"PhpCsFixer\Fixer\Operator\ObjectOperatorWithoutWhitespaceFixer",
+    r"PhpCsFixer\Fixer\Operator\StandardizeNotEqualsFixer",
+    r"PhpCsFixer\Fixer\Semicolon\NoEmptyStatementFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseKeywordsFixer",
     r"PhpCsFixer\Fixer\Casing\ConstantCaseFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseStaticReferenceFixer",
     r"PhpCsFixer\Fixer\CastNotation\LowercaseCastFixer",
     r"PhpCsFixer\Fixer\CastNotation\ShortScalarCastFixer",
+    r"PhpCsFixer\Fixer\Casing\MagicConstantCasingFixer",
+    r"PhpCsFixer\Fixer\Casing\MagicMethodCasingFixer",
+    r"PhpCsFixer\Fixer\Casing\NativeFunctionCasingFixer",
+    r"PhpCsFixer\Fixer\Casing\IntegerLiteralCaseFixer",
+    r"PhpCsFixer\Fixer\Casing\ClassReferenceNameCasingFixer",
     r"PhpCsFixer\Fixer\NamespaceNotation\NoLeadingNamespaceWhitespaceFixer",
     r"PhpCsFixer\Fixer\Semicolon\NoSinglelineWhitespaceBeforeSemicolonsFixer",
     r"PhpCsFixer\Fixer\Whitespace\NoWhitespaceInBlankLineFixer",
@@ -51,11 +60,20 @@ pub const RULE_NAMES: &[&str] = &[
 pub fn fix(s: &mut Stream) -> bool {
     let mut changed = false;
     changed |= full_opening_tag(s);
+    changed |= line_ending(s);
+    changed |= object_operator_without_whitespace(s);
+    changed |= standardize_not_equals(s);
+    changed |= no_empty_statement(s);
     changed |= lowercase_keywords(s);
     changed |= constant_case(s);
     changed |= lowercase_static_reference(s);
     changed |= lowercase_cast(s);
     changed |= short_scalar_cast(s);
+    changed |= magic_constant_casing(s);
+    changed |= magic_method_casing(s);
+    changed |= native_function_casing(s);
+    changed |= integer_literal_case(s);
+    changed |= class_reference_name_casing(s);
     changed |= no_leading_namespace_whitespace(s);
     changed |= no_singleline_whitespace_before_semicolons(s);
     changed |= no_whitespace_in_blank_line(s);
@@ -1573,4 +1591,381 @@ fn no_closing_tag(s: &mut Stream) -> bool {
         }
     }
     true
+}
+
+// --- ported batch 1: casing + simple token rewrites -------------------------
+
+// First non-whitespace token index at or after i+1, or None.
+fn next_significant_index(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i + 1;
+    while j < s.len() {
+        if s.kind(j) != Kind::Whitespace {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+fn line_ending(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        let k = s.kind(i);
+        if k != Kind::Whitespace && k != Kind::Comment && k != Kind::DocComment {
+            continue;
+        }
+        if s.bytes(i).windows(2).any(|w| w == b"\r\n") {
+            let v: Vec<u8> = {
+                let b = s.bytes(i);
+                let mut out = Vec::with_capacity(b.len());
+                let mut j = 0;
+                while j < b.len() {
+                    if j + 1 < b.len() && b[j] == b'\r' && b[j + 1] == b'\n' {
+                        out.push(b'\n');
+                        j += 2;
+                    } else {
+                        out.push(b[j]);
+                        j += 1;
+                    }
+                }
+                out
+            };
+            s.set_owned(i, v);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn object_operator_without_whitespace(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct || (s.bytes(i) != b"->" && s.bytes(i) != b"?->") {
+            i += 1;
+            continue;
+        }
+        if i + 1 < s.len() && s.kind(i + 1) == Kind::Whitespace && !has_newline(s.bytes(i + 1)) {
+            s.remove_at(i + 1);
+            changed = true;
+        }
+        if i > 0 && s.kind(i - 1) == Kind::Whitespace && !has_newline(s.bytes(i - 1)) {
+            s.remove_at(i - 1);
+            i -= 1;
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn standardize_not_equals(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) == Kind::Punct && s.bytes(i) == b"<>" {
+            s.set_owned(i, b"!=".to_vec());
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn no_empty_statement(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut depth: i32 = 0;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct {
+            i += 1;
+            continue;
+        }
+        match s.bytes(i) {
+            b"(" | b"[" => depth += 1,
+            b")" | b"]" => depth -= 1,
+            b";" => {
+                if depth == 0 {
+                    if let Some(p) = prev_significant_index(s, i) {
+                        if s.bytes(p) == b";" {
+                            s.remove_at(i);
+                            i = i.saturating_sub(1);
+                            changed = true;
+                            continue;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn magic_constant_casing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Ident {
+            continue;
+        }
+        let lower = s.bytes(i).to_ascii_lowercase();
+        let canonical: &[u8] = match lower.as_slice() {
+            b"__line__" => b"__LINE__",
+            b"__file__" => b"__FILE__",
+            b"__dir__" => b"__DIR__",
+            b"__function__" => b"__FUNCTION__",
+            b"__class__" => b"__CLASS__",
+            b"__trait__" => b"__TRAIT__",
+            b"__method__" => b"__METHOD__",
+            b"__namespace__" => b"__NAMESPACE__",
+            b"__compiler_halt_offset__" => b"__COMPILER_HALT_OFFSET__",
+            _ => continue,
+        };
+        if canonical != s.bytes(i) {
+            s.set_owned(i, canonical.to_vec());
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn magic_method_casing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Ident {
+            continue;
+        }
+        let lower = s.bytes(i).to_ascii_lowercase();
+        let canonical: &[u8] = match lower.as_slice() {
+            b"__construct" => b"__construct",
+            b"__destruct" => b"__destruct",
+            b"__call" => b"__call",
+            b"__callstatic" => b"__callStatic",
+            b"__get" => b"__get",
+            b"__set" => b"__set",
+            b"__isset" => b"__isset",
+            b"__unset" => b"__unset",
+            b"__sleep" => b"__sleep",
+            b"__wakeup" => b"__wakeup",
+            b"__serialize" => b"__serialize",
+            b"__unserialize" => b"__unserialize",
+            b"__tostring" => b"__toString",
+            b"__invoke" => b"__invoke",
+            b"__set_state" => b"__set_state",
+            b"__clone" => b"__clone",
+            b"__debuginfo" => b"__debugInfo",
+            _ => continue,
+        };
+        if canonical == s.bytes(i) {
+            continue;
+        }
+        // a magic method is always a declaration or call ("__set("); a constant
+        // named "__SET" (followed by "=") must not be recased
+        if next_significant_value(s, i) != b"(" {
+            continue;
+        }
+        s.set_owned(i, canonical.to_vec());
+        changed = true;
+    }
+    changed
+}
+
+fn integer_literal_case(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Number {
+            continue;
+        }
+        let b = s.bytes(i);
+        if b.len() < 2 || b[0] != b'0' {
+            continue;
+        }
+        if matches!(b[1], b'x' | b'X' | b'b' | b'B' | b'o' | b'O') {
+            let lower = b.to_ascii_lowercase();
+            if lower.as_slice() != s.bytes(i) {
+                s.set_owned(i, lower);
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+fn native_function_casing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Ident {
+            continue;
+        }
+        let lower = s.bytes(i).to_ascii_lowercase();
+        if !is_native_function(lower.as_slice()) || lower.as_slice() == s.bytes(i) {
+            continue;
+        }
+        // must be a function call, not a method or a namespaced name
+        if let Some(p) = prev_significant_index(s, i) {
+            match s.bytes(p) {
+                b"->" | b"?->" | b"::" | b"\\" | b"function" => continue,
+                _ => {}
+            }
+        }
+        if next_significant_value(s, i) != b"(" {
+            continue;
+        }
+        s.set_owned(i, lower);
+        changed = true;
+    }
+    changed
+}
+
+fn class_reference_name_casing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::Ident {
+            continue;
+        }
+        let lower = s.bytes(i).to_ascii_lowercase();
+        let canonical = match builtin_class_name(lower.as_slice()) {
+            Some(c) => c,
+            None => continue,
+        };
+        if canonical == s.bytes(i) {
+            continue;
+        }
+        // only a fully-qualified reference "\Name" is unambiguously the global built-in
+        let bs = match prev_significant_index(s, i) {
+            Some(b) if s.kind(b) == Kind::Punct && s.bytes(b) == b"\\" => b,
+            _ => continue,
+        };
+        // "\Name\..." - the name heads a namespace, not the class itself
+        if let Some(n) = next_significant_index(s, i) {
+            if s.kind(n) == Kind::Punct && s.bytes(n) == b"\\" {
+                continue;
+            }
+        }
+        // "Foo\Name" - part of a namespaced name, not a global built-in
+        let before = prev_significant_index(s, bs);
+        if let Some(bidx) = before {
+            if s.kind(bidx) == Kind::Ident {
+                continue;
+            }
+        }
+        if !is_class_reference_position(s, before, i) {
+            continue;
+        }
+        s.set_owned(i, canonical.to_vec());
+        changed = true;
+    }
+    changed
+}
+
+fn is_class_reference_position(s: &Stream, before: Option<usize>, name_idx: usize) -> bool {
+    let next = next_significant_index(s, name_idx);
+    if let (Some(b), Some(n)) = (before, next) {
+        if is_block_open_or_comma(s, b) && is_block_close_or_comma(s, n) {
+            return false;
+        }
+    }
+    if let Some(b) = before {
+        if s.kind(b) == Kind::Keyword && s.bytes(b).eq_ignore_ascii_case(b"new") {
+            return true;
+        }
+    }
+    if let Some(n) = next {
+        if s.kind(n) == Kind::CloseTag {
+            return false;
+        }
+        match s.bytes(n) {
+            b"(" | b";" | b"=" => return false,
+            _ => {}
+        }
+    }
+    true
+}
+
+fn is_block_open_or_comma(s: &Stream, i: usize) -> bool {
+    s.kind(i) == Kind::Punct && matches!(s.bytes(i), b"," | b"(" | b"[" | b"{")
+}
+
+fn is_block_close_or_comma(s: &Stream, i: usize) -> bool {
+    s.kind(i) == Kind::Punct && matches!(s.bytes(i), b"," | b")" | b"]" | b"}")
+}
+
+fn is_native_function(b: &[u8]) -> bool {
+    matches!(
+        b,
+        b"strlen" | b"count" | b"sizeof" | b"is_array" | b"is_string" | b"is_int" | b"is_integer" | b"is_bool" | b"is_null" | b"is_object" | b"is_callable" | b"is_numeric" | b"is_float" | b"is_a" | b"is_iterable" | b"array_map" | b"array_filter" | b"array_merge" | b"array_keys" | b"array_values" | b"array_key_exists" | b"in_array" | b"implode" | b"explode" | b"str_replace" | b"str_repeat" | b"substr" | b"strpos" | b"stripos" | b"strrpos" | b"strtolower" | b"strtoupper" | b"ucfirst" | b"lcfirst" | b"ucwords" | b"trim" | b"ltrim" | b"rtrim" | b"sprintf" | b"printf" | b"vsprintf" | b"number_format" | b"json_encode" | b"json_decode" | b"preg_match" | b"preg_replace" | b"preg_split" | b"preg_match_all" | b"preg_quote" | b"sort" | b"rsort" | b"usort" | b"uasort" | b"uksort" | b"ksort" | b"krsort" | b"asort" | b"arsort" | b"array_push" | b"array_pop" | b"array_shift" | b"array_unshift" | b"array_slice" | b"array_splice" | b"array_reverse" | b"array_unique" | b"array_flip" | b"array_combine" | b"array_column" | b"array_sum" | b"array_product" | b"array_reduce" | b"array_search" | b"array_fill" | b"array_diff" | b"array_intersect" | b"array_pad" | b"array_chunk" | b"array_key_first" | b"array_key_last" | b"max" | b"min" | b"abs" | b"ceil" | b"floor" | b"round" | b"intval" | b"floatval" | b"strval" | b"boolval" | b"gettype" | b"settype" | b"function_exists" | b"method_exists" | b"class_exists" | b"interface_exists" | b"property_exists" | b"defined" | b"define" | b"constant" | b"call_user_func" | b"call_user_func_array" | b"func_get_args" | b"func_num_args" | b"compact" | b"extract" | b"print_r" | b"var_dump" | b"var_export" | b"serialize" | b"unserialize" | b"base64_encode" | b"base64_decode" | b"md5" | b"sha1" | b"hash" | b"dechex" | b"hexdec" | b"date" | b"time" | b"mktime" | b"strtotime" | b"microtime" | b"str_pad" | b"str_split" | b"str_contains" | b"str_starts_with" | b"str_ends_with" | b"wordwrap" | b"nl2br" | b"htmlspecialchars" | b"htmlentities" | b"strip_tags" | b"addslashes" | b"stripslashes" | b"ord" | b"chr" | b"intdiv" | b"fmod" | b"pow" | b"sqrt" | b"rand" | b"mt_rand" | b"random_int" | b"array_is_list"
+    )
+}
+
+fn builtin_class_name(b: &[u8]) -> Option<&'static [u8]> {
+    Some(match b {
+        b"stdclass" => b"stdClass",
+        b"closure" => b"Closure",
+        b"generator" => b"Generator",
+        b"fiber" => b"Fiber",
+        b"weakmap" => b"WeakMap",
+        b"weakreference" => b"WeakReference",
+        b"stringable" => b"Stringable",
+        b"throwable" => b"Throwable",
+        b"traversable" => b"Traversable",
+        b"iterator" => b"Iterator",
+        b"iteratoraggregate" => b"IteratorAggregate",
+        b"arrayaccess" => b"ArrayAccess",
+        b"countable" => b"Countable",
+        b"jsonserializable" => b"JsonSerializable",
+        b"unitenum" => b"UnitEnum",
+        b"backedenum" => b"BackedEnum",
+        b"attribute" => b"Attribute",
+        b"exception" => b"Exception",
+        b"errorexception" => b"ErrorException",
+        b"error" => b"Error",
+        b"typeerror" => b"TypeError",
+        b"valueerror" => b"ValueError",
+        b"argumentcounterror" => b"ArgumentCountError",
+        b"arithmeticerror" => b"ArithmeticError",
+        b"divisionbyzeroerror" => b"DivisionByZeroError",
+        b"unhandledmatcherror" => b"UnhandledMatchError",
+        b"jsonexception" => b"JsonException",
+        b"logicexception" => b"LogicException",
+        b"badfunctioncallexception" => b"BadFunctionCallException",
+        b"badmethodcallexception" => b"BadMethodCallException",
+        b"domainexception" => b"DomainException",
+        b"invalidargumentexception" => b"InvalidArgumentException",
+        b"lengthexception" => b"LengthException",
+        b"outofrangeexception" => b"OutOfRangeException",
+        b"runtimeexception" => b"RuntimeException",
+        b"outofboundsexception" => b"OutOfBoundsException",
+        b"overflowexception" => b"OverflowException",
+        b"rangeexception" => b"RangeException",
+        b"underflowexception" => b"UnderflowException",
+        b"unexpectedvalueexception" => b"UnexpectedValueException",
+        b"arrayobject" => b"ArrayObject",
+        b"arrayiterator" => b"ArrayIterator",
+        b"splstack" => b"SplStack",
+        b"splqueue" => b"SplQueue",
+        b"spldoublylinkedlist" => b"SplDoublyLinkedList",
+        b"splfixedarray" => b"SplFixedArray",
+        b"splheap" => b"SplHeap",
+        b"splminheap" => b"SplMinHeap",
+        b"splmaxheap" => b"SplMaxHeap",
+        b"splpriorityqueue" => b"SplPriorityQueue",
+        b"splobjectstorage" => b"SplObjectStorage",
+        b"splfileinfo" => b"SplFileInfo",
+        b"splfileobject" => b"SplFileObject",
+        b"spltempfileobject" => b"SplTempFileObject",
+        b"datetime" => b"DateTime",
+        b"datetimeimmutable" => b"DateTimeImmutable",
+        b"datetimeinterface" => b"DateTimeInterface",
+        b"dateinterval" => b"DateInterval",
+        b"dateperiod" => b"DatePeriod",
+        b"datetimezone" => b"DateTimeZone",
+        b"reflectionclass" => b"ReflectionClass",
+        b"reflectionmethod" => b"ReflectionMethod",
+        b"reflectionproperty" => b"ReflectionProperty",
+        b"reflectionfunction" => b"ReflectionFunction",
+        b"reflectionparameter" => b"ReflectionParameter",
+        b"reflectionnamedtype" => b"ReflectionNamedType",
+        b"reflectionexception" => b"ReflectionException",
+        b"reflectionenum" => b"ReflectionEnum",
+        _ => return None,
+    })
 }
