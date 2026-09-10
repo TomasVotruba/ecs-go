@@ -1535,39 +1535,77 @@ fn return_type_declaration(s: &mut Stream) -> bool {
 fn indentation_type(s: &mut Stream) -> bool {
     let mut changed = false;
     for i in 0..s.len() {
-        if s.kind(i) != Kind::Whitespace {
-            continue;
-        }
         let v = s.bytes(i).to_vec();
         if !v.contains(&b'\t') {
             continue;
         }
-        let parts: Vec<&[u8]> = v.split(|&c| c == b'\n').collect();
-        let mut out: Vec<u8> = Vec::with_capacity(v.len());
-        let mut touched = false;
-        for (k, part) in parts.iter().enumerate() {
-            if k > 0 {
-                out.push(b'\n');
-            }
-            if k >= 1 && part.contains(&b'\t') {
-                for &c in part.iter() {
-                    if c == b'\t' {
-                        out.extend_from_slice(b"    ");
+        match s.kind(i) {
+            Kind::Whitespace => {
+                let parts: Vec<&[u8]> = v.split(|&c| c == b'\n').collect();
+                let mut out: Vec<u8> = Vec::with_capacity(v.len());
+                let mut touched = false;
+                for (k, part) in parts.iter().enumerate() {
+                    if k > 0 {
+                        out.push(b'\n');
+                    }
+                    if k >= 1 && part.contains(&b'\t') {
+                        for &c in part.iter() {
+                            if c == b'\t' {
+                                out.extend_from_slice(b"    ");
+                            } else {
+                                out.push(c);
+                            }
+                        }
+                        touched = true;
                     } else {
-                        out.push(c);
+                        out.extend_from_slice(part);
                     }
                 }
-                touched = true;
-            } else {
-                out.extend_from_slice(part);
+                if touched {
+                    s.set_owned(i, out);
+                    changed = true;
+                }
             }
-        }
-        if touched {
-            s.set_owned(i, out);
-            changed = true;
+            Kind::Comment | Kind::DocComment => {
+                let out = reindent_comment_tabs(&v);
+                if out != v {
+                    s.set_owned(i, out);
+                    changed = true;
+                }
+            }
+            _ => {}
         }
     }
     changed
+}
+
+// Convert leading-indentation tabs to four spaces on each continuation line of a
+// multi-line comment or docblock, matching ECS's indentation_type.
+fn reindent_comment_tabs(v: &[u8]) -> Vec<u8> {
+    let parts: Vec<&[u8]> = v.split(|&c| c == b'\n').collect();
+    let mut out: Vec<u8> = Vec::with_capacity(v.len());
+    for (k, part) in parts.iter().enumerate() {
+        if k > 0 {
+            out.push(b'\n');
+        }
+        if k == 0 {
+            out.extend_from_slice(part);
+            continue;
+        }
+        let mut j = 0;
+        while j < part.len() && (part[j] == b' ' || part[j] == b'\t') {
+            j += 1;
+        }
+        for &c in &part[..j] {
+            if c == b'\t' {
+                out.extend_from_slice(b"    ");
+            } else {
+                out.push(c);
+            }
+        }
+        out.extend_from_slice(&part[j..]);
+    }
+    out
 }
 
 fn blank_lines_before_namespace(s: &mut Stream) -> bool {
