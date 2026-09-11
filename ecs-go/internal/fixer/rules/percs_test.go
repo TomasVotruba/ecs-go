@@ -10,8 +10,9 @@ func TestNewWithParentheses(t *testing.T) {
 	if _, changed := apply(t, NewWithParentheses{}, "<?php $a = new Foo(1);"); changed {
 		t.Fatal("already-parenthesized new must not change")
 	}
-	if _, changed := apply(t, NewWithParentheses{}, "<?php $a = new class {};"); changed {
-		t.Fatal("anonymous class must not gain parentheses")
+	// anonymous class gains parentheses too (ECS psr12 anonymous_class => true)
+	if got, changed := apply(t, NewWithParentheses{}, "<?php $a = new class {};"); !changed || got != "<?php $a = new class() {};" {
+		t.Fatalf("anonymous class: changed=%v got=%q", changed, got)
 	}
 	// dynamic class references gain parentheses too (matches ECS)
 	got, changed = apply(t, NewWithParentheses{}, "<?php $a = new $type; $b = new $this->job;")

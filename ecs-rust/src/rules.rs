@@ -1484,6 +1484,11 @@ fn no_multiple_statements_per_line(s: &mut Stream) -> bool {
             i += 1;
             continue;
         }
+        // a trailing comment after ";" is not a second statement
+        if matches!(s.kind(next_idx), Kind::Comment | Kind::DocComment) {
+            i += 1;
+            continue;
+        }
         let indent = line_indent(s, i);
         let mut v = vec![b'\n'];
         v.extend_from_slice(&indent);
@@ -4865,6 +4870,14 @@ fn new_with_parentheses(s: &mut Stream) -> bool {
         }
         let nk = s.kind(j);
         if nk == Kind::Keyword && s.bytes(j).eq_ignore_ascii_case(b"class") {
+            // anonymous class: "new class extends X" -> "new class() extends X"
+            if next_significant_value(s, j) == b"(" {
+                i += 1;
+                continue;
+            }
+            s.insert_owned(j + 1, Kind::Punct, b"(".to_vec());
+            s.insert_owned(j + 2, Kind::Punct, b")".to_vec());
+            changed = true;
             i += 1;
             continue;
         }
@@ -7147,9 +7160,16 @@ fn braces_position(s: &mut Stream) -> bool {
             i += 1;
             continue;
         }
-        let (kind, _) = classify_brace(s, i);
+        let (kind, kw) = classify_brace(s, i);
         let next_line = match kind {
-            BraceKind::ClassLike => true,
+            BraceKind::ClassLike => {
+                // an anonymous class ("new class ... {") keeps its brace inline
+                let anon = kw
+                    .and_then(|k| prev_significant_index(s, k))
+                    .map(|p| s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"new"))
+                    .unwrap_or(false);
+                !anon
+            }
             BraceKind::FunctionDecl => !func_signature_multiline(s, i),
             BraceKind::Control => false,
             _ => {

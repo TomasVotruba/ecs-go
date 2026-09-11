@@ -29,11 +29,19 @@ func (BracesPosition) Fix(s *tokens.Stream) bool {
 		if s.At(i).Kind != token.Punct || s.At(i).Value != "{" {
 			continue
 		}
-		kind, _ := classifyBrace(s, i)
+		kind, kw := classifyBrace(s, i)
 
 		nextLine := false
 		switch kind {
 		case braceClassLike:
+			// an anonymous class ("new class ... {") keeps its opening brace on
+			// the same line (PHP-CS-Fixer anonymous_classes_opening_brace default)
+			if kw >= 0 {
+				if prev, ok := prevSignificant(s, kw); ok && prev.Kind == token.Keyword && strings.EqualFold(prev.Value, "new") {
+					nextLine = false
+					break
+				}
+			}
 			nextLine = true
 		case braceFunctionDecl:
 			// PSR-12 keeps "){" on one line when the signature is multiline
