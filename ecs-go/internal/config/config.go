@@ -20,12 +20,12 @@ type Config struct {
 	Jobs  int // parallel workers
 }
 
-// Configure returns a config seeded with all built-in rules, echoing
-// ECSConfig::configure()->withPreparedSets(...).
+// Configure returns a config seeded with the default psr12 + common sets,
+// echoing ECSConfig::configure()->withPreparedSets(psr12: true, common: true).
 func Configure() *Config {
 	return &Config{
 		Paths: []string{"."},
-		Rules: rules.All(),
+		Rules: set.Default(),
 		Jobs:  runtime.NumCPU(),
 	}
 }
@@ -110,7 +110,7 @@ func resolve(f file) (*Config, error) {
 	}
 
 	if !selective {
-		c.Rules = rules.All()
+		c.Rules = set.Default()
 		return c, nil
 	}
 	for _, fx := range rules.All() {
