@@ -156,8 +156,8 @@ func usageMatchesKind(s *tokens.Stream, k int, kind string) bool {
 			}
 		}
 	}
-	fnCall := nextSignificantValue(s, k) == "(" &&
-		!(hasPrev && prev.Kind == token.Keyword && strings.EqualFold(prev.Value, "new"))
+	prevNew := hasPrev && prev.Kind == token.Keyword && strings.EqualFold(prev.Value, "new")
+	fnCall := nextSignificantValue(s, k) == "(" && !prevNew
 	if kind == "function" {
 		return fnCall
 	}
