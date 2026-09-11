@@ -1,6 +1,11 @@
 package rules
 
-import "ecs-go/internal/fixer"
+import (
+	"sort"
+	"strings"
+
+	"ecs-go/internal/fixer"
+)
 
 // SpacingFixers are the whitespace/operator spacing rules, safest first. This is
 // the ordered "spaces" set that gradual levels slice.
@@ -192,7 +197,22 @@ func All() []fixer.Fixer {
 	all = append(all, ConstructFixers()...)
 	all = append(all, StructuralFixers()...)
 	all = append(all, NoClosingTag{})
+	// run in PHP-CS-Fixer priority order (descending); ties keep the curated
+	// order above so parity with ECS's execution order is preserved
+	sort.SliceStable(all, func(a, b int) bool {
+		return fixerPriorityOf(all[a]) > fixerPriorityOf(all[b])
+	})
 	return all
+}
+
+// fixerPriorityOf returns a fixer's PHP-CS-Fixer priority (0 when unknown).
+func fixerPriorityOf(f fixer.Fixer) int {
+	name := f.Name()
+	short := name
+	if i := strings.LastIndexByte(name, '\\'); i >= 0 {
+		short = name[i+1:]
+	}
+	return fixerPriority[short]
 }
 
 // ByName returns the fixer whose Name matches, if any.
