@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ecs-go/internal/fixer/rules"
+	"ecs-go/internal/set"
 )
 
 func write(t *testing.T, body string) string {
@@ -17,13 +18,13 @@ func write(t *testing.T, body string) string {
 	return path
 }
 
-func TestLoadDefaultsToAllRules(t *testing.T) {
+func TestLoadDefaultsToDefaultSet(t *testing.T) {
 	c, err := Load(write(t, `{}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Rules) != len(rules.All()) {
-		t.Fatalf("empty config should enable all rules, got %d", len(c.Rules))
+	if len(c.Rules) != len(set.Default()) {
+		t.Fatalf("empty config should enable the default psr12+common set, got %d", len(c.Rules))
 	}
 	if len(c.Paths) != 1 || c.Paths[0] != "." {
 		t.Fatalf("default path should be '.', got %v", c.Paths)
