@@ -111,22 +111,31 @@ jobs:
                   } >> "$GITHUB_STEP_SUMMARY"
                   echo "identical=$same differing=$differ of $total"
 
-                  echo "### Sample divergences" >> "$GITHUB_STEP_SUMMARY"
-                  shown=0
-                  for f in $(cd /tmp/ours && find . -name '*.php'); do
-                      if [ "$shown" -ge 3 ]; then break; fi
-                      if ! diff -q "/tmp/ours/$f" "/tmp/ecs/$f" >/dev/null 2>&1; then
-                          {
-                              echo ""
-                              echo "<details><summary>$f</summary>"
-                              echo ""
-                              echo '```diff'
-                              diff "/tmp/ours/$f" "/tmp/ecs/$f" | head -40 || true
-                              echo '```'
-                              echo "</details>"
-                          } >> "$GITHUB_STEP_SUMMARY"
-                          shown=$((shown + 1))
-                      fi
+                  # Per differing file: which rules ECS applied vs ecs-go, and the
+                  # snippet they differ on. ECS applied checkers come from the JSON
+                  # captured on the pristine sample; ecs-go's from a dry-run check.
+                  echo "### Divergences ($differ files): applied rules + diff" >> "$GITHUB_STEP_SUMMARY"
+                  export LC_ALL=C
+                  for f in $(cd /tmp/ours && find . -name '*.php' | sort); do
+                      diff -q "/tmp/ours/$f" "/tmp/ecs/$f" >/dev/null 2>&1 && continue
+                      rel=${f#./}
+                      abs="/tmp/sample/$rel"
+                      ecs_rules=$(jq -r --arg k "$abs" '.files[$k].diffs[]?.applied_checkers[]?' /tmp/ecs.json 2>/dev/null | sed -E 's#.*\\##' | sort -u)
+                      go_rules=$(/tmp/ecs-go "$abs" 2>/dev/null | sed -n 's/^[[:space:]]*\*[[:space:]]//p' | sed -E 's#.*\\##' | sort -u)
+                      ecs_only=$(comm -23 <(printf '%s\n' "$ecs_rules") <(printf '%s\n' "$go_rules") | grep -v '^$' | paste -sd, - || true)
+                      go_only=$(comm -13 <(printf '%s\n' "$ecs_rules") <(printf '%s\n' "$go_rules") | grep -v '^$' | paste -sd, - || true)
+                      {
+                          echo ""
+                          echo "<details><summary>$rel</summary>"
+                          echo ""
+                          echo "- **ECS applied, ecs-go did not:** ${ecs_only:-(none)}"
+                          echo "- **ecs-go applied, ECS did not:** ${go_only:-(none)}"
+                          echo ""
+                          echo '```diff'
+                          diff "/tmp/ours/$f" "/tmp/ecs/$f" | head -40 || true
+                          echo '```'
+                          echo "</details>"
+                      } >> "$GITHUB_STEP_SUMMARY"
                   done
 
                   # fail when ecs-go output does not match ECS
