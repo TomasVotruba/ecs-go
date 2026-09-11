@@ -9,12 +9,57 @@ use crate::token::Kind;
 // FQCNs of the ported fixers, matching ecs-go's names. Used to build the Go-side
 // `--rules` subset for a fair, identical-work comparison.
 pub const RULE_NAMES: &[&str] = &[
+    r"PhpCsFixer\Fixer\Basic\EncodingFixer",
     r"PhpCsFixer\Fixer\PhpTag\FullOpeningTagFixer",
-    r"PhpCsFixer\Fixer\Whitespace\LineEndingFixer",
-    r"PhpCsFixer\Fixer\LanguageConstruct\IsNullFixer",
-    r"PhpCsFixer\Fixer\ControlStructure\YodaStyleFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\SingleClassElementPerStatementFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\ClassAttributesSeparationFixer",
+    r"PhpCsFixer\Fixer\Whitespace\IndentationTypeFixer",
+    r"PhpCsFixer\Fixer\Semicolon\NoEmptyStatementFixer",
+    r"PhpCsFixer\Fixer\StringNotation\NoBinaryStringFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\ElseifFixer",
+    r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePromotedPropertyFixer",
+    r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
+    r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
+    r"PhpCsFixer\Fixer\Operator\NewWithParenthesesFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\ArraySyntaxFixer",
+    r"PhpCsFixer\Fixer\LanguageConstruct\SingleSpaceAroundConstructFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\ClassDefinitionFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer",
+    r"PhpCsFixer\Fixer\ArrayNotation\NoMultilineWhitespaceAroundDoubleArrowFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\FunctionDeclarationFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\MethodArgumentSpaceFixer",
+    r"PhpCsFixer\Fixer\Whitespace\ArrayIndentationFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\AlignMultilineCommentFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocIndentFixer",
+    r"PhpCsFixer\Fixer\Operator\LongToShorthandOperatorFixer",
+    r"PhpCsFixer\Fixer\Operator\StandardizeIncrementFixer",
+    r"PhpCsFixer\Fixer\StringNotation\SingleQuoteFixer",
+    r"PhpCsFixer\Fixer\NamespaceNotation\CleanNamespaceFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocReturnSelfReferenceFixer",
+    r"PhpCsFixer\Fixer\StringNotation\ExplicitStringVariableFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\NoSuperfluousPhpdocTagsFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoUselessInheritdocFixer",
+    r"PhpCsFixer\Fixer\Operator\NoUselessConcatOperatorFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocLineSpanFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoEmptyReturnFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\NullableTypeDeclarationForDefaultNullValueFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\NoEmptyPhpdocFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\NoSpacesAfterFunctionNameFixer",
+    r"PhpCsFixer\Fixer\Whitespace\SpacesInsideParenthesesFixer",
     r"PhpCsFixer\Fixer\ListNotation\ListSyntaxFixer",
+    r"PhpCsFixer\Fixer\Comment\NoEmptyCommentFixer",
+    r"PhpCsFixer\Fixer\LanguageConstruct\IsNullFixer",
+    r"PhpCsFixer\Fixer\Comment\SingleLineCommentSpacingFixer",
+    r"PhpCsFixer\Fixer\Operator\NoSpaceAroundDoubleColonFixer",
+    r"PhpCsFixer\Fixer\Import\NoUnneededImportAliasFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopConditionFixer",
+    r"PhpCsFixer\Fixer\Operator\TernaryOperatorSpacesFixer",
+    r"PhpCsFixer\Fixer\PhpTag\BlankLineAfterOpeningTagFixer",
+    r"PhpCsFixer\Fixer\Import\SingleImportPerStatementFixer",
+    r"PhpCsFixer\Fixer\Whitespace\LineEndingFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\YodaStyleFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NoWhitespaceBeforeCommaInArrayFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\WhitespaceAfterCommaInArrayFixer",
     r"PhpCsFixer\Fixer\ControlStructure\TrailingCommaInMultilineFixer",
@@ -23,65 +68,31 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Operator\ObjectOperatorWithoutWhitespaceFixer",
     r"PhpCsFixer\Fixer\Operator\StandardizeNotEqualsFixer",
     r"PhpCsFixer\Fixer\Operator\TernaryToNullCoalescingFixer",
-    r"PhpCsFixer\Fixer\Semicolon\NoEmptyStatementFixer",
-    r"PhpCsFixer\Fixer\Comment\NoEmptyCommentFixer",
-    r"PhpCsFixer\Fixer\Comment\SingleLineCommentSpacingFixer",
-    r"PhpCsFixer\Fixer\StringNotation\SingleQuoteFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\TrimArraySpacesFixer",
-    r"PhpCsFixer\Fixer\Operator\NoSpaceAroundDoubleColonFixer",
     r"PhpCsFixer\Fixer\AttributeNotation\AttributeBlockNoSpacesFixer",
     r"PhpCsFixer\Fixer\StringNotation\HeredocToNowdocFixer",
-    r"PhpCsFixer\Fixer\StringNotation\NoBinaryStringFixer",
-    r"PhpCsFixer\Fixer\Operator\NoUselessConcatOperatorFixer",
-    r"PhpCsFixer\Fixer\CastNotation\NoShortBoolCastFixer",
     r"PhpCsFixer\Fixer\CastNotation\NoUnsetCastFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NoWhitespaceInEmptyArrayFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NormalizeIndexBraceFixer",
-    r"PhpCsFixer\Fixer\ArrayNotation\NoMultilineWhitespaceAroundDoubleArrowFixer",
-    r"PhpCsFixer\Fixer\Operator\StandardizeIncrementFixer",
-    r"PhpCsFixer\Fixer\Operator\LongToShorthandOperatorFixer",
     r"PhpCsFixer\Fixer\ControlStructure\SwitchContinueToBreakFixer",
-    r"PhpCsFixer\Fixer\Import\NoUnneededImportAliasFixer",
-    r"PhpCsFixer\Fixer\NamespaceNotation\CleanNamespaceFixer",
     r"PhpCsFixer\Fixer\Comment\MultilineCommentOpeningClosingFixer",
-    r"PhpCsFixer\Fixer\Basic\EncodingFixer",
     r"PhpCsFixer\Fixer\LanguageConstruct\DeclareParenthesesFixer",
     r"PhpCsFixer\Fixer\Whitespace\TypeDeclarationSpacesFixer",
     r"PhpCsFixer\Fixer\Whitespace\CompactNullableTypeDeclarationFixer",
-    r"PhpCsFixer\Fixer\Whitespace\TypesSpacesFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\AlignMultilineCommentFixer",
-    r"PhpCsFixer\Fixer\Operator\AssignNullCoalescingToCoalesceEqualFixer",
-    r"PhpCsFixer\Fixer\FunctionNotation\NullableTypeDeclarationForDefaultNullValueFixer",
-    r"PhpCsFixer\Fixer\Comment\SingleLineCommentStyleFixer",
     r"PhpCsFixer\Fixer\LanguageConstruct\ExplicitIndirectVariableFixer",
-    r"PhpCsFixer\Fixer\StringNotation\ExplicitStringVariableFixer",
     r"PhpCsFixer\Fixer\ClassNotation\NoNullPropertyInitializationFixer",
     r"PhpCsFixer\Fixer\ControlStructure\IncludeFixer",
-    r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
-    r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopConditionFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\NoSuperfluousPhpdocTagsFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoUselessInheritdocFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocScalarFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocTypesFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoAliasTagFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoPackageFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoAccessFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocSingleLineVarSpacingFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoEmptyReturnFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocTrimFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocTrimConsecutiveBlankLineSeparationFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\NoEmptyPhpdocFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\NoBlankLinesAfterPhpdocFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocTagCasingFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocInlineTagNormalizerFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocNoDuplicateTypesFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocVarWithoutNameFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocIndentFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocOrderByValueFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocLineSpanFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocTypesOrderFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocVarAnnotationCorrectOrderFixer",
-    r"PhpCsFixer\Fixer\Phpdoc\PhpdocReturnSelfReferenceFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseKeywordsFixer",
     r"PhpCsFixer\Fixer\Casing\ConstantCaseFixer",
     r"PhpCsFixer\Fixer\Casing\LowercaseStaticReferenceFixer",
@@ -96,65 +107,99 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Casing\ClassReferenceNameCasingFixer",
     r"PhpCsFixer\Fixer\NamespaceNotation\NoLeadingNamespaceWhitespaceFixer",
     r"PhpCsFixer\Fixer\Semicolon\NoSinglelineWhitespaceBeforeSemicolonsFixer",
-    r"PhpCsFixer\Fixer\Whitespace\NoWhitespaceInBlankLineFixer",
-    r"PhpCsFixer\Fixer\Semicolon\SpaceAfterSemicolonFixer",
-    r"PhpCsFixer\Fixer\Operator\BinaryOperatorSpacesFixer",
-    r"PhpCsFixer\Fixer\Operator\TernaryOperatorSpacesFixer",
     r"PhpCsFixer\Fixer\Operator\ConcatSpaceFixer",
-    r"PhpCsFixer\Fixer\CastNotation\CastSpacesFixer",
-    r"PhpCsFixer\Fixer\PhpTag\BlankLineAfterOpeningTagFixer",
     r"PhpCsFixer\Fixer\Whitespace\NoTrailingWhitespaceFixer",
     r"PhpCsFixer\Fixer\Comment\NoTrailingWhitespaceInCommentFixer",
-    r"PhpCsFixer\Fixer\Whitespace\SingleBlankLineAtEofFixer",
     r"PhpCsFixer\Fixer\LanguageConstruct\DeclareEqualNormalizeFixer",
-    r"PhpCsFixer\Fixer\LanguageConstruct\SingleSpaceAroundConstructFixer",
-    r"PhpCsFixer\Fixer\FunctionNotation\NoSpacesAfterFunctionNameFixer",
-    r"PhpCsFixer\Fixer\Whitespace\SpacesInsideParenthesesFixer",
     r"PhpCsFixer\Fixer\Operator\UnaryOperatorSpacesFixer",
-    r"PhpCsFixer\Fixer\Import\NoLeadingImportSlashFixer",
-    r"PhpCsFixer\Fixer\ControlStructure\ElseifFixer",
     r"PhpCsFixer\Fixer\ControlStructure\SwitchCaseSemicolonToColonFixer",
     r"PhpCsFixer\Fixer\ControlStructure\SwitchCaseSpaceFixer",
-    r"PhpCsFixer\Fixer\Basic\NoMultipleStatementsPerLineFixer",
-    r"PhpCsFixer\Fixer\FunctionNotation\MethodArgumentSpaceFixer",
-    r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePromotedPropertyFixer",
-    r"PhpCsFixer\Fixer\FunctionNotation\ReturnTypeDeclarationFixer",
-    r"PhpCsFixer\Fixer\Operator\NewWithParenthesesFixer",
-    r"PhpCsFixer\Fixer\FunctionNotation\FunctionDeclarationFixer",
-    r"PhpCsFixer\Fixer\Whitespace\IndentationTypeFixer",
-    r"PhpCsFixer\Fixer\ClassNotation\ClassDefinitionFixer",
-    r"PhpCsFixer\Fixer\Basic\BracesPositionFixer",
     r"PhpCsFixer\Fixer\ClassNotation\VisibilityRequiredFixer",
-    r"PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer",
-    r"PhpCsFixer\Fixer\ClassNotation\SingleClassElementPerStatementFixer",
-    r"PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer",
-    r"PhpCsFixer\Fixer\ClassNotation\ClassAttributesSeparationFixer",
-    r"PhpCsFixer\Fixer\NamespaceNotation\BlankLinesBeforeNamespaceFixer",
-    r"PhpCsFixer\Fixer\NamespaceNotation\BlankLineAfterNamespaceFixer",
-    r"PhpCsFixer\Fixer\Import\NoUnusedImportsFixer",
-    r"PhpCsFixer\Fixer\Import\SingleImportPerStatementFixer",
-    r"PhpCsFixer\Fixer\Import\OrderedImportsFixer",
-    r"PhpCsFixer\Fixer\Whitespace\BlankLineBetweenImportGroupsFixer",
-    r"PhpCsFixer\Fixer\Import\SingleLineAfterImportsFixer",
     r"PhpCsFixer\Fixer\ClassNotation\NoBlankLinesAfterClassOpeningFixer",
-    r"PhpCsFixer\Fixer\Whitespace\StatementIndentationFixer",
-    r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
-    r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
-    r"PhpCsFixer\Fixer\Whitespace\ArrayIndentationFixer",
-    r"PhpCsFixer\Fixer\Whitespace\NoExtraBlankLinesFixer",
     r"PhpCsFixer\Fixer\PhpTag\NoClosingTagFixer",
+    r"PhpCsFixer\Fixer\Whitespace\TypesSpacesFixer",
+    r"PhpCsFixer\Fixer\Operator\AssignNullCoalescingToCoalesceEqualFixer",
+    r"PhpCsFixer\Fixer\Semicolon\SpaceAfterSemicolonFixer",
+    r"PhpCsFixer\Fixer\Basic\NoMultipleStatementsPerLineFixer",
+    r"PhpCsFixer\Fixer\Basic\BracesPositionFixer",
+    r"PhpCsFixer\Fixer\Whitespace\StatementIndentationFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocTrimFixer",
+    r"PhpCsFixer\Fixer\CastNotation\NoShortBoolCastFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocSingleLineVarSpacingFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocOrderByValueFixer",
+    r"PhpCsFixer\Fixer\CastNotation\CastSpacesFixer",
+    r"PhpCsFixer\Fixer\Import\NoUnusedImportsFixer",
+    r"PhpCsFixer\Fixer\Import\SingleLineAfterImportsFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\ReturnTypeDeclarationFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\NoBlankLinesAfterPhpdocFixer",
+    r"PhpCsFixer\Fixer\Import\NoLeadingImportSlashFixer",
+    r"PhpCsFixer\Fixer\NamespaceNotation\BlankLineAfterNamespaceFixer",
+    r"PhpCsFixer\Fixer\Whitespace\NoExtraBlankLinesFixer",
+    r"PhpCsFixer\Fixer\Import\OrderedImportsFixer",
+    r"PhpCsFixer\Fixer\Comment\SingleLineCommentStyleFixer",
+    r"PhpCsFixer\Fixer\NamespaceNotation\BlankLinesBeforeNamespaceFixer",
+    r"PhpCsFixer\Fixer\Operator\BinaryOperatorSpacesFixer",
+    r"PhpCsFixer\Fixer\Whitespace\BlankLineBetweenImportGroupsFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocTrimConsecutiveBlankLineSeparationFixer",
+    r"PhpCsFixer\Fixer\Whitespace\NoWhitespaceInBlankLineFixer",
+    r"PhpCsFixer\Fixer\Whitespace\SingleBlankLineAtEofFixer",
 ];
 
 // Rules run in ecs-go's rules.All() order, restricted to the ported set, so the
 // Rust output matches the Go output for the matching `--rules` subset.
 pub fn fix(s: &mut Stream) -> bool {
     let mut changed = false;
+    changed |= encoding(s);
     changed |= full_opening_tag(s);
-    changed |= line_ending(s);
-    changed |= is_null(s);
-    changed |= yoda_style(s);
+    changed |= ordered_class_elements(s);
+    changed |= single_class_element_per_statement(s);
+    changed |= class_attributes_separation(s);
+    changed |= indentation_type(s);
+    changed |= no_empty_statement(s);
+    changed |= no_binary_string(s);
+    changed |= elseif(s);
+    changed |= standalone_line_promoted_property(s);
+    changed |= array_list_item_newline(s);
+    changed |= empty_loop_body(s);
+    changed |= method_chaining_newline(s);
+    changed |= new_with_parentheses(s);
     changed |= array_syntax(s);
+    changed |= single_space_around_construct(s);
+    changed |= class_definition(s);
+    changed |= single_trait_insert_per_statement(s);
+    changed |= no_multiline_whitespace_around_double_arrow(s);
+    changed |= function_declaration(s);
+    changed |= method_argument_space(s);
+    changed |= array_indentation(s);
+    changed |= align_multiline_comment(s);
+    changed |= phpdoc_indent(s);
+    changed |= long_to_shorthand_operator(s);
+    changed |= standardize_increment(s);
+    changed |= single_quote(s);
+    changed |= clean_namespace(s);
+    changed |= phpdoc_return_self_reference(s);
+    changed |= explicit_string_variable(s);
+    changed |= no_superfluous_phpdoc_tags(s);
+    changed |= phpdoc_no_useless_inheritdoc(s);
+    changed |= no_useless_concat_operator(s);
+    changed |= phpdoc_line_span(s);
+    changed |= phpdoc_no_empty_return(s);
+    changed |= nullable_type_declaration_for_default_null_value(s);
+    changed |= no_empty_phpdoc(s);
+    changed |= no_spaces_after_function_name(s);
+    changed |= spaces_inside_parentheses(s);
     changed |= list_syntax(s);
+    changed |= no_empty_comment(s);
+    changed |= is_null(s);
+    changed |= single_line_comment_spacing(s);
+    changed |= no_space_around_double_colon(s);
+    changed |= no_unneeded_import_alias(s);
+    changed |= empty_loop_condition(s);
+    changed |= ternary_operator_spaces(s);
+    changed |= blank_line_after_opening_tag(s);
+    changed |= single_import_per_statement(s);
+    changed |= line_ending(s);
+    changed |= yoda_style(s);
     changed |= no_whitespace_before_comma_in_array(s);
     changed |= whitespace_after_comma_in_array(s);
     changed |= trailing_comma_in_multiline(s);
@@ -163,65 +208,31 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= object_operator_without_whitespace(s);
     changed |= standardize_not_equals(s);
     changed |= ternary_to_null_coalescing(s);
-    changed |= no_empty_statement(s);
-    changed |= no_empty_comment(s);
-    changed |= single_line_comment_spacing(s);
-    changed |= single_quote(s);
     changed |= trim_array_spaces(s);
-    changed |= no_space_around_double_colon(s);
     changed |= attribute_block_no_spaces(s);
     changed |= heredoc_to_nowdoc(s);
-    changed |= no_binary_string(s);
-    changed |= no_useless_concat_operator(s);
-    changed |= no_short_bool_cast(s);
     changed |= no_unset_cast(s);
     changed |= no_whitespace_in_empty_array(s);
     changed |= normalize_index_brace(s);
-    changed |= no_multiline_whitespace_around_double_arrow(s);
-    changed |= standardize_increment(s);
-    changed |= long_to_shorthand_operator(s);
     changed |= switch_continue_to_break(s);
-    changed |= no_unneeded_import_alias(s);
-    changed |= clean_namespace(s);
     changed |= multiline_comment_opening_closing(s);
-    changed |= encoding(s);
     changed |= declare_parentheses(s);
     changed |= type_declaration_spaces(s);
     changed |= compact_nullable_type_declaration(s);
-    changed |= types_spaces(s);
-    changed |= align_multiline_comment(s);
-    changed |= assign_null_coalescing_to_coalesce_equal(s);
-    changed |= nullable_type_declaration_for_default_null_value(s);
-    changed |= single_line_comment_style(s);
     changed |= explicit_indirect_variable(s);
-    changed |= explicit_string_variable(s);
     changed |= no_null_property_initialization(s);
     changed |= include(s);
-    changed |= empty_loop_body(s);
-    changed |= empty_loop_condition(s);
-    changed |= no_superfluous_phpdoc_tags(s);
-    changed |= phpdoc_no_useless_inheritdoc(s);
     changed |= phpdoc_scalar(s);
     changed |= phpdoc_types(s);
     changed |= phpdoc_no_alias_tag(s);
     changed |= phpdoc_no_package(s);
     changed |= phpdoc_no_access(s);
-    changed |= phpdoc_single_line_var_spacing(s);
-    changed |= phpdoc_no_empty_return(s);
-    changed |= phpdoc_trim(s);
-    changed |= phpdoc_trim_consecutive_blank_line_separation(s);
-    changed |= no_empty_phpdoc(s);
-    changed |= no_blank_lines_after_phpdoc(s);
     changed |= phpdoc_tag_casing(s);
     changed |= phpdoc_inline_tag_normalizer(s);
     changed |= phpdoc_no_duplicate_types(s);
     changed |= phpdoc_var_without_name(s);
-    changed |= phpdoc_indent(s);
-    changed |= phpdoc_order_by_value(s);
-    changed |= phpdoc_line_span(s);
     changed |= phpdoc_types_order(s);
     changed |= phpdoc_var_annotation_correct_order(s);
-    changed |= phpdoc_return_self_reference(s);
     changed |= lowercase_keywords(s);
     changed |= constant_case(s);
     changed |= lowercase_static_reference(s);
@@ -236,53 +247,42 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= class_reference_name_casing(s);
     changed |= no_leading_namespace_whitespace(s);
     changed |= no_singleline_whitespace_before_semicolons(s);
-    changed |= no_whitespace_in_blank_line(s);
-    changed |= space_after_semicolon(s);
-    changed |= binary_operator_spaces(s);
-    changed |= ternary_operator_spaces(s);
     changed |= concat_space(s);
-    changed |= cast_spaces(s);
-    changed |= blank_line_after_opening_tag(s);
     changed |= no_trailing_whitespace(s);
     changed |= no_trailing_whitespace_in_comment(s);
-    changed |= single_blank_line_at_eof(s);
     changed |= declare_equal_normalize(s);
-    changed |= single_space_around_construct(s);
-    changed |= no_spaces_after_function_name(s);
-    changed |= spaces_inside_parentheses(s);
     changed |= unary_operator_spaces(s);
-    changed |= no_leading_import_slash(s);
-    changed |= elseif(s);
     changed |= switch_case_semicolon_to_colon(s);
     changed |= switch_case_space(s);
-    changed |= no_multiple_statements_per_line(s);
-    changed |= method_argument_space(s);
-    changed |= standalone_line_promoted_property(s);
-    changed |= return_type_declaration(s);
-    changed |= new_with_parentheses(s);
-    changed |= function_declaration(s);
-    changed |= indentation_type(s);
-    changed |= class_definition(s);
-    changed |= braces_position(s);
     changed |= visibility_required(s);
-    changed |= single_trait_insert_per_statement(s);
-    changed |= single_class_element_per_statement(s);
-    changed |= ordered_class_elements(s);
-    changed |= class_attributes_separation(s);
-    changed |= blank_lines_before_namespace(s);
-    changed |= blank_line_after_namespace(s);
-    changed |= no_unused_imports(s);
-    changed |= single_import_per_statement(s);
-    changed |= ordered_imports(s);
-    changed |= blank_line_between_import_groups(s);
-    changed |= single_line_after_imports(s);
     changed |= no_blank_lines_after_class_opening(s);
-    changed |= statement_indentation(s);
-    changed |= method_chaining_newline(s);
-    changed |= array_list_item_newline(s);
-    changed |= array_indentation(s);
-    changed |= no_extra_blank_lines(s);
     changed |= no_closing_tag(s);
+    changed |= types_spaces(s);
+    changed |= assign_null_coalescing_to_coalesce_equal(s);
+    changed |= space_after_semicolon(s);
+    changed |= no_multiple_statements_per_line(s);
+    changed |= braces_position(s);
+    changed |= statement_indentation(s);
+    changed |= phpdoc_trim(s);
+    changed |= no_short_bool_cast(s);
+    changed |= phpdoc_single_line_var_spacing(s);
+    changed |= phpdoc_order_by_value(s);
+    changed |= cast_spaces(s);
+    changed |= no_unused_imports(s);
+    changed |= single_line_after_imports(s);
+    changed |= return_type_declaration(s);
+    changed |= no_blank_lines_after_phpdoc(s);
+    changed |= no_leading_import_slash(s);
+    changed |= blank_line_after_namespace(s);
+    changed |= no_extra_blank_lines(s);
+    changed |= ordered_imports(s);
+    changed |= single_line_comment_style(s);
+    changed |= blank_lines_before_namespace(s);
+    changed |= binary_operator_spaces(s);
+    changed |= blank_line_between_import_groups(s);
+    changed |= phpdoc_trim_consecutive_blank_line_separation(s);
+    changed |= no_whitespace_in_blank_line(s);
+    changed |= single_blank_line_at_eof(s);
     changed
 }
 
