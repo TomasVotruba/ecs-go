@@ -40,9 +40,15 @@ func (LowercaseKeywords) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.Keyword {
 			continue
 		}
-		// a keyword-spelled name in assignment position (e.g. a typed class
-		// constant "const string ARRAY = ...") must not be lowercased
+		// a keyword-spelled constant name in assignment position (e.g.
+		// "const string RETURN = ...") must not be lowercased
 		if nextSignificantValue(s, i) == "=" {
+			continue
+		}
+		// a keyword-spelled class/member name (e.g. "Enum" in "extends Enum",
+		// "Spatie\Enum\Enum", "class Enum", or a named argument "instanceOf:") is
+		// an identifier, not a keyword
+		if keywordUsedAsIdentifier(s, i) {
 			continue
 		}
 		if lower := lowerASCII(t.Value); lower != t.Value {
@@ -123,4 +129,33 @@ func (LowercaseStaticReference) Fix(s *tokens.Stream) bool {
 		}
 	}
 	return changed
+}
+
+// keywordUsedAsIdentifier reports whether a keyword-spelled token is actually a
+// class or member name (the lexer marks context-sensitive words like "enum" as
+// keywords even when used as identifiers).
+func keywordUsedAsIdentifier(s *tokens.Stream, i int) bool {
+	if prev, ok := prevSignificant(s, i); ok {
+		if prev.Kind == token.Punct {
+			switch prev.Value {
+			case `\`, "->", "?->", "::":
+				return true
+			}
+		}
+		if prev.Kind == token.Keyword {
+			switch strings.ToLower(prev.Value) {
+			case "extends", "implements", "new", "instanceof",
+				"class", "interface", "trait", "enum", "function", "const",
+				"namespace", "use", "as", "goto", "insteadof":
+				return true
+			}
+		}
+	}
+	if n := nextSignificantIndex(s, i); n >= 0 && s.At(n).Kind == token.Punct {
+		switch s.At(n).Value {
+		case `\`, "::", ":":
+			return true
+		}
+	}
+	return false
 }

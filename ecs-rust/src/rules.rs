@@ -608,6 +608,11 @@ fn lowercase_keywords(s: &mut Stream) -> bool {
         if next_significant_value(s, i) == b"=" {
             continue;
         }
+        // a keyword-spelled class/member name (e.g. "Enum" in "extends Enum",
+        // "class Enum", or a named argument "instanceOf:") is an identifier
+        if keyword_used_as_identifier(s, i) {
+            continue;
+        }
         let lower = s.bytes(i).to_ascii_lowercase();
         if lower.as_slice() != s.bytes(i) {
             s.set_owned(i, lower);
@@ -615,6 +620,34 @@ fn lowercase_keywords(s: &mut Stream) -> bool {
         }
     }
     changed
+}
+
+fn keyword_used_as_identifier(s: &Stream, i: usize) -> bool {
+    if let Some(p) = prev_significant_index(s, i) {
+        if s.kind(p) == Kind::Punct {
+            match s.bytes(p) {
+                b"\\" | b"->" | b"?->" | b"::" => return true,
+                _ => {}
+            }
+        }
+        if s.kind(p) == Kind::Keyword {
+            match s.bytes(p).to_ascii_lowercase().as_slice() {
+                b"extends" | b"implements" | b"new" | b"instanceof" | b"class"
+                | b"interface" | b"trait" | b"enum" | b"function" | b"const"
+                | b"namespace" | b"use" | b"as" | b"goto" | b"insteadof" => return true,
+                _ => {}
+            }
+        }
+    }
+    if let Some(n) = next_significant_index(s, i) {
+        if s.kind(n) == Kind::Punct {
+            match s.bytes(n) {
+                b"\\" | b"::" | b":" => return true,
+                _ => {}
+            }
+        }
+    }
+    false
 }
 
 fn constant_case(s: &mut Stream) -> bool {
