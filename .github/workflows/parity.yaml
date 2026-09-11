@@ -115,6 +115,8 @@ jobs:
                   # snippet they differ on. ECS applied checkers come from the JSON
                   # captured on the pristine sample; ecs-go's from a dry-run check.
                   echo "### Divergences ($differ files): applied rules + diff" >> "$GITHUB_STEP_SUMMARY"
+                  echo ""
+                  echo "=== Divergences ($differ files) ==="
                   export LC_ALL=C
                   for f in $(cd /tmp/ours && find . -name '*.php' | sort); do
                       diff -q "/tmp/ours/$f" "/tmp/ecs/$f" >/dev/null 2>&1 && continue
@@ -124,6 +126,13 @@ jobs:
                       go_rules=$(/tmp/ecs-go "$abs" 2>/dev/null | sed -n 's/^[[:space:]]*\*[[:space:]]//p' | sed -E 's#.*\\##' | sort -u)
                       ecs_only=$(comm -23 <(printf '%s\n' "$ecs_rules") <(printf '%s\n' "$go_rules") | grep -v '^$' | paste -sd, - || true)
                       go_only=$(comm -13 <(printf '%s\n' "$ecs_rules") <(printf '%s\n' "$go_rules") | grep -v '^$' | paste -sd, - || true)
+                      # stdout (CI log): file + which rules differ + the diff
+                      echo ""
+                      echo "--- $rel"
+                      echo "    ECS applied, ecs-go did not: ${ecs_only:-(none)}"
+                      echo "    ecs-go applied, ECS did not: ${go_only:-(none)}"
+                      diff "/tmp/ours/$f" "/tmp/ecs/$f" | sed 's/^/    /' | head -40 || true
+                      # job summary (rich, collapsible)
                       {
                           echo ""
                           echo "<details><summary>$rel</summary>"
