@@ -63,6 +63,10 @@ func (NoMultipleStatementsPerLine) Fix(s *tokens.Stream) bool {
 		if nt.Kind == token.CloseTag {
 			continue
 		}
+		// a trailing comment after ";" is not a second statement
+		if nt.Kind == token.Comment || nt.Kind == token.DocComment {
+			continue
+		}
 
 		indent := lineIndent(s, i)
 		if inlineWS {

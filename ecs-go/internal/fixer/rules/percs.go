@@ -36,7 +36,15 @@ func (NewWithParentheses) Fix(s *tokens.Stream) bool {
 		// dynamic class reference (new $var, new $this->prop, new $a::$b)
 		nt := s.At(j)
 		if nt.Kind == token.Keyword && strings.ToLower(nt.Value) == "class" {
-			continue // anonymous class
+			// anonymous class: "new class extends X" -> "new class() extends X"
+			// (ECS's psr12 config sets anonymous_class => true)
+			if nextSignificantValue(s, j) == "(" {
+				continue // already "new class(...)"
+			}
+			s.InsertAt(j+1, token.Token{Kind: token.Punct, Value: "("})
+			s.InsertAt(j+2, token.Token{Kind: token.Punct, Value: ")"})
+			changed = true
+			continue
 		}
 		if nt.Kind == token.Variable {
 			k := consumeNewVarRef(s, j)

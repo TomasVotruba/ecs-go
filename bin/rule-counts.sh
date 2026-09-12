@@ -15,6 +15,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 README="$ROOT/README.md"
 RULES_TXT="$ROOT/ecs-go/ecs-rules.txt"
+ALL_FIXERS="$ROOT/ecs-go/ecs-all-fixers.txt"
 START="<!-- rule-counts:start -->"
 END="<!-- rule-counts:end -->"
 
@@ -22,6 +23,14 @@ ecs=$(grep -oE '[0-9]+ rules configured in ECS' "$RULES_TXT" | grep -oE '^[0-9]+
 
 go build -C "$ROOT/ecs-go" -o /tmp/ecs-go-count . >&2
 go_count=$(/tmp/ecs-go-count list-checkers | grep -cE '^[[:space:]]*- ')
+
+# rules ECS configures (across its sets) that ecs-go does not implement yet
+missing=""
+if [ -f "$ALL_FIXERS" ]; then
+    /tmp/ecs-go-count list-checkers | sed 's/^[[:space:]]*-[[:space:]]*//' | LC_ALL=C sort -u > /tmp/ecs-go-impl.txt
+    missing=$(LC_ALL=C comm -23 <(LC_ALL=C sort -u "$ALL_FIXERS") /tmp/ecs-go-impl.txt | sed -E 's#.*\\##')
+fi
+missing_count=$(printf '%s' "$missing" | grep -c . || true)
 
 cargo build --release --manifest-path "$ROOT/ecs-rust/Cargo.toml" >&2 2>/dev/null
 rust_count=$("$ROOT/ecs-rust/target/release/ecs-rust" list-rules | grep -cE 'Fixer$')
@@ -47,7 +56,7 @@ new=$(awk -v start="$START" -v end="$END" -v block="$block" '
   !skip {print}
 ' "$README")
 
-# Emit to the CI job summary so every PR shows the counters.
+# Emit to the CI job summary so every PR shows the counters and the backlog.
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     {
         echo "### Rule coverage"
@@ -56,7 +65,20 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         echo "| ECS (baseline) | $ecs | 100% |"
         echo "| ecs-go | $go_count | ${go_pct}% |"
         echo "| ecs-rust | $rust_count | ${rust_pct}% |"
+        echo ""
+        echo "### Missing in ecs-go ($missing_count of $(LC_ALL=C sort -u "$ALL_FIXERS" 2>/dev/null | grep -c . || echo 0) ECS fixers)"
+        if [ -n "$missing" ]; then
+            printf '%s\n' "$missing" | sed 's/^/- `/; s/$/`/'
+        else
+            echo "None - full coverage."
+        fi
     } >> "$GITHUB_STEP_SUMMARY"
+fi
+
+# Always print the missing list to stdout too (visible in CI logs).
+echo "Missing in ecs-go ($missing_count):"
+if [ -n "$missing" ]; then
+    printf '  %s\n' $missing
 fi
 
 if [ "${1:-}" = "--check" ]; then
