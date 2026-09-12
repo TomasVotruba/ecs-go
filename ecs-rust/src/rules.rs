@@ -7161,6 +7161,14 @@ fn braces_position(s: &mut Stream) -> bool {
             continue;
         }
         let (kind, kw) = classify_brace(s, i);
+        // an empty class/function body already collapsed to "{}" stays on its
+        // line - ECS keeps "class A {}" as-is; only reflow a body with content
+        if matches!(kind, BraceKind::ClassLike | BraceKind::FunctionDecl)
+            && match_forward(s, i) == Some(i + 1)
+        {
+            i += 1;
+            continue;
+        }
         let next_line = match kind {
             BraceKind::ClassLike => {
                 // an anonymous class ("new class ... {") keeps its brace inline

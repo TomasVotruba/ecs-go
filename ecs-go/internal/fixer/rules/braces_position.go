@@ -31,6 +31,13 @@ func (BracesPosition) Fix(s *tokens.Stream) bool {
 		}
 		kind, kw := classifyBrace(s, i)
 
+		// an empty class/function body already collapsed to "{}" stays on its
+		// line - ECS keeps "class A {}" as-is (single_line_empty_body owns the
+		// collapse); only reflow a body with content
+		if (kind == braceClassLike || kind == braceFunctionDecl) && s.MatchForward(i) == i+1 {
+			continue
+		}
+
 		nextLine := false
 		switch kind {
 		case braceClassLike:
