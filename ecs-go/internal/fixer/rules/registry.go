@@ -149,6 +149,8 @@ func ConstructFixers() []fixer.Fixer {
 		NotOperatorWithSuccessorSpace{},
 		NoLeadingImportSlash{},
 		Elseif{},
+		ControlStructureContinuationPosition{},
+		NoUnneededControlParentheses{},
 		SwitchCaseSemicolonToColon{},
 		SwitchCaseSpace{},
 		NoMultipleStatementsPerLine{},
