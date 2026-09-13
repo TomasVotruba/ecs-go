@@ -107,6 +107,7 @@ func CommonFixers() []fixer.Fixer {
 		EmptyLoopBody{},
 		EmptyLoopCondition{},
 		NoUselessReturn{},
+		SimplifiedNullReturn{},
 		FunctionToConstant{},
 		SelfAccessor{},
 		RemoveUselessDefaultComment{},

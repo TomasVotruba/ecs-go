@@ -131,6 +131,7 @@ var fixerPriority = map[string]int{
 	"SelfAccessorFixer":                               -11,
 	"SelfStaticAccessorFixer":                         -10,
 	"ShortScalarCastFixer":                            0,
+	"SimplifiedNullReturnFixer":                       16,
 	"SingleBlankLineAtEofFixer":                       -100,
 	"SingleClassElementPerStatementFixer":             56,
 	"SingleImportPerStatementFixer":                   1,
