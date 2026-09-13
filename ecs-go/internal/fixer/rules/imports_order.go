@@ -40,6 +40,19 @@ func importSortKey(s *tokens.Stream, useIdx, semi int) string {
 	return strings.ReplaceAll(strings.ToLower(b.String()), `\`, "\x00")
 }
 
+// importKindRank orders use statements by kind for ECS's default imports_order
+// (['class', 'function', 'const']).
+func importKindRank(kind string) int {
+	switch kind {
+	case "function":
+		return 1
+	case "const":
+		return 2
+	default: // class
+		return 0
+	}
+}
+
 func useKind(s *tokens.Stream, useIdx int) string {
 	j := skipWhitespace(s, useIdx+1)
 	if j < s.Len() && s.At(j).Kind == token.Keyword {
@@ -98,9 +111,10 @@ func collectImportRun(s *tokens.Stream, start int) []importStmt {
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Import/OrderedImportsFixer.php
 //
-// OrderedImports sorts a run of use statements alphabetically by imported path
-// (case-insensitive), matching ECS's default (sort_algorithm: alpha, no type
-// grouping).
+// OrderedImports sorts a run of use statements by kind (class, then function,
+// then const) and alphabetically by imported path within each kind
+// (case-insensitive), matching ECS's psr12 config (sort_algorithm: alpha,
+// imports_order: ['class', 'function', 'const']).
 type OrderedImports struct{}
 
 func (OrderedImports) Name() string {
@@ -140,6 +154,10 @@ func reorderImports(s *tokens.Stream, run []importStmt) (int, bool) {
 
 	ordered := append([]importStmt(nil), run...)
 	sort.SliceStable(ordered, func(a, b int) bool {
+		// ECS default imports_order: class, then function, then const; alpha within
+		if ra, rb := importKindRank(ordered[a].kind), importKindRank(ordered[b].kind); ra != rb {
+			return ra < rb
+		}
 		return ordered[a].pathKey < ordered[b].pathKey
 	})
 

@@ -5693,7 +5693,8 @@ fn reorder_imports(s: &mut Stream, run: &[ImportStmt]) -> (usize, bool) {
     let indent = indent_before(s, first);
 
     let mut ordered: Vec<&ImportStmt> = run.iter().collect();
-    ordered.sort_by(|a, b| a.key.cmp(&b.key));
+    // ECS default imports_order: class, then function, then const; alpha within
+    ordered.sort_by(|a, b| a.rank.cmp(&b.rank).then_with(|| a.key.cmp(&b.key)));
 
     let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
     for (p, st) in ordered.iter().enumerate() {
