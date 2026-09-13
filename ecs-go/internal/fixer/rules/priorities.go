@@ -158,4 +158,9 @@ var fixerPriority = map[string]int{
 	"VisibilityRequiredFixer":                         0,
 	"WhitespaceAfterCommaInArrayFixer":                0,
 	"YodaStyleFixer":                                  0,
+	"NoAliasLanguageConstructCallFixer":               0,
+	"BlankLineBeforeStatementFixer":                   -21,
+	"PhpdocSummaryFixer":                              0,
+	"PhpdocTagTypeFixer":                              0,
+	"PhpdocOrderFixer":                                -2,
 }
