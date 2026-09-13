@@ -120,6 +120,7 @@ func CommonFixers() []fixer.Fixer {
 // PhpdocFixers normalize doc comments.
 func PhpdocFixers() []fixer.Fixer {
 	return []fixer.Fixer{
+		DoctrineAnnotationSpaces{},
 		NoSuperfluousPhpdocTags{},
 		PhpdocNoUselessInheritdoc{},
 		PhpdocScalar{},
