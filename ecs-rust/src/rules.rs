@@ -1739,6 +1739,13 @@ fn no_blank_lines_after_class_opening(s: &mut Stream) -> bool {
             continue;
         }
         let brace = brace as usize;
+        // an empty class body ("{\n\n}") keeps its blank line - ECS only trims
+        // blanks before a member
+        if let Some(ni) = next_significant_index(s, brace) {
+            if s.kind(ni) == Kind::Punct && s.bytes(ni) == b"}" {
+                continue;
+            }
+        }
         if brace + 1 >= s.len() || s.kind(brace + 1) != Kind::Whitespace {
             continue;
         }

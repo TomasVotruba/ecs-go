@@ -134,6 +134,11 @@ func (NoBlankLinesAfterClassOpening) Fix(s *tokens.Stream) bool {
 		if brace < 0 || brace+1 >= s.Len() {
 			continue
 		}
+		// an empty class body ("{\n\n}") keeps its blank line - ECS's
+		// no_blank_lines_after_class_opening only trims blanks before a member
+		if ni := nextSignificantIndex(s, brace); ni >= 0 && s.At(ni).Kind == token.Punct && s.At(ni).Value == "}" {
+			continue
+		}
 		ws := s.At(brace + 1)
 		if ws.Kind != token.Whitespace || strings.Count(ws.Value, "\n") <= 1 {
 			continue
