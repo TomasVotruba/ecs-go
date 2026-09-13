@@ -185,6 +185,7 @@ func StructuralFixers() []fixer.Fixer {
 		SingleTraitInsertPerStatement{},
 		SingleClassElementPerStatement{},
 		OrderedClassElements{},
+		SelfStaticAccessor{},
 		ClassAttributesSeparation{},
 		BlankLinesBeforeNamespace{},
 		SingleBlankLineBeforeNamespace{},
