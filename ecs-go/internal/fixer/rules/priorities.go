@@ -3,16 +3,23 @@ package rules
 // fixerPriority maps a fixer's short name to its PHP-CS-Fixer getPriority()
 // value. Fixers run in descending priority, mirroring ECS's execution order.
 var fixerPriority = map[string]int{
-	"AddMissingParamNameFixer":                        0,
-	"AlignMultilineCommentFixer":                      27,
-	"ArrayIndentationFixer":                           29,
-	"ArrayListItemNewlineFixer":                       40,
-	"ArraySyntaxFixer":                                37,
-	"AssignNullCoalescingToCoalesceEqualFixer":        -1,
-	"AttributeBlockNoSpacesFixer":                     0,
-	"BinaryOperatorSpacesFixer":                       -32,
-	"BlankLineAfterNamespaceFixer":                    -20,
-	"BlankLineAfterOpeningTagFixer":                   1,
+	"AddMissingParamNameFixer":                 0,
+	"AlignMultilineCommentFixer":               27,
+	"ArrayIndentationFixer":                    29,
+	"ArrayListItemNewlineFixer":                40,
+	"ArraySyntaxFixer":                         37,
+	"AssignNullCoalescingToCoalesceEqualFixer": -1,
+	"AttributeBlockNoSpacesFixer":              0,
+	"BinaryOperatorSpacesFixer":                -32,
+	"BlankLineAfterNamespaceFixer":             -20,
+	"BlankLineAfterOpeningTagFixer":            1,
+	// getPriority() is 0 upstream; raised to run before blank_line_after_opening_tag
+	// so ecs-go reaches the same output in a single pass (PHP-CS-Fixer loops to fixpoint)
+	"LinebreakAfterOpeningTagFixer":                   2,
+	"IncrementStyleFixer":                             15,
+	"NullableTypeDeclarationFixer":                    2,
+	"OrderedTypesFixer":                               0,
+	"MethodChainingIndentationFixer":                  0,
 	"BlankLineAfterStrictTypesFixer":                  0,
 	"BlankLineBetweenImportGroupsFixer":               -40,
 	"BlankLinesBeforeNamespaceFixer":                  -31,

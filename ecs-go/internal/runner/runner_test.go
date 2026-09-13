@@ -35,7 +35,9 @@ func TestRunFixesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(path)
-	want := "<?php $x = 1;\n"
+	// linebreak_after_opening_tag + blank_line_after_opening_tag move code off
+	// the "<?php" line and add the blank line
+	want := "<?php\n\n$x = 1;\n"
 	if string(b) != want {
 		t.Fatalf("fix: got %q want %q", string(b), want)
 	}
