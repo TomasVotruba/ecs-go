@@ -293,6 +293,10 @@ func TestNoBlankLinesAfterClassOpening(t *testing.T) {
 	if want := "<?php class A\n{\n    public $x;\n}"; !changed || got != want {
 		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
 	}
+	// an empty class body keeps its blank line (matches ECS)
+	if _, changed := apply(t, NoBlankLinesAfterClassOpening{}, "<?php class A\n{\n\n}"); changed {
+		t.Fatal("empty class body must keep its blank line")
+	}
 }
 
 func TestIndentationType(t *testing.T) {
