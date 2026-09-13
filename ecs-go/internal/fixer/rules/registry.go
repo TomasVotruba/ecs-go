@@ -26,6 +26,7 @@ func SpacingFixers() []fixer.Fixer {
 		NoTrailingWhitespace{},
 		NoTrailingWhitespaceInComment{},
 		SingleBlankLineAtEndOfFile{},
+		BlankLineBeforeStatement{},
 	}
 }
 
@@ -111,6 +112,7 @@ func CommonFixers() []fixer.Fixer {
 		RemoveUselessDefaultComment{},
 		ProtectedToPrivate{},
 		AddMissingParamName{},
+		NoAliasLanguageConstructCall{},
 	}
 }
 
@@ -141,6 +143,9 @@ func PhpdocFixers() []fixer.Fixer {
 		PhpdocTypesOrder{},
 		PhpdocVarAnnotationCorrectOrder{},
 		PhpdocReturnSelfReference{},
+		PhpdocSummary{},
+		PhpdocOrder{},
+		PhpdocTagType{},
 	}
 }
 
