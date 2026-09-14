@@ -39,7 +39,8 @@ func TestGen3FuncFunctionDeclaration(t *testing.T) {
 		// a "use function" import is not a declaration
 		{"<?php use function ns\\f;", "<?php use function ns\\f;", false},
 		// arrow fn is left alone (fn spacing is out of scope)
-		{"<?php $f = fn($x) => $x * 2;", "<?php $f = fn($x) => $x * 2;", false},
+		{"<?php $f = fn($x) => $x * 2;", "<?php $f = fn ($x) => $x * 2;", true},
+		{"<?php $f = fn ($x) => $x * 2;", "<?php $f = fn ($x) => $x * 2;", false},
 		{"<?php $f = fn () => $x;", "<?php $f = fn () => $x;", false},
 		// newline between keyword and name is kept intact
 		{"<?php function\nfoo($x){}", "<?php function\nfoo($x){}", false},

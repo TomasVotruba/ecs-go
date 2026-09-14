@@ -6693,6 +6693,13 @@ fn function_declaration(s: &mut Stream) -> bool {
             if fix_function_declaration(s, i) {
                 changed = true;
             }
+        } else if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"fn") {
+            // arrow function: one space between "fn" and "(" (closure_fn_spacing)
+            if let Some(n) = next_significant_index(s, i) {
+                if s.kind(n) == Kind::Punct && s.bytes(n) == b"(" && fn_ensure_single_space_after(s, i) {
+                    changed = true;
+                }
+            }
         }
         i += 1;
     }
@@ -8146,20 +8153,82 @@ fn is_phpdoc_type_keyword(low: &[u8]) -> bool {
         low,
         b"array" | b"bool" | b"callable" | b"false" | b"float" | b"int" | b"iterable"
             | b"mixed" | b"null" | b"object" | b"parent" | b"self" | b"static"
-            | b"string" | b"true" | b"void" | b"never" | b"$this"
+            | b"string" | b"true" | b"void" | b"never" | b"$this" | b"scalar"
     )
 }
 
-fn typecase_map(base: &[u8]) -> Option<Vec<u8>> {
-    let low = base.to_ascii_lowercase();
-    if base != low.as_slice() && is_phpdoc_type_keyword(low.as_slice()) {
-        Some(low)
-    } else {
-        None
+// match_generic_tag: like match_type_tag but for type-carrying generic tags.
+fn match_generic_tag(t: &[u8]) -> Option<(usize, usize, usize)> {
+    if t.first() != Some(&b'@') {
+        return None;
     }
+    let mut i = 1;
+    while i < t.len() && (t[i].is_ascii_alphabetic() || t[i] == b'-') {
+        i += 1;
+    }
+    let name = t[1..i].to_ascii_lowercase();
+    let ok = matches!(
+        name.as_slice(),
+        b"implements" | b"extends" | b"use" | b"template-extends" | b"template-implements"
+    );
+    if !ok {
+        return None;
+    }
+    let ws_start = i;
+    while i < t.len() && (t[i] == b' ' || t[i] == b'\t') {
+        i += 1;
+    }
+    if i == ws_start {
+        return None;
+    }
+    let m1_len = i;
+    let type_start = i;
+    while i < t.len() && t[i] != b' ' && t[i] != b'\t' {
+        i += 1;
+    }
+    if i == type_start {
+        return None;
+    }
+    Some((m1_len, type_start, i))
 }
 
-// shared for phpdoc_scalar / phpdoc_types: rewrite the type in each type-tag line
+// normalize_phpdoc_type_case: lowercase keyword bases anywhere in a type -
+// unions, arrays, nullables, generics (Foo<Scalar> -> Foo<scalar>). A namespaced
+// word ("\Foo") or a class-constant reference ("Ref::STATIC") is left as-is.
+fn normalize_phpdoc_type_case(typ: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(typ.len());
+    let mut i = 0;
+    while i < typ.len() {
+        let c = typ[i];
+        let is_start = c == b'$' || c == b'_' || c == b'\\' || c.is_ascii_alphabetic();
+        if !is_start {
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        let st = i;
+        i += 1;
+        while i < typ.len()
+            && (typ[i] == b'_' || typ[i] == b'\\' || typ[i].is_ascii_alphanumeric())
+        {
+            i += 1;
+        }
+        let w = &typ[st..i];
+        let qualified =
+            w.contains(&b'\\') || (st > 0 && (typ[st - 1] == b':' || typ[st - 1] == b'\\'));
+        if !qualified {
+            let low = w.to_ascii_lowercase();
+            if low.as_slice() != w && is_phpdoc_type_keyword(&low) {
+                out.extend_from_slice(&low);
+                continue;
+            }
+        }
+        out.extend_from_slice(w);
+    }
+    out
+}
+
+// shared for phpdoc_scalar: rewrite the type in each type-tag line
 fn rewrite_type_lines(d: &mut Doc, map: fn(&[u8]) -> Option<Vec<u8>>) -> bool {
     let mut changed = false;
     for l in d.inner.iter_mut() {
@@ -8189,7 +8258,29 @@ fn phpdoc_scalar(s: &mut Stream) -> bool {
 }
 
 fn phpdoc_types(s: &mut Stream) -> bool {
-    apply_to_docblocks(s, |d| rewrite_type_lines(d, typecase_map))
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            let lead = l.content.len() - trim_left_space(&l.content).len();
+            let trimmed = l.content[lead..].to_vec();
+            let (m1_len, ts, te) = match match_type_tag(&trimmed).or_else(|| match_generic_tag(&trimmed)) {
+                Some(x) => x,
+                None => continue,
+            };
+            let old_type = &trimmed[ts..te];
+            let new_type = normalize_phpdoc_type_case(old_type);
+            if new_type.as_slice() == old_type {
+                continue;
+            }
+            let mut nc = l.content[..lead].to_vec();
+            nc.extend_from_slice(&trimmed[..m1_len]);
+            nc.extend_from_slice(&new_type);
+            nc.extend_from_slice(&trimmed[te..]);
+            l.content = nc;
+            changed = true;
+        }
+        changed
+    })
 }
 
 fn phpdoc_trim(s: &mut Stream) -> bool {
@@ -8463,6 +8554,12 @@ fn no_blank_lines_after_phpdoc(s: &mut Stream) -> bool {
         let v = s.bytes(j);
         if v.iter().filter(|&&c| c == b'\n').count() < 2 {
             continue;
+        }
+        // a file-level docblock before "declare" keeps its blank line
+        if let Some(k) = next_significant_index(s, i) {
+            if s.kind(k) == Kind::Keyword && s.bytes(k).eq_ignore_ascii_case(b"declare") {
+                continue;
+            }
         }
         let last = v.iter().rposition(|&c| c == b'\n').unwrap();
         let nv = v[last..].to_vec();
@@ -8786,13 +8883,32 @@ fn docblock_line_indent(s: &Stream, i: usize) -> Option<Vec<u8>> {
     Some(v[nl + 1..].to_vec())
 }
 
+// docblock_target_indent: indent of the element the docblock documents (the
+// line holding the next significant token).
+fn docblock_target_indent(s: &Stream, i: usize) -> Option<Vec<u8>> {
+    if i + 1 >= s.len() || s.kind(i + 1) != Kind::Whitespace {
+        return None;
+    }
+    let v = s.bytes(i + 1);
+    let nl = v.iter().rposition(|&c| c == b'\n')?;
+    Some(v[nl + 1..].to_vec())
+}
+
 fn phpdoc_indent(s: &mut Stream) -> bool {
     let mut changed = false;
     for i in 0..s.len() {
         if s.kind(i) != Kind::DocComment {
             continue;
         }
-        let indent = match docblock_line_indent(s, i) {
+        // must begin its own line
+        if i == 0
+            || s.kind(i - 1) != Kind::Whitespace
+            || !s.bytes(i - 1).contains(&b'\n')
+        {
+            continue;
+        }
+        // align to the documented element, not the docblock's own indent
+        let indent = match docblock_target_indent(s, i) {
             Some(x) => x,
             None => continue,
         };
@@ -8826,6 +8942,18 @@ fn phpdoc_indent(s: &mut Stream) -> bool {
             let r = doc_render(&d);
             s.set_owned(i, r);
             changed = true;
+        }
+        // move the opening "/**" line to the same indent
+        if s.kind(i - 1) == Kind::Whitespace {
+            let v = s.bytes(i - 1);
+            if let Some(nl) = v.iter().rposition(|&c| c == b'\n') {
+                if v[nl + 1..] != indent[..] {
+                    let mut nv = v[..nl + 1].to_vec();
+                    nv.extend_from_slice(&indent);
+                    s.set_owned(i - 1, nv);
+                    changed = true;
+                }
+            }
         }
     }
     changed
