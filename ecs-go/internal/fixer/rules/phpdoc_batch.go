@@ -66,7 +66,7 @@ var phpdocTypeKeywords = map[string]bool{
 	"array": true, "bool": true, "callable": true, "false": true, "float": true,
 	"int": true, "iterable": true, "mixed": true, "null": true, "object": true,
 	"parent": true, "self": true, "static": true, "string": true, "true": true,
-	"void": true, "never": true, "$this": true,
+	"void": true, "never": true, "$this": true, "scalar": true,
 }
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Phpdoc/PhpdocTypesFixer.php
@@ -82,12 +82,18 @@ func (PhpdocTypes) SourceURL() string {
 	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Phpdoc/PhpdocTypesFixer.php"
 }
 
+// phpdocGenericTagRe matches type-carrying generic tags (@implements X<Y>, ...).
+var phpdocGenericTagRe = regexp.MustCompile(`(?i)^(@(?:implements|extends|use|template-extends|template-implements)\s+)(\S+)(.*)$`)
+
 func (PhpdocTypes) Fix(s *tokens.Stream) bool {
 	return applyToDocblocks(s, func(d *docblock) bool {
 		changed := false
 		for i, l := range d.inner {
 			trimmed := strings.TrimLeft(l.content, " ")
 			m := phpdocTypeTagRe.FindStringSubmatch(trimmed)
+			if m == nil {
+				m = phpdocGenericTagRe.FindStringSubmatch(trimmed)
+			}
 			if m == nil {
 				continue
 			}
@@ -103,28 +109,30 @@ func (PhpdocTypes) Fix(s *tokens.Stream) bool {
 	})
 }
 
-// normalizePhpdocTypeCase lowercases keyword bases in a phpdoc type, handling
-// nullables, unions and array suffixes. Non-keyword class names are left as-is.
+var phpdocTypeWordRe = regexp.MustCompile(`[$A-Za-z_\\][A-Za-z0-9_\\]*`)
+
+// normalizePhpdocTypeCase lowercases keyword bases anywhere in a phpdoc type -
+// unions, array suffixes, nullables and generics (Foo<Scalar> -> Foo<scalar>).
+// A word that is namespaced ("\Foo") or a class-constant/member reference
+// ("Ref::STATIC") is left as-is.
 func normalizePhpdocTypeCase(typ string) string {
-	nullable := strings.HasPrefix(typ, "?")
-	body := strings.TrimPrefix(typ, "?")
-	parts := strings.Split(body, "|")
-	for i, p := range parts {
-		base, suffix := p, ""
-		for strings.HasSuffix(base, "[]") {
-			base = base[:len(base)-2]
-			suffix = "[]" + suffix
+	var b strings.Builder
+	prev := 0
+	for _, loc := range phpdocTypeWordRe.FindAllStringIndex(typ, -1) {
+		st, en := loc[0], loc[1]
+		b.WriteString(typ[prev:st])
+		w := typ[st:en]
+		qualified := strings.Contains(w, `\`) || (st > 0 && (typ[st-1] == ':' || typ[st-1] == '\\'))
+		if !qualified {
+			if low := strings.ToLower(w); low != w && phpdocTypeKeywords[low] {
+				w = low
+			}
 		}
-		low := strings.ToLower(base)
-		if base != low && phpdocTypeKeywords[low] {
-			parts[i] = low + suffix
-		}
+		b.WriteString(w)
+		prev = en
 	}
-	out := strings.Join(parts, "|")
-	if nullable {
-		out = "?" + out
-	}
-	return out
+	b.WriteString(typ[prev:])
+	return b.String()
 }
 
 var aliasTagRe = regexp.MustCompile(`^@(type|link)\b`)
@@ -321,6 +329,12 @@ func (NoBlankLinesAfterPhpdoc) Fix(s *tokens.Stream) bool {
 		}
 		v := s.At(j).Value
 		if strings.Count(v, "\n") < 2 {
+			continue
+		}
+		// a file-level docblock before "declare" keeps its blank line - ECS only
+		// trims the blank after a docblock attached to a structural element
+		if k := nextSignificantIndex(s, i); k >= 0 &&
+			s.At(k).Kind == token.Keyword && strings.EqualFold(s.At(k).Value, "declare") {
 			continue
 		}
 		// Keep the last newline plus the following statement's indentation.

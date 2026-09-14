@@ -77,11 +77,21 @@ func (FunctionDeclaration) Fix(s *tokens.Stream) bool {
 	changed := false
 	for i := 0; i < s.Len(); i++ {
 		t := s.At(i)
-		if t.Kind != token.Keyword || strings.ToLower(t.Value) != "function" {
+		if t.Kind != token.Keyword {
 			continue
 		}
-		if fixFunctionDeclaration(s, i) {
-			changed = true
+		switch strings.ToLower(t.Value) {
+		case "function":
+			if fixFunctionDeclaration(s, i) {
+				changed = true
+			}
+		case "fn":
+			// arrow function: one space between "fn" and "(" (closure_fn_spacing)
+			if n := nextSignificantIndex(s, i); n >= 0 &&
+				s.At(n).Kind == token.Punct && s.At(n).Value == "(" &&
+				fnEnsureSingleSpaceAfter(s, i) {
+				changed = true
+			}
 		}
 	}
 	return changed

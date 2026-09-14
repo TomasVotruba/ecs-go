@@ -31,7 +31,12 @@ func (PhpdocIndent) Fix(s *tokens.Stream) bool {
 		if t.Kind != token.DocComment {
 			continue
 		}
-		indent, ok := docblockLineIndent(s, i)
+		if !docblockAtLineStart(s, i) {
+			continue
+		}
+		// align to the element the docblock documents (the next line), not the
+		// docblock's own possibly-wrong indent
+		indent, ok := docblockTargetIndent(s, i)
 		if !ok {
 			continue
 		}
@@ -43,8 +48,41 @@ func (PhpdocIndent) Fix(s *tokens.Stream) bool {
 			s.SetValue(i, d.render())
 			changed = true
 		}
+		// move the opening "/**" line to the same indent
+		if s.At(i-1).Kind == token.Whitespace {
+			v := s.At(i - 1).Value
+			nl := strings.LastIndexByte(v, '\n')
+			if nl >= 0 && v[nl+1:] != indent {
+				s.SetValue(i-1, v[:nl+1]+indent)
+				changed = true
+			}
+		}
 	}
 	return changed
+}
+
+// docblockAtLineStart reports whether the docblock at i begins its own line.
+func docblockAtLineStart(s *tokens.Stream, i int) bool {
+	if i == 0 {
+		return false
+	}
+	prev := s.At(i - 1)
+	return prev.Kind == token.Whitespace && strings.IndexByte(prev.Value, '\n') >= 0
+}
+
+// docblockTargetIndent returns the indentation of the structural element the
+// docblock at i documents - the indent of the line holding the next significant
+// token. ok is false when there is none.
+func docblockTargetIndent(s *tokens.Stream, i int) (string, bool) {
+	if i+1 >= s.Len() || s.At(i+1).Kind != token.Whitespace {
+		return "", false
+	}
+	v := s.At(i + 1).Value
+	nl := strings.LastIndexByte(v, '\n')
+	if nl < 0 {
+		return "", false
+	}
+	return v[nl+1:], true
 }
 
 // docblockLineIndent returns the indentation of the line the docblock at index i
