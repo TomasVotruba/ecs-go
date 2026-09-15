@@ -18,6 +18,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Semicolon\NoEmptyStatementFixer",
     r"PhpCsFixer\Fixer\StringNotation\NoBinaryStringFixer",
     r"PhpCsFixer\Fixer\ControlStructure\ElseifFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\NoAlternativeSyntaxFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePromotedPropertyFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
@@ -157,6 +158,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= indentation_type(s);
     changed |= no_empty_statement(s);
     changed |= no_binary_string(s);
+    changed |= no_alternative_syntax(s);
     changed |= elseif(s);
     changed |= standalone_line_promoted_property(s);
     changed |= array_list_item_newline(s);
@@ -9862,6 +9864,160 @@ fn no_superfluous_phpdoc_tags(s: &mut Stream) -> bool {
             let r = doc_render(&d);
             s.set_owned(i, r);
             changed = true;
+        }
+    }
+    changed
+}
+
+// PHP-CS-Fixer NoAlternativeSyntaxFixer: replace control-structure alternative
+// syntax with braces. Matches ECS default fix_non_monolithic_code=true.
+const NAS_OPEN: &[&[u8]] = &[b"if", b"foreach", b"while", b"for", b"switch", b"declare"];
+const NAS_END: &[&[u8]] = &[
+    b"endif", b"endforeach", b"endwhile", b"endfor", b"endswitch", b"enddeclare",
+];
+
+fn nas_kw_in(s: &Stream, i: usize, set: &[&[u8]]) -> bool {
+    if s.kind(i) != Kind::Keyword {
+        return false;
+    }
+    let b = s.bytes(i);
+    set.iter().any(|w| b.eq_ignore_ascii_case(w))
+}
+
+fn nas_is_punct(s: &Stream, i: usize, v: &[u8]) -> bool {
+    s.kind(i) == Kind::Punct && s.bytes(i) == v
+}
+
+fn nas_next_meaningful(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i + 1;
+    while j < s.len() {
+        let k = s.kind(j);
+        if k != Kind::Whitespace && k != Kind::Comment && k != Kind::DocComment {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+fn nas_find_parenthesis_end(s: &Stream, control_index: usize) -> usize {
+    match nas_next_meaningful(s, control_index) {
+        Some(ni) if nas_is_punct(s, ni, b"(") => match_forward(s, ni).unwrap_or(control_index),
+        _ => control_index,
+    }
+}
+
+fn nas_next_paren(s: &Stream, index: usize) -> Option<usize> {
+    let mut j = index + 1;
+    while j < s.len() {
+        if nas_is_punct(s, j, b"(") {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+// Replace the single token at pos with items (kind, bytes), preserving order.
+fn nas_replace(s: &mut Stream, pos: usize, items: &[(Kind, &[u8])]) {
+    s.remove_at(pos);
+    for (i, (k, v)) in items.iter().enumerate() {
+        s.insert_owned(pos + i, *k, v.to_vec());
+    }
+}
+
+fn nas_add_braces(s: &mut Stream, keyword: &[u8], index: usize, colon_index: usize) {
+    let trailing_ws = index + 1 < s.len() && s.kind(index + 1) != Kind::Whitespace;
+    let mut open: Vec<(Kind, &[u8])> = vec![
+        (Kind::Punct, b"}"),
+        (Kind::Whitespace, b" "),
+        (Kind::Keyword, keyword),
+    ];
+    if trailing_ws {
+        open.push((Kind::Whitespace, b" "));
+    }
+    let open_len = open.len();
+    nas_replace(s, index, &open);
+
+    let colon_index = colon_index + open_len - 1;
+    let mut closing: Vec<(Kind, &[u8])> = vec![(Kind::Punct, b"{")];
+    if colon_index + 1 < s.len() && s.kind(colon_index + 1) != Kind::Whitespace {
+        closing.push((Kind::Whitespace, b" "));
+    }
+    nas_replace(s, colon_index, &closing);
+}
+
+fn nas_fix_open_close(s: &mut Stream, index: usize) -> bool {
+    if nas_kw_in(s, index, NAS_OPEN) {
+        let open_index = match nas_next_paren(s, index) {
+            Some(o) => o,
+            None => return false,
+        };
+        let close_index = match match_forward(s, open_index) {
+            Some(c) => c,
+            None => return false,
+        };
+        let after_index = match nas_next_meaningful(s, close_index) {
+            Some(a) if nas_is_punct(s, a, b":") => a,
+            _ => return false,
+        };
+        let mut items: Vec<(Kind, &[u8])> = Vec::new();
+        if after_index >= 1 && s.kind(after_index - 1) != Kind::Whitespace {
+            items.push((Kind::Whitespace, b" "));
+        }
+        items.push((Kind::Punct, b"{"));
+        if after_index + 1 < s.len() && s.kind(after_index + 1) != Kind::Whitespace {
+            items.push((Kind::Whitespace, b" "));
+        }
+        nas_replace(s, after_index, &items);
+        return true;
+    }
+
+    if !nas_kw_in(s, index, NAS_END) {
+        return false;
+    }
+    let next_index = nas_next_meaningful(s, index);
+    nas_replace(s, index, &[(Kind::Punct, b"}")]);
+    if let Some(ni) = next_index {
+        if nas_is_punct(s, ni, b";") {
+            s.remove_at(ni);
+        }
+    }
+    true
+}
+
+fn nas_fix_else(s: &mut Stream, index: usize) -> bool {
+    match nas_next_meaningful(s, index) {
+        Some(a) if nas_is_punct(s, a, b":") => {
+            nas_add_braces(s, b"else", index, a);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn nas_fix_elseif(s: &mut Stream, index: usize) -> bool {
+    let paren_end = nas_find_parenthesis_end(s, index);
+    match nas_next_meaningful(s, paren_end) {
+        Some(a) if nas_is_punct(s, a, b":") => {
+            nas_add_braces(s, b"elseif", index, a);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn no_alternative_syntax(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut index = s.len();
+    while index > 0 {
+        index -= 1;
+        if kw_eq(s, index, b"elseif") {
+            changed |= nas_fix_elseif(s, index);
+        } else if kw_eq(s, index, b"else") {
+            changed |= nas_fix_else(s, index);
+        } else {
+            changed |= nas_fix_open_close(s, index);
         }
     }
     changed
