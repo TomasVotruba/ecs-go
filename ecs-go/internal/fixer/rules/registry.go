@@ -84,6 +84,7 @@ func CommonFixers() []fixer.Fixer {
 		IncrementStyle{},
 		LongToShorthandOperator{},
 		SwitchContinueToBreak{},
+		NoAlternativeSyntax{},
 		NoMixedEchoPrint{},
 		NoAliasFunctions{},
 		NoUnneededImportAlias{},

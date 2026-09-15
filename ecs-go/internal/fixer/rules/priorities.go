@@ -76,6 +76,7 @@ var fixerPriority = map[string]int{
 	"NoLeadingImportSlashFixer":                       -20,
 	"NoAliasFunctionsFixer":                           40,
 	"NoLeadingNamespaceWhitespaceFixer":               0,
+	"NoAlternativeSyntaxFixer":                        42,
 	"NoMixedEchoPrintFixer":                           -10,
 	"NoMultilineWhitespaceAroundDoubleArrowFixer":     31,
 	"NoMultipleStatementsPerLineFixer":                -1,
