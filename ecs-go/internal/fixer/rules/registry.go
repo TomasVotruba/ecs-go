@@ -116,6 +116,7 @@ func CommonFixers() []fixer.Fixer {
 		ProtectedToPrivate{},
 		AddMissingParamName{},
 		NoAliasLanguageConstructCall{},
+		NoUnreachableDefaultArgumentValue{},
 	}
 }
 

@@ -31,6 +31,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NoMultilineWhitespaceAroundDoubleArrowFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\FunctionDeclarationFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\NoUnreachableDefaultArgumentValueFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\MethodArgumentSpaceFixer",
     r"PhpCsFixer\Fixer\Whitespace\ArrayIndentationFixer",
     r"PhpCsFixer\Fixer\Phpdoc\AlignMultilineCommentFixer",
@@ -174,6 +175,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_trait_insert_per_statement(s);
     changed |= no_multiline_whitespace_around_double_arrow(s);
     changed |= function_declaration(s);
+    changed |= no_unreachable_default_argument_value(s);
     changed |= method_argument_space(s);
     changed |= array_indentation(s);
     changed |= align_multiline_comment(s);
@@ -10282,6 +10284,227 @@ fn no_unneeded_braces(s: &mut Stream) -> bool {
                 s.remove_at(i);
                 changed = true;
             }
+        }
+    }
+    changed
+}
+
+// PHP-CS-Fixer NoUnreachableDefaultArgumentValueFixer: remove default values of
+// arguments that precede a required one. "= null" on a non-nullable typed
+// argument is kept.
+struct NudArg {
+    name_index: Option<usize>,
+    variadic: bool,
+    equals_idx: Option<usize>,
+    default_end: usize,
+    null_dflt: bool,
+    has_type: bool,
+    nullable: bool,
+}
+
+fn nud_next_paren(s: &Stream, index: usize) -> Option<usize> {
+    let mut j = index + 1;
+    while j < s.len() {
+        if s.kind(j) == Kind::Punct && s.bytes(j) == b"(" {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+fn nud_is_insignificant(k: Kind) -> bool {
+    k == Kind::Whitespace || k == Kind::Comment || k == Kind::DocComment
+}
+
+fn nud_analyze_arg(s: &Stream, start: usize, end: usize) -> Option<NudArg> {
+    let mut a = NudArg {
+        name_index: None,
+        variadic: false,
+        equals_idx: None,
+        default_end: 0,
+        null_dflt: false,
+        has_type: false,
+        nullable: false,
+    };
+    let mut depth = 0i32;
+    let mut i = start;
+    while i <= end {
+        let k = s.kind(i);
+        if k == Kind::Punct {
+            match s.bytes(i) {
+                b"(" | b"[" | b"{" => {
+                    depth += 1;
+                    i += 1;
+                    continue;
+                }
+                b")" | b"]" | b"}" => {
+                    depth -= 1;
+                    i += 1;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        if depth == 0 {
+            if k == Kind::Variable && a.name_index.is_none() && a.equals_idx.is_none() {
+                a.name_index = Some(i);
+            } else if k == Kind::Punct
+                && s.bytes(i) == b"="
+                && a.name_index.is_some()
+                && a.equals_idx.is_none()
+            {
+                a.equals_idx = Some(i);
+            }
+        }
+        i += 1;
+    }
+    let name_index = a.name_index?;
+
+    // variadic: "..." right before the name
+    let mut j = name_index as isize - 1;
+    while j >= start as isize {
+        if !nud_is_insignificant(s.kind(j as usize)) {
+            if s.kind(j as usize) == Kind::Punct && s.bytes(j as usize) == b"..." {
+                a.variadic = true;
+            }
+            break;
+        }
+        j -= 1;
+    }
+
+    // type tokens before the name (excluding "&" and "...")
+    for t in start..name_index {
+        let k = s.kind(t);
+        if nud_is_insignificant(k) {
+            continue;
+        }
+        if k == Kind::Punct && (s.bytes(t) == b"&" || s.bytes(t) == b"...") {
+            continue;
+        }
+        a.has_type = true;
+        if k == Kind::Punct && s.bytes(t) == b"?" {
+            a.nullable = true;
+        }
+        if k == Kind::Ident && s.bytes(t).eq_ignore_ascii_case(b"null") {
+            a.nullable = true;
+        }
+    }
+
+    if let Some(eq) = a.equals_idx {
+        let mut de = end;
+        while de > eq && nud_is_insignificant(s.kind(de)) {
+            de -= 1;
+        }
+        a.default_end = de;
+        let mut meaningful: Vec<usize> = Vec::new();
+        for t in (eq + 1)..=end {
+            if !nud_is_insignificant(s.kind(t)) {
+                meaningful.push(t);
+            }
+        }
+        if meaningful.len() == 1 {
+            let v = meaningful[0];
+            if (s.kind(v) == Kind::Ident || s.kind(v) == Kind::Keyword)
+                && s.bytes(v).eq_ignore_ascii_case(b"null")
+            {
+                a.null_dflt = true;
+            }
+        }
+    }
+    Some(a)
+}
+
+fn nud_parse_args(s: &Stream, open_paren: usize, close_paren: usize) -> Vec<NudArg> {
+    let mut args = Vec::new();
+    let mut depth = 0i32;
+    let mut start = open_paren + 1;
+    let mut i = open_paren + 1;
+    while i < close_paren {
+        if s.kind(i) == Kind::Punct {
+            match s.bytes(i) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b"," if depth == 0 => {
+                    if start <= i.wrapping_sub(1) {
+                        if let Some(a) = nud_analyze_arg(s, start, i - 1) {
+                            args.push(a);
+                        }
+                    }
+                    start = i + 1;
+                }
+                _ => {}
+            }
+        }
+        i += 1;
+    }
+    if start <= close_paren - 1 {
+        if let Some(a) = nud_analyze_arg(s, start, close_paren - 1) {
+            args.push(a);
+        }
+    }
+    args
+}
+
+fn nud_fix_function(s: &mut Stream, fn_index: usize) -> bool {
+    let open_paren = match nud_next_paren(s, fn_index) {
+        Some(o) => o,
+        None => return false,
+    };
+    let close_paren = match match_forward(s, open_paren) {
+        Some(c) => c,
+        None => return false,
+    };
+    let args = nud_parse_args(s, open_paren, close_paren);
+
+    let mut changed = false;
+    let mut remove_default = false;
+    for a in args.iter().rev() {
+        if a.variadic {
+            continue;
+        }
+        let eq = match a.equals_idx {
+            None => {
+                remove_default = true;
+                continue;
+            }
+            Some(e) => e,
+        };
+        if !remove_default {
+            continue;
+        }
+        if a.null_dflt && a.has_type && !a.nullable {
+            continue;
+        }
+        let mut j = a.default_end;
+        loop {
+            s.remove_at(j);
+            if j == eq {
+                break;
+            }
+            j -= 1;
+        }
+        if eq >= 1 && s.kind(eq - 1) == Kind::Whitespace {
+            if let Some(p) = prev_significant_index(s, eq - 1) {
+                if s.kind(p) != Kind::Comment {
+                    s.remove_at(eq - 1);
+                }
+            }
+        }
+        changed = true;
+    }
+    changed
+}
+
+fn no_unreachable_default_argument_value(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if s.kind(i) == Kind::Keyword
+            && (s.bytes(i).eq_ignore_ascii_case(b"function") || s.bytes(i).eq_ignore_ascii_case(b"fn"))
+        {
+            changed |= nud_fix_function(s, i);
         }
     }
     changed
