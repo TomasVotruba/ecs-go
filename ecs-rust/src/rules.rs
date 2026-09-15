@@ -18,6 +18,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Semicolon\NoEmptyStatementFixer",
     r"PhpCsFixer\Fixer\StringNotation\NoBinaryStringFixer",
     r"PhpCsFixer\Fixer\ControlStructure\ElseifFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\ControlStructureBracesFixer",
     r"PhpCsFixer\Fixer\ControlStructure\NoAlternativeSyntaxFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePromotedPropertyFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
@@ -160,6 +161,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_binary_string(s);
     changed |= no_alternative_syntax(s);
     changed |= elseif(s);
+    changed |= control_structure_braces(s);
     changed |= standalone_line_promoted_property(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
@@ -10019,6 +10021,186 @@ fn no_alternative_syntax(s: &mut Stream) -> bool {
         } else {
             changed |= nas_fix_open_close(s, index);
         }
+    }
+    changed
+}
+
+// PHP-CS-Fixer ControlStructureBracesFixer: wrap each control structure body in
+// braces. No-op on already-braced code; alternative syntax is left to
+// no_alternative_syntax, which runs first.
+const CSB_CONTROL: &[&[u8]] = &[
+    b"declare", b"do", b"else", b"elseif", b"finally", b"for", b"foreach", b"if",
+    b"while", b"try", b"catch", b"switch",
+];
+const CSB_ALT_TERMINATORS: &[&[u8]] = &[
+    b"endif", b"endwhile", b"endfor", b"endforeach", b"endswitch", b"enddeclare",
+];
+
+fn csb_is_control(s: &Stream, i: usize) -> bool {
+    if s.kind(i) != Kind::Keyword {
+        return false;
+    }
+    let b = s.bytes(i);
+    CSB_CONTROL.iter().any(|w| b.eq_ignore_ascii_case(w))
+}
+
+fn csb_is_punct(s: &Stream, i: usize, v: &[u8]) -> bool {
+    s.kind(i) == Kind::Punct && s.bytes(i) == v
+}
+
+fn csb_next_meaningful(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i + 1;
+    while j < s.len() {
+        let k = s.kind(j);
+        if k != Kind::Whitespace && k != Kind::Comment && k != Kind::DocComment {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+fn csb_find_parenthesis_end(s: &Stream, control_index: usize) -> usize {
+    match csb_next_meaningful(s, control_index) {
+        Some(ni) if csb_is_punct(s, ni, b"(") => match_forward(s, ni).unwrap_or(control_index),
+        _ => control_index,
+    }
+}
+
+fn csb_in_list(s: &Stream, i: usize, list: &[&[u8]]) -> bool {
+    let b = s.bytes(i);
+    list.iter().any(|w| b.eq_ignore_ascii_case(w))
+}
+
+fn csb_is_alt_syntax(s: &Stream, control_index: usize) -> bool {
+    let pe = csb_find_parenthesis_end(s, control_index);
+    matches!(csb_next_meaningful(s, pe), Some(a) if csb_is_punct(s, a, b":"))
+}
+
+fn csb_continuation(opening: &[u8]) -> &'static [&'static [u8]] {
+    match opening {
+        b"if" => &[b"else", b"elseif"],
+        b"do" => &[b"while"],
+        b"try" => &[b"catch", b"finally"],
+        _ => &[],
+    }
+}
+
+fn csb_final_continuation(opening: &[u8]) -> &'static [&'static [u8]] {
+    match opening {
+        b"if" => &[b"else"],
+        b"try" => &[b"finally"],
+        _ => &[],
+    }
+}
+
+fn csb_find_statement_end(s: &Stream, paren_end: usize) -> Option<usize> {
+    let next_index = csb_next_meaningful(s, paren_end)?;
+
+    if csb_is_punct(s, next_index, b"{") {
+        return match_forward(s, next_index);
+    }
+
+    if csb_is_control(s, next_index) {
+        let pe = csb_find_parenthesis_end(s, next_index);
+        let mut end_index = csb_find_statement_end(s, pe)?;
+
+        let opening = s.bytes(next_index).to_ascii_lowercase();
+        if opening == b"if" || opening == b"try" || opening == b"do" {
+            loop {
+                match csb_next_meaningful(s, end_index) {
+                    Some(ni)
+                        if s.kind(ni) == Kind::Keyword
+                            && csb_in_list(s, ni, csb_continuation(&opening)) =>
+                    {
+                        let is_final = csb_in_list(s, ni, csb_final_continuation(&opening));
+                        let pe = csb_find_parenthesis_end(s, ni);
+                        end_index = csb_find_statement_end(s, pe)?;
+                        if is_final {
+                            return Some(end_index);
+                        }
+                    }
+                    _ => break,
+                }
+            }
+        }
+        return Some(end_index);
+    }
+
+    let mut index = paren_end;
+    loop {
+        index += 1;
+        if index >= s.len() {
+            return None;
+        }
+        if csb_is_punct(s, index, b"{") {
+            index = match_forward(s, index)?;
+            continue;
+        }
+        if csb_is_punct(s, index, b";") {
+            return Some(index);
+        }
+        if s.kind(index) == Kind::CloseTag {
+            return prev_significant_index(s, index);
+        }
+        if s.kind(index) == Kind::Keyword && csb_in_list(s, index, CSB_ALT_TERMINATORS) {
+            return None;
+        }
+    }
+}
+
+fn control_structure_braces(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut index = s.len();
+    while index > 0 {
+        index -= 1;
+        if !csb_is_control(s, index) {
+            continue;
+        }
+
+        if kw_eq(s, index, b"else") {
+            if let Some(ni) = csb_next_meaningful(s, index) {
+                if kw_eq(s, ni, b"if") {
+                    continue;
+                }
+            }
+        }
+
+        let paren_end = csb_find_parenthesis_end(s, index);
+        let next_after = match csb_next_meaningful(s, paren_end) {
+            Some(n) => n,
+            None => continue,
+        };
+
+        if csb_is_punct(s, next_after, b";")
+            || csb_is_punct(s, next_after, b"{")
+            || csb_is_punct(s, next_after, b":")
+            || s.kind(next_after) == Kind::CloseTag
+        {
+            continue;
+        }
+
+        if csb_is_control(s, next_after) && csb_is_alt_syntax(s, next_after) {
+            continue;
+        }
+
+        let statement_end = match csb_find_statement_end(s, paren_end) {
+            Some(e) => e,
+            None => continue,
+        };
+
+        let need_semicolon =
+            !(csb_is_punct(s, statement_end, b";") || csb_is_punct(s, statement_end, b"}"));
+        // insert closing at statement_end+1, preserving order
+        s.insert_owned(statement_end + 1, Kind::Punct, b"}".to_vec());
+        s.insert_owned(statement_end + 1, Kind::Whitespace, b" ".to_vec());
+        if need_semicolon {
+            s.insert_owned(statement_end + 1, Kind::Punct, b";".to_vec());
+        }
+        // insert opening at paren_end+1
+        s.insert_owned(paren_end + 1, Kind::Punct, b"{".to_vec());
+        s.insert_owned(paren_end + 1, Kind::Whitespace, b" ".to_vec());
+        changed = true;
     }
     changed
 }

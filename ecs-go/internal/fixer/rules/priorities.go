@@ -33,6 +33,7 @@ var fixerPriority = map[string]int{
 	"CompactNullableTypeDeclarationFixer":             0,
 	"ConcatSpaceFixer":                                0,
 	"ConstantCaseFixer":                               0,
+	"ControlStructureBracesFixer":                     1,
 	"ControlStructureContinuationPositionFixer":       0,
 	"DeclareEqualNormalizeFixer":                      0,
 	"DeclareParenthesesFixer":                         0,
