@@ -77,6 +77,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ArrayNotation\NoWhitespaceInEmptyArrayFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NormalizeIndexBraceFixer",
     r"PhpCsFixer\Fixer\ControlStructure\SwitchContinueToBreakFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\NoUnneededCurlyBracesFixer",
     r"PhpCsFixer\Fixer\Comment\MultilineCommentOpeningClosingFixer",
     r"PhpCsFixer\Fixer\LanguageConstruct\DeclareParenthesesFixer",
     r"PhpCsFixer\Fixer\Whitespace\TypeDeclarationSpacesFixer",
@@ -219,6 +220,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_whitespace_in_empty_array(s);
     changed |= normalize_index_brace(s);
     changed |= switch_continue_to_break(s);
+    changed |= no_unneeded_braces(s);
     changed |= multiline_comment_opening_closing(s);
     changed |= declare_parentheses(s);
     changed |= type_declaration_spaces(s);
@@ -10201,6 +10203,86 @@ fn control_structure_braces(s: &mut Stream) -> bool {
         s.insert_owned(paren_end + 1, Kind::Punct, b"{".to_vec());
         s.insert_owned(paren_end + 1, Kind::Whitespace, b" ".to_vec());
         changed = true;
+    }
+    changed
+}
+
+// PHP-CS-Fixer NoUnneededBracesFixer (NoUnneededCurlyBracesFixer): remove
+// superfluous standalone braces and single-element group imports.
+fn nub_is_punct(s: &Stream, i: usize, v: &[u8]) -> bool {
+    s.kind(i) == Kind::Punct && s.bytes(i) == v
+}
+
+fn nub_prev_meaningful(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i as isize - 1;
+    while j >= 0 {
+        let k = s.kind(j as usize);
+        if k != Kind::Whitespace && k != Kind::Comment && k != Kind::DocComment {
+            return Some(j as usize);
+        }
+        j -= 1;
+    }
+    None
+}
+
+fn nub_regular_over_complete(s: &Stream, prev: usize) -> bool {
+    if s.kind(prev) == Kind::OpenTag {
+        return true;
+    }
+    if s.kind(prev) != Kind::Punct {
+        return false;
+    }
+    let b = s.bytes(prev);
+    b == b"{" || b == b"}" || b == b":" || b == b";"
+}
+
+fn nub_group_import_over_complete(s: &Stream, open_index: usize) -> bool {
+    let close_index = match match_forward(s, open_index) {
+        Some(c) => c,
+        None => return false,
+    };
+    let mut j = open_index + 1;
+    while j < close_index {
+        if nub_is_punct(s, j, b",") {
+            return false;
+        }
+        if s.kind(j) == Kind::Whitespace && s.bytes(j).iter().any(|&c| c == b'\n' || c == b'\r') {
+            return false;
+        }
+        j += 1;
+    }
+    true
+}
+
+fn no_unneeded_braces(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 1 {
+        i -= 1;
+        if !nub_is_punct(s, i, b"{") {
+            continue;
+        }
+        let prev = match nub_prev_meaningful(s, i) {
+            Some(p) => p,
+            None => continue,
+        };
+        if nub_is_punct(s, prev, br"\") {
+            if nub_group_import_over_complete(s, i) {
+                if let Some(close_index) = match_forward(s, i) {
+                    s.remove_at(close_index);
+                    s.remove_at(i);
+                    changed = true;
+                }
+            }
+            continue;
+        }
+        if nub_regular_over_complete(s, prev) {
+            if let Some(close_index) = match_forward(s, i) {
+                s.remove_at(close_index);
+                s.remove_at(i);
+                changed = true;
+            }
+        }
     }
     changed
 }
