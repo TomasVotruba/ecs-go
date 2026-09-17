@@ -15,6 +15,18 @@ const SourceBase = "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src
 // for the few rules ported from there rather than PHP-CS-Fixer.
 const SymplifySourceBase = "https://github.com/symplify/coding-standard/blob/main/src/Fixer/"
 
+// EcsSrcSourceBase is the ecsphp/ecs-src monorepo location, for Symplify fixers
+// that live there but have not been split out to symplify/coding-standard.
+const EcsSrcSourceBase = "https://github.com/ecsphp/ecs-src/blob/main/packages/coding-standard/src/Fixer/"
+
+// ecsSrcOnlyFixers are Symplify fixers sourced from ecsphp/ecs-src rather than
+// the split symplify/coding-standard repository.
+var ecsSrcOnlyFixers = map[string]bool{
+	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer`:         true,
+	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePlainConstructorParamFixer`: true,
+	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer`: true,
+}
+
 type Fixer interface {
 	// Name is the checker identifier (the PHP-CS-Fixer FQCN) shown in reports.
 	Name() string
@@ -34,6 +46,9 @@ func SourceURLFor(name string) string {
 	}
 	category := parts[len(parts)-2]
 	class := parts[len(parts)-1]
+	if ecsSrcOnlyFixers[name] {
+		return EcsSrcSourceBase + category + "/" + class + ".php"
+	}
 	if strings.HasPrefix(name, `Symplify\CodingStandard\`) {
 		return SymplifySourceBase + category + "/" + class + ".php"
 	}
