@@ -25,6 +25,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer",
     r"PhpCsFixer\Fixer\ControlStructure\NoBreakCommentFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocSeparationFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -173,6 +174,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= standalone_line_required_param(s);
     changed |= standalone_line_symfony_attribute_param(s);
     changed |= no_break_comment(s);
+    changed |= phpdoc_separation(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -7911,6 +7913,296 @@ fn no_break_comment(s: &mut Stream) -> bool {
         }
     }
     s.render() != before
+}
+
+fn doc_is_ws(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0c)
+}
+
+// mirrors DocBlock's split on /([^\n\r]+\R*)/: each line keeps its trailing newlines
+fn split_doc_lines(content: &[u8]) -> Vec<Vec<u8>> {
+    let mut lines = Vec::new();
+    let mut i = 0;
+    let n = content.len();
+    while i < n {
+        // a line must start with a non-newline char; leading newlines are dropped
+        // (PREG_SPLIT_NO_EMPTY), which never happens inside a real docblock anyway
+        if content[i] == b'\n' || content[i] == b'\r' {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        // [^\n\r]+
+        while i < n && content[i] != b'\n' && content[i] != b'\r' {
+            i += 1;
+        }
+        // \R* (any run of \r\n, \r, \n)
+        while i < n && (content[i] == b'\n' || content[i] == b'\r') {
+            i += 1;
+        }
+        lines.push(content[start..i].to_vec());
+    }
+    lines
+}
+
+fn line_contains_tag(line: &[u8]) -> bool {
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'*' {
+            let mut j = i + 1;
+            while j < line.len() && doc_is_ws(line[j]) {
+                j += 1;
+            }
+            if j < line.len() && line[j] == b'@' {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn line_contains_useful_content(line: &[u8]) -> bool {
+    // /\*\s*\S+/
+    let mut matched = false;
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'*' {
+            let mut j = i + 1;
+            while j < line.len() && doc_is_ws(line[j]) {
+                j += 1;
+            }
+            if j < line.len() && !doc_is_ws(line[j]) {
+                matched = true;
+                break;
+            }
+        }
+        i += 1;
+    }
+    if !matched {
+        return false;
+    }
+    // trim(str_replace(['/','*'],' ', line)) !== ''
+    line.iter()
+        .any(|&c| c != b'/' && c != b'*' && !doc_is_ws(c))
+}
+
+fn line_add_blank(line: &[u8]) -> Vec<u8> {
+    // ^([\t ]*\*)[^\r\n]*(\r?\n)(?:\r?\n)?$
+    let mut p = 0;
+    while p < line.len() && (line[p] == b' ' || line[p] == b'\t') {
+        p += 1;
+    }
+    if p >= line.len() || line[p] != b'*' {
+        return line.to_vec();
+    }
+    let prefix_end = p + 1;
+    // [^\r\n]* up to first newline
+    let mut q = prefix_end;
+    while q < line.len() && line[q] != b'\n' && line[q] != b'\r' {
+        q += 1;
+    }
+    // (\r?\n)
+    let nl_start = q;
+    if q < line.len() && line[q] == b'\r' {
+        q += 1;
+    }
+    if q < line.len() && line[q] == b'\n' {
+        q += 1;
+    } else {
+        return line.to_vec();
+    }
+    let first_nl = &line[nl_start..q];
+    // optional (\r?\n) then end
+    let mut r = q;
+    if r < line.len() && line[r] == b'\r' {
+        r += 1;
+    }
+    if r < line.len() && line[r] == b'\n' {
+        r += 1;
+    }
+    if r != line.len() {
+        return line.to_vec();
+    }
+    let mut out = line.to_vec();
+    out.extend_from_slice(&line[..prefix_end]);
+    out.extend_from_slice(first_nl);
+    out
+}
+
+struct DocAnnotation {
+    start: usize,
+    end: usize,
+    name: Vec<u8>,
+}
+
+fn find_annotation_length(lines: &[Vec<u8>], start: usize) -> usize {
+    let mut index = start;
+    loop {
+        index += 1;
+        if index >= lines.len() {
+            break;
+        }
+        if line_contains_tag(&lines[index]) {
+            break;
+        }
+        if !line_contains_useful_content(&lines[index]) {
+            if index + 1 >= lines.len()
+                || !line_contains_useful_content(&lines[index + 1])
+                || line_contains_tag(&lines[index + 1])
+            {
+                break;
+            }
+        }
+    }
+    index - start
+}
+
+fn annotation_tag_name(lines: &[Vec<u8>]) -> Vec<u8> {
+    let mut content: Vec<u8> = Vec::new();
+    for l in lines {
+        content.extend_from_slice(l);
+    }
+    // @([a-zA-Z0-9_\-]+) with boundary (ws|end|'(')
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b'@' {
+            let mut j = i + 1;
+            while j < content.len()
+                && (content[j].is_ascii_alphanumeric() || content[j] == b'_' || content[j] == b'-')
+            {
+                j += 1;
+            }
+            if j > i + 1 {
+                if j >= content.len() {
+                    return content[i + 1..j].to_vec();
+                }
+                let c = content[j];
+                if doc_is_ws(c) || c == b'(' {
+                    return content[i + 1..j].to_vec();
+                }
+            }
+        }
+        i += 1;
+    }
+    Vec::new()
+}
+
+fn doc_annotations(lines: &[Vec<u8>]) -> Vec<DocAnnotation> {
+    let mut anns = Vec::new();
+    let mut index = 0;
+    while index < lines.len() {
+        if !line_contains_tag(&lines[index]) {
+            index += 1;
+            continue;
+        }
+        let length = find_annotation_length(lines, index);
+        anns.push(DocAnnotation {
+            start: index,
+            end: index + length - 1,
+            name: annotation_tag_name(&lines[index..index + length]),
+        });
+        index += length;
+    }
+    anns
+}
+
+const PHPDOC_SEPARATION_GROUPS: &[&[&[u8]]] = &[
+    &[b"author", b"copyright", b"license"],
+    &[b"category", b"package", b"subpackage"],
+    &[b"property", b"property-read", b"property-write"],
+    &[b"deprecated", b"link", b"see", b"since"],
+];
+
+fn tag_in_group(tag: &[u8], group: &[&[u8]]) -> bool {
+    // default groups have no wildcard; exact match
+    group.iter().any(|g| *g == tag)
+}
+
+fn separation_should_be_together(first: &[u8], second: &[u8]) -> bool {
+    if first.is_empty() || second.is_empty() {
+        return false;
+    }
+    if first == second {
+        return true;
+    }
+    for group in PHPDOC_SEPARATION_GROUPS {
+        let first_in = tag_in_group(first, group);
+        let second_in = tag_in_group(second, group);
+        if first_in {
+            return second_in;
+        }
+        if second_in {
+            return false;
+        }
+    }
+    false
+}
+
+fn fix_separation_description(lines: &mut [Vec<u8>]) {
+    let mut i = 0;
+    while i < lines.len() {
+        if line_contains_tag(&lines[i]) {
+            break;
+        }
+        if line_contains_useful_content(&lines[i]) {
+            if i + 1 < lines.len() && line_contains_tag(&lines[i + 1]) {
+                lines[i] = line_add_blank(&lines[i]);
+                break;
+            }
+        }
+        i += 1;
+    }
+}
+
+fn fix_separation_annotations(lines: &mut [Vec<u8>]) {
+    let anns = doc_annotations(lines);
+    let mut idx = 0;
+    while idx + 1 < anns.len() {
+        let first = &anns[idx];
+        let second = &anns[idx + 1];
+        if separation_should_be_together(&first.name, &second.name) {
+            for pos in first.end + 1..second.start {
+                lines[pos].clear();
+            }
+        } else {
+            let pos = first.end;
+            let final_ = second.start - 1;
+            if pos == final_ {
+                lines[pos] = line_add_blank(&lines[pos]);
+            } else {
+                for p in pos + 1..final_ {
+                    lines[p].clear();
+                }
+            }
+        }
+        idx += 1;
+    }
+}
+
+fn phpdoc_separation(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        let mut lines = split_doc_lines(s.bytes(i));
+        if lines.len() < 2 {
+            i += 1;
+            continue;
+        }
+        fix_separation_description(&mut lines);
+        fix_separation_annotations(&mut lines);
+        let rebuilt: Vec<u8> = lines.concat();
+        if rebuilt != s.bytes(i) {
+            s.set_owned(i, rebuilt);
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
 }
 
 fn collapse_space(s: &mut Stream, i: usize) -> bool {
