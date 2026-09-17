@@ -26,6 +26,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer",
     r"PhpCsFixer\Fixer\ControlStructure\NoBreakCommentFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocSeparationFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocToCommentFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -175,6 +176,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= standalone_line_symfony_attribute_param(s);
     changed |= no_break_comment(s);
     changed |= phpdoc_separation(s);
+    changed |= phpdoc_to_comment(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -8178,6 +8180,232 @@ fn fix_separation_annotations(lines: &mut [Vec<u8>]) {
         }
         idx += 1;
     }
+}
+
+fn bytes_contains(hay: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() || needle.len() > hay.len() {
+        return needle.is_empty();
+    }
+    hay.windows(needle.len()).any(|w| w == needle)
+}
+
+fn is_structural_skip_keyword(lo: &[u8]) -> bool {
+    matches!(
+        lo,
+        b"private" | b"protected" | b"public" | b"var" | b"function" | b"fn" | b"abstract"
+            | b"const" | b"namespace" | b"require" | b"require_once" | b"include"
+            | b"include_once" | b"final" | b"readonly"
+    )
+}
+
+fn is_classy_keyword(lo: &[u8]) -> bool {
+    matches!(lo, b"class" | b"interface" | b"trait" | b"enum")
+}
+
+fn is_assignment_op(v: &[u8]) -> bool {
+    matches!(
+        v,
+        b"=" | b"+=" | b"-=" | b"*=" | b"/=" | b"%=" | b"**=" | b"&=" | b"|=" | b"^="
+            | b"<<=" | b">>=" | b"??=" | b".="
+    )
+}
+
+fn doc_is_header_comment(s: &Stream, index: usize) -> bool {
+    if sig_next(s, index).is_none() {
+        return false;
+    }
+    let mut prev = match get_prev_non_whitespace(s, index) {
+        Some(p) => p,
+        None => return false,
+    };
+    if is_punct_val(s, prev, b";") {
+        let brace_close = match sig_prev(s, prev) {
+            Some(p) => p,
+            None => return false,
+        };
+        if !is_punct_val(s, brace_close, b")") {
+            return false;
+        }
+        let brace_open = match match_backward(s, brace_close) {
+            Some(p) => p,
+            None => return false,
+        };
+        let declare = match sig_prev(s, brace_open) {
+            Some(p) => p,
+            None => return false,
+        };
+        if !kw_is(s, declare, b"declare") {
+            return false;
+        }
+        prev = match get_prev_non_whitespace(s, declare) {
+            Some(p) => p,
+            None => return false,
+        };
+    }
+    s.kind(prev) == Kind::OpenTag
+}
+
+fn doc_next_token_index(s: &Stream, index: usize) -> Option<usize> {
+    let mut next = sig_next(s, index);
+    while let Some(n) = next {
+        if is_punct_val(s, n, b"(") {
+            next = sig_next(s, n);
+        } else {
+            break;
+        }
+    }
+    next
+}
+
+fn prev_enum_or_switch(s: &Stream, index: usize) -> Option<usize> {
+    let mut j = index as isize - 1;
+    while j >= 0 {
+        let k = j as usize;
+        if s.kind(k) == Kind::Keyword {
+            let lo = s.bytes(k).to_ascii_lowercase();
+            if lo == b"enum" || lo == b"switch" {
+                return Some(k);
+            }
+        }
+        j -= 1;
+    }
+    None
+}
+
+fn doc_is_structural_element(s: &Stream, index: usize) -> bool {
+    match s.kind(index) {
+        Kind::Keyword => {
+            let lo = s.bytes(index).to_ascii_lowercase();
+            if is_classy_keyword(&lo) || is_structural_skip_keyword(&lo) {
+                return true;
+            }
+            if lo == b"case" {
+                return matches!(prev_enum_or_switch(s, index), Some(p) if kw_is(s, p, b"enum"));
+            }
+            if lo == b"static" {
+                return !matches!(sig_next(s, index), Some(n) if is_punct_val(s, n, b"::"));
+            }
+            false
+        }
+        Kind::Ident => {
+            let lo = s.bytes(index).to_ascii_lowercase();
+            lo == b"get" || lo == b"set"
+        }
+        _ => false,
+    }
+}
+
+fn doc_is_valid_control(s: &Stream, doc_content: &[u8], control_index: usize) -> bool {
+    if s.kind(control_index) != Kind::Keyword {
+        return false;
+    }
+    match s.bytes(control_index).to_ascii_lowercase().as_slice() {
+        b"for" | b"foreach" | b"if" | b"switch" | b"while" => {}
+        _ => return false,
+    }
+    let open = match sig_next(s, control_index) {
+        Some(o) if is_punct_val(s, o, b"(") => o,
+        _ => return false,
+    };
+    let close_idx = match match_forward(s, open) {
+        Some(c) => c,
+        None => return false,
+    };
+    let mut i = open + 1;
+    while i < close_idx {
+        if s.kind(i) == Kind::Variable && bytes_contains(doc_content, s.bytes(i)) {
+            return true;
+        }
+        i += 1;
+    }
+    false
+}
+
+fn doc_is_valid_variable(s: &Stream, index: usize) -> bool {
+    if s.kind(index) != Kind::Variable {
+        return false;
+    }
+    match sig_next(s, index) {
+        Some(n) => s.kind(n) == Kind::Punct && is_assignment_op(s.bytes(n)),
+        None => false,
+    }
+}
+
+fn doc_is_valid_variable_assignment(s: &Stream, doc_content: &[u8], lc_index: usize) -> bool {
+    let end_idx = if s.kind(lc_index) == Kind::Keyword
+        && matches!(
+            s.bytes(lc_index).to_ascii_lowercase().as_slice(),
+            b"list" | b"print" | b"echo"
+        ) {
+        next_punct_of_kind(s, lc_index, &[b")"])
+    } else if is_punct_val(s, lc_index, b"[") {
+        match_forward(s, lc_index)
+    } else {
+        return false;
+    };
+    let end_idx = match end_idx {
+        Some(e) => e,
+        None => return false,
+    };
+    let mut i = lc_index + 1;
+    while i < end_idx {
+        if s.kind(i) == Kind::Variable && bytes_contains(doc_content, s.bytes(i)) {
+            return true;
+        }
+        i += 1;
+    }
+    false
+}
+
+fn doc_is_before_structural_element(s: &Stream, index: usize) -> bool {
+    let next = match doc_next_token_index(s, index) {
+        Some(n) if !is_punct_val(s, n, b"}") => n,
+        _ => return false,
+    };
+    let doc_content = s.bytes(index).to_vec();
+    if doc_is_structural_element(s, next) {
+        return true;
+    }
+    if doc_is_valid_control(s, &doc_content, next) {
+        return true;
+    }
+    if doc_is_valid_variable(s, next) {
+        return true;
+    }
+    if doc_is_valid_variable_assignment(s, &doc_content, next) {
+        return true;
+    }
+    if kw_is(s, next, b"use") {
+        return true;
+    }
+    false
+}
+
+fn phpdoc_to_comment(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        if doc_is_header_comment(s, i) || doc_is_before_structural_element(s, i) {
+            i += 1;
+            continue;
+        }
+        let content = s.bytes(i);
+        let mut p = 0;
+        while p < content.len() && (content[p] == b'/' || content[p] == b'*') {
+            p += 1;
+        }
+        let mut new_val = b"/*".to_vec();
+        new_val.extend_from_slice(&content[p..]);
+        s.set_owned(i, new_val);
+        s.set_kind(i, Kind::Comment);
+        changed = true;
+        i += 1;
+    }
+    changed
 }
 
 fn phpdoc_separation(s: &mut Stream) -> bool {

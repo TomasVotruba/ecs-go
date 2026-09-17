@@ -182,6 +182,7 @@ func ConstructFixers() []fixer.Fixer {
 		NewWithParentheses{},
 		FunctionDeclaration{},
 		PhpdocSeparation{},
+		PhpdocToComment{},
 	}
 }
 

@@ -35,6 +35,10 @@ impl<'a> Stream<'a> {
         self.toks[i].value = Value::Owned(v);
     }
 
+    pub fn set_kind(&mut self, i: usize, kind: Kind) {
+        self.toks[i].kind = kind;
+    }
+
     pub fn remove_at(&mut self, i: usize) {
         self.toks.remove(i);
     }
