@@ -55,7 +55,7 @@ func (PhpdocSeparation) Fix(s *tokens.Stream) bool {
 
 // fixSeparationDescription separates the description from the first annotation.
 func fixSeparationDescription(lines []string) {
-	for i := 0; i < len(lines); i++ {
+	for i := range lines {
 		if lineContainsTag(lines[i]) {
 			break
 		}
@@ -70,7 +70,7 @@ func fixSeparationDescription(lines []string) {
 
 func fixSeparationAnnotations(lines []string) {
 	anns := docAnnotations(lines)
-	for idx := 0; idx < len(anns); idx++ {
+	for idx := range anns {
 		if idx+1 >= len(anns) {
 			break
 		}

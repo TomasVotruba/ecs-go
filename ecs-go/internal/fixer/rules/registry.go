@@ -183,6 +183,7 @@ func ConstructFixers() []fixer.Fixer {
 		FunctionDeclaration{},
 		PhpdocSeparation{},
 		PhpdocToComment{},
+		ParamReturnAndVarTagMalforms{},
 	}
 }
 

@@ -12,8 +12,8 @@ CI keeps it current.
 | tool | rules | of ECS |
 |---|---:|---:|
 | [ECS](https://github.com/symplify/easy-coding-standard) (baseline) | 208 | 100% |
-| ecs-go | 173 | 83% |
-| ecs-rust | 144 | 69% |
+| ecs-go | 174 | 83% |
+| ecs-rust | 145 | 69% |
 <!-- rule-counts:end -->
 
 ## Install

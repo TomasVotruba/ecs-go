@@ -27,6 +27,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ControlStructure\NoBreakCommentFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocSeparationFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocToCommentFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\ParamReturnAndVarTagMalformsFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -177,6 +178,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_break_comment(s);
     changed |= phpdoc_separation(s);
     changed |= phpdoc_to_comment(s);
+    changed |= param_return_and_var_tag_malforms(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -8406,6 +8408,11 @@ fn phpdoc_to_comment(s: &mut Stream) -> bool {
         i += 1;
     }
     changed
+}
+
+fn param_return_and_var_tag_malforms(_s: &mut Stream) -> bool {
+    // deprecated upstream: no-op, kept for set parity
+    false
 }
 
 fn phpdoc_separation(s: &mut Stream) -> bool {

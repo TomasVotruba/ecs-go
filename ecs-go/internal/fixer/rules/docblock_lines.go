@@ -1,6 +1,9 @@
 package rules
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 // A raw-line model of a docblock that mirrors PHP-CS-Fixer's DocBlock/Line:
 // the content is split into lines, each keeping its trailing newline, and the
@@ -110,10 +113,7 @@ func findAnnotationLength(lines []string, start int) int {
 var tagNameRe = regexp.MustCompile(`@([a-zA-Z0-9_\-]+)`)
 
 func annotationTagName(lines []string) string {
-	content := ""
-	for _, l := range lines {
-		content += l
-	}
+	content := strings.Join(lines, "")
 	loc := tagNameRe.FindStringSubmatchIndex(content)
 	if loc == nil {
 		return ""
