@@ -23,6 +23,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePromotedPropertyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePlainConstructorParamFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer",
+    r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -169,6 +170,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= standalone_line_promoted_property(s);
     changed |= standalone_line_plain_constructor_param(s);
     changed |= standalone_line_required_param(s);
+    changed |= standalone_line_symfony_attribute_param(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -7247,6 +7249,159 @@ fn standalone_line_required_param(s: &mut Stream) -> bool {
         }
         if reflow_paren(s, open, close_idx) {
             changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+const SYMFONY_ATTRIBUTE_SHORT_NAMES: &[&[u8]] = &[
+    b"AsCommand",
+    b"Route",
+    b"Autowire",
+    b"AutowireIterator",
+    b"AutowireLocator",
+    b"AsAlias",
+    b"AsDecorator",
+    b"AsTaggedItem",
+    b"When",
+    b"AsEventListener",
+    b"AsMessageHandler",
+    b"AsController",
+    b"MapRequestPayload",
+    b"MapQueryParameter",
+    b"MapQueryString",
+    b"MapEntity",
+    b"IsGranted",
+];
+
+fn trim_ascii(b: &[u8]) -> &[u8] {
+    let mut start = 0;
+    let mut end = b.len();
+    while start < end && b[start].is_ascii_whitespace() {
+        start += 1;
+    }
+    while end > start && b[end - 1].is_ascii_whitespace() {
+        end -= 1;
+    }
+    &b[start..end]
+}
+
+fn attribute_short_name(attr: &[u8], open: usize) -> &[u8] {
+    let mut start = open;
+    while start > 0 {
+        let c = attr[start - 1];
+        if c == b'_' || c.is_ascii_alphanumeric() {
+            start -= 1;
+        } else {
+            break;
+        }
+    }
+    &attr[start..open]
+}
+
+fn match_paren(attr: &[u8], open: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut j = open;
+    while j < attr.len() {
+        match attr[j] {
+            b'(' | b'[' => depth += 1,
+            b')' | b']' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(j);
+                }
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    None
+}
+
+fn split_top_level_args(inner: &[u8]) -> Vec<Vec<u8>> {
+    let mut args: Vec<Vec<u8>> = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    let mut in_string = 0u8;
+    let mut j = 0usize;
+    while j < inner.len() {
+        let c = inner[j];
+        if in_string != 0 {
+            if c == b'\\' {
+                j += 1;
+            } else if c == in_string {
+                in_string = 0;
+            }
+            j += 1;
+            continue;
+        }
+        match c {
+            b'\'' | b'"' => in_string = c,
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth -= 1,
+            b',' if depth == 0 => {
+                args.push(trim_ascii(&inner[start..j]).to_vec());
+                start = j + 1;
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    let last = trim_ascii(&inner[start..]);
+    if !last.is_empty() {
+        args.push(last.to_vec());
+    }
+    args
+}
+
+fn reflow_symfony_attribute(attr: &[u8], base: &[u8]) -> Option<Vec<u8>> {
+    let open = attr.iter().position(|&c| c == b'(')?;
+    let short_name = attribute_short_name(attr, open);
+    if !SYMFONY_ATTRIBUTE_SHORT_NAMES.contains(&short_name) {
+        return None;
+    }
+    let close_idx = match_paren(attr, open)?;
+    let inner = &attr[open + 1..close_idx];
+    let args = split_top_level_args(inner);
+    if args.is_empty() {
+        return None;
+    }
+    if short_name != b"AsCommand" && args.len() < 2 {
+        return None;
+    }
+    let mut indent = base.to_vec();
+    indent.extend_from_slice(b"    ");
+    let mut out: Vec<u8> = Vec::new();
+    out.extend_from_slice(&attr[..=open]);
+    for (idx, arg) in args.iter().enumerate() {
+        out.push(b'\n');
+        out.extend_from_slice(&indent);
+        out.extend_from_slice(arg);
+        if idx < args.len() - 1 {
+            out.push(b',');
+        }
+    }
+    out.push(b'\n');
+    out.extend_from_slice(base);
+    out.extend_from_slice(&attr[close_idx..]);
+    Some(out)
+}
+
+fn standalone_line_symfony_attribute_param(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Comment || !s.bytes(i).starts_with(b"#[") {
+            i += 1;
+            continue;
+        }
+        let base = line_indent_before(s, i);
+        if let Some(reflowed) = reflow_symfony_attribute(s.bytes(i), &base) {
+            if reflowed != s.bytes(i) {
+                s.set_owned(i, reflowed);
+                changed = true;
+            }
         }
         i += 1;
     }

@@ -24,6 +24,7 @@ const EcsSrcSourceBase = "https://github.com/ecsphp/ecs-src/blob/main/packages/c
 var ecsSrcOnlyFixers = map[string]bool{
 	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer`:         true,
 	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePlainConstructorParamFixer`: true,
+	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer`: true,
 }
 
 type Fixer interface {
