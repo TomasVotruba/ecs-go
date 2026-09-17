@@ -21,6 +21,8 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ControlStructure\ControlStructureBracesFixer",
     r"PhpCsFixer\Fixer\ControlStructure\NoAlternativeSyntaxFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePromotedPropertyFixer",
+    r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePlainConstructorParamFixer",
+    r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -165,6 +167,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= elseif(s);
     changed |= control_structure_braces(s);
     changed |= standalone_line_promoted_property(s);
+    changed |= standalone_line_plain_constructor_param(s);
+    changed |= standalone_line_required_param(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -7059,6 +7063,185 @@ fn standalone_line_promoted_property(s: &mut Stream) -> bool {
             continue;
         }
         if !has_promoted_param(s, open, close_idx) {
+            i += 1;
+            continue;
+        }
+        if reflow_paren(s, open, close_idx) {
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn count_params(s: &Stream, open: usize, close_idx: usize) -> usize {
+    let mut count = 0usize;
+    let mut depth = 0i32;
+    let mut j = open + 1;
+    while j < close_idx {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                _ => {}
+            }
+            j += 1;
+            continue;
+        }
+        if depth == 0 && s.kind(j) == Kind::Variable {
+            count += 1;
+        }
+        j += 1;
+    }
+    count
+}
+
+fn standalone_line_plain_constructor_param(s: &mut Stream) -> bool {
+    const MIN_PARAM_COUNT: usize = 4;
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Ident || !s.bytes(i).eq_ignore_ascii_case(b"__construct") {
+            i += 1;
+            continue;
+        }
+        match sig_prev(s, i) {
+            Some(p) if s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"function") => {}
+            _ => {
+                i += 1;
+                continue;
+            }
+        }
+        let open = match sig_next(s, i) {
+            Some(o) if s.kind(o) == Kind::Punct && s.bytes(o) == b"(" => o,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        let close_idx = match match_forward(s, open) {
+            Some(c) => c,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        if sig_next(s, open) == Some(close_idx) {
+            i += 1;
+            continue;
+        }
+        if count_params(s, open, close_idx) < MIN_PARAM_COUNT {
+            i += 1;
+            continue;
+        }
+        if has_promoted_param(s, open, close_idx) {
+            i += 1;
+            continue;
+        }
+        if reflow_paren(s, open, close_idx) {
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+// whole-word case-insensitive search, matching a `\bword\b` regex on lowercased input
+fn contains_word_ci(hay: &[u8], needle_lower: &[u8]) -> bool {
+    if needle_lower.is_empty() || hay.len() < needle_lower.len() {
+        return false;
+    }
+    let lo = hay.to_ascii_lowercase();
+    let mut i = 0;
+    while i + needle_lower.len() <= lo.len() {
+        if &lo[i..i + needle_lower.len()] == needle_lower {
+            let before_ok = i == 0 || !is_word_byte(lo[i - 1]);
+            let after = i + needle_lower.len();
+            let after_ok = after >= lo.len() || !is_word_byte(lo[after]);
+            if before_ok && after_ok {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+// the lexer folds a #[Required] attribute into a single "#..." comment token
+fn has_required_attribute(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"#[") && contains_word_ci(bytes, b"required")
+}
+
+fn is_public_required_method(s: &Stream, fn_pos: usize) -> bool {
+    let mut is_public = false;
+    let mut is_required = false;
+    let mut j = fn_pos;
+    while j > 0 {
+        j -= 1;
+        match s.kind(j) {
+            Kind::Whitespace => continue,
+            Kind::Comment => {
+                if has_required_attribute(s.bytes(j)) {
+                    is_required = true;
+                }
+                continue;
+            }
+            Kind::DocComment => {
+                if contains_word_ci(s.bytes(j), b"@required") {
+                    is_required = true;
+                }
+                continue;
+            }
+            Kind::Keyword => match s.bytes(j).to_ascii_lowercase().as_slice() {
+                b"public" => {
+                    is_public = true;
+                    continue;
+                }
+                b"protected" | b"private" | b"static" | b"final" | b"abstract" | b"readonly" => {
+                    continue;
+                }
+                _ => return is_public && is_required,
+            },
+            _ => return is_public && is_required,
+        }
+    }
+    is_public && is_required
+}
+
+fn standalone_line_required_param(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Keyword || !s.bytes(i).eq_ignore_ascii_case(b"function") {
+            i += 1;
+            continue;
+        }
+        if !is_public_required_method(s, i) {
+            i += 1;
+            continue;
+        }
+        let name = match sig_next(s, i) {
+            Some(n) => n,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let open = match sig_next(s, name) {
+            Some(o) if s.kind(o) == Kind::Punct && s.bytes(o) == b"(" => o,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        let close_idx = match match_forward(s, open) {
+            Some(c) => c,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        if sig_next(s, open) == Some(close_idx) {
             i += 1;
             continue;
         }

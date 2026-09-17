@@ -174,6 +174,8 @@ func ConstructFixers() []fixer.Fixer {
 		NoMultipleStatementsPerLine{},
 		MethodArgumentSpace{},
 		StandaloneLinePromotedProperty{},
+		StandaloneLinePlainConstructorParam{},
+		StandaloneLineRequiredParam{},
 		ReturnTypeDeclaration{},
 		NewWithParentheses{},
 		FunctionDeclaration{},
