@@ -24,6 +24,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePlainConstructorParamFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\NoBreakCommentFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -171,6 +172,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= standalone_line_plain_constructor_param(s);
     changed |= standalone_line_required_param(s);
     changed |= standalone_line_symfony_attribute_param(s);
+    changed |= no_break_comment(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -7406,6 +7408,509 @@ fn standalone_line_symfony_attribute_param(s: &mut Stream) -> bool {
         i += 1;
     }
     changed
+}
+
+const NO_BREAK_STRUCTURE_KINDS: &[&[u8]] = &[
+    b"for", b"foreach", b"while", b"if", b"elseif", b"switch", b"function", b"match",
+];
+
+fn nb_is_structure_kind(b: &[u8]) -> bool {
+    let lo = b.to_ascii_lowercase();
+    NO_BREAK_STRUCTURE_KINDS.iter().any(|k| *k == lo.as_slice())
+}
+
+fn kw_is(s: &Stream, i: usize, name: &[u8]) -> bool {
+    s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(name)
+}
+
+fn is_punct_val(s: &Stream, i: usize, v: &[u8]) -> bool {
+    i < s.len() && s.kind(i) == Kind::Punct && s.bytes(i) == v
+}
+
+fn next_punct_of_kind(s: &Stream, idx: usize, vals: &[&[u8]]) -> Option<usize> {
+    let mut j = idx + 1;
+    while j < s.len() {
+        if s.kind(j) == Kind::Punct && vals.iter().any(|v| *v == s.bytes(j)) {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+fn get_prev_non_whitespace(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i as isize - 1;
+    while j >= 0 {
+        if s.kind(j as usize) != Kind::Whitespace {
+            return Some(j as usize);
+        }
+        j -= 1;
+    }
+    None
+}
+
+fn prev_whitespace(s: &Stream, i: usize) -> Option<usize> {
+    let mut j = i as isize - 1;
+    while j >= 0 {
+        if s.kind(j as usize) == Kind::Whitespace {
+            return Some(j as usize);
+        }
+        j -= 1;
+    }
+    None
+}
+
+fn nb_detect_indent(s: &Stream, index: usize) -> Vec<u8> {
+    let mut idx = index;
+    loop {
+        let wi = match prev_whitespace(s, idx) {
+            Some(w) => w,
+            None => return Vec::new(),
+        };
+        let w = s.bytes(wi);
+        if w.contains(&b'\n') {
+            if let Some(nl) = w.iter().rposition(|&c| c == b'\n') {
+                return w[nl + 1..].to_vec();
+            }
+        }
+        if wi >= 1 {
+            let pk = s.kind(wi - 1);
+            if (pk == Kind::OpenTag || pk == Kind::Comment) && s.bytes(wi - 1).last() == Some(&b'\n') {
+                if let Some(nl) = w.iter().rposition(|&c| c == b'\n') {
+                    return w[nl + 1..].to_vec();
+                }
+                return w.to_vec();
+            }
+        }
+        idx = wi;
+    }
+}
+
+// mirrors the ~^((//|#)\s*no break\s*)|(/\*\*?\s*no break(\s+.*)*\*/)$~i regex
+fn is_no_break_comment_token(s: &Stream, i: usize) -> bool {
+    let k = s.kind(i);
+    if k != Kind::Comment && k != Kind::DocComment {
+        return false;
+    }
+    let lo = s.bytes(i).to_ascii_lowercase();
+    // case A: line comment starting with // or #
+    let prefix = if lo.starts_with(b"//") {
+        Some(2)
+    } else if lo.starts_with(b"#") {
+        Some(1)
+    } else {
+        None
+    };
+    if let Some(mut p) = prefix {
+        while p < lo.len() && lo[p].is_ascii_whitespace() {
+            p += 1;
+        }
+        if lo[p..].starts_with(b"no break") {
+            return true;
+        }
+    }
+    // case B: block comment /* ... no break ... */
+    if lo.starts_with(b"/*") && lo.ends_with(b"*/") {
+        let mut p = 2;
+        if p < lo.len() && lo[p] == b'*' {
+            p += 1;
+        }
+        while p < lo.len() && lo[p].is_ascii_whitespace() {
+            p += 1;
+        }
+        if lo[p..].starts_with(b"no break") {
+            let after = p + b"no break".len();
+            let inner = &lo[after..lo.len() - 2];
+            if inner.is_empty() || inner[0].is_ascii_whitespace() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn is_throw_statement_start(s: &Stream, prev: usize) -> bool {
+    if s.kind(prev) == Kind::OpenTag {
+        return true;
+    }
+    s.kind(prev) == Kind::Punct && matches!(s.bytes(prev), b"{" | b";" | b"}")
+}
+
+fn no_break_structure_end(s: &Stream, position: usize) -> usize {
+    let initial = s.bytes(position).to_ascii_lowercase();
+    let mut position = position;
+
+    if nb_is_structure_kind(&initial) {
+        if let Some(op) = next_punct_of_kind(s, position, &[b"("]) {
+            if let Some(e) = match_forward(s, op) {
+                position = e;
+            }
+        }
+    } else if initial == b"class" {
+        if let Some(op) = sig_next(s, position) {
+            if is_punct_val(s, op, b"(") {
+                if let Some(e) = match_forward(s, op) {
+                    position = e;
+                }
+            }
+        }
+    }
+
+    if initial == b"function" {
+        match next_punct_of_kind(s, position, &[b"{"]) {
+            Some(p) => position = p,
+            None => return s.len() - 1,
+        }
+    } else {
+        match sig_next(s, position) {
+            Some(p) => position = p,
+            None => return s.len() - 1,
+        }
+    }
+
+    if !is_punct_val(s, position, b"{") {
+        return next_punct_of_kind(s, position, &[b";"]).unwrap_or(s.len() - 1);
+    }
+
+    position = match match_forward(s, position) {
+        Some(e) => e,
+        None => return s.len() - 1,
+    };
+
+    if initial == b"do" {
+        if let Some(op) = next_punct_of_kind(s, position, &[b"("]) {
+            if let Some(e) = match_forward(s, op) {
+                position = e;
+            }
+        }
+        return next_punct_of_kind(s, position, &[b";"]).unwrap_or(s.len() - 1);
+    }
+    position
+}
+
+fn nb_prev_of_kinds(s: &Stream, idx: usize) -> Option<usize> {
+    let mut j = idx as isize - 1;
+    while j >= 0 {
+        let k = j as usize;
+        if is_punct_val(s, k, b"}") {
+            return Some(k);
+        }
+        if s.kind(k) == Kind::Keyword {
+            let lo = s.bytes(k).to_ascii_lowercase();
+            if lo == b"enum" || lo == b"switch" {
+                return Some(k);
+            }
+        }
+        j -= 1;
+    }
+    None
+}
+
+fn is_enum_case(s: &Stream, case_index: usize, has_enum: bool) -> bool {
+    if !has_enum {
+        return false;
+    }
+    let mut prev = case_index;
+    loop {
+        prev = match nb_prev_of_kinds(s, prev) {
+            Some(p) => p,
+            None => return false,
+        };
+        if is_punct_val(s, prev, b"}") {
+            prev = match match_backward(s, prev) {
+                Some(p) => p,
+                None => return false,
+            };
+            continue;
+        }
+        return kw_is(s, prev, b"enum");
+    }
+}
+
+fn split_trailing_newline(content: &[u8]) -> (&[u8], &[u8]) {
+    match content.iter().rposition(|&c| c == b'\n') {
+        Some(nl) => (&content[..nl], &content[nl..]),
+        None => (content, b""),
+    }
+}
+
+fn strip_newlines(v: &[u8]) -> Vec<u8> {
+    v.iter().copied().filter(|&c| c != b'\n' && c != b'\r').collect()
+}
+
+fn replace_trailing_space(v: &[u8], repl: &[u8]) -> Vec<u8> {
+    let mut end = v.len();
+    while end > 0 && matches!(v[end - 1], b' ' | b'\t' | b'\r' | b'\n') {
+        end -= 1;
+    }
+    if end == v.len() {
+        return v.to_vec();
+    }
+    let mut out = v[..end].to_vec();
+    out.extend_from_slice(repl);
+    out
+}
+
+fn strip_leading_newline_indent(v: &[u8]) -> Vec<u8> {
+    let mut i = 0;
+    if i < v.len() && (v[i] == b'\n' || v[i] == b'\r') {
+        while i < v.len() && (v[i] == b'\n' || v[i] == b'\r') {
+            i += 1;
+        }
+        while i < v.len() && (v[i] == b' ' || v[i] == b'\t') {
+            i += 1;
+        }
+        return v[i..].to_vec();
+    }
+    v.to_vec()
+}
+
+fn strip_trailing_newline_indent(v: &[u8]) -> Vec<u8> {
+    let mut j = v.len();
+    while j > 0 && (v[j - 1] == b' ' || v[j - 1] == b'\t') {
+        j -= 1;
+    }
+    if j > 0 && (v[j - 1] == b'\n' || v[j - 1] == b'\r') {
+        while j > 0 && (v[j - 1] == b'\n' || v[j - 1] == b'\r') {
+            j -= 1;
+        }
+        return v[..j].to_vec();
+    }
+    v.to_vec()
+}
+
+fn nb_ensure_newline_at(s: &mut Stream, position: usize) -> usize {
+    let mut content = b"\n".to_vec();
+    content.extend_from_slice(&nb_detect_indent(s, position));
+    if position == 0 {
+        return position;
+    }
+    let ws = position - 1;
+
+    if s.kind(ws) != Kind::Whitespace {
+        if s.kind(ws) == Kind::OpenTag {
+            content = strip_newlines(&content);
+            if !has_newline(s.bytes(ws)) {
+                let repl = replace_trailing_space(s.bytes(ws), b"\n");
+                s.set_owned(ws, repl);
+            }
+        }
+        if !content.is_empty() {
+            s.insert_owned(position, Kind::Whitespace, content);
+            return position;
+        }
+        return position - 1;
+    }
+
+    if position >= 2 && s.kind(position - 2) == Kind::OpenTag && has_newline(s.bytes(position - 2)) {
+        if content.first() == Some(&b'\n') {
+            content.remove(0);
+        }
+    }
+    if !has_newline(s.bytes(ws)) {
+        s.set_owned(ws, content);
+    }
+    position - 1
+}
+
+fn insert_no_break_comment_at(s: &mut Stream, case_position: usize) {
+    let mut newline_position = nb_ensure_newline_at(s, case_position);
+    let content = s.bytes(newline_position).to_vec();
+    let mut nb_newlines = content.iter().filter(|&&c| c == b'\n').count();
+
+    if s.kind(newline_position) == Kind::OpenTag && has_newline(&content) {
+        nb_newlines += 1;
+    } else if newline_position >= 1
+        && s.kind(newline_position - 1) == Kind::OpenTag
+        && has_newline(s.bytes(newline_position - 1))
+    {
+        nb_newlines += 1;
+        if !has_newline(&content) {
+            let mut v = b"\n".to_vec();
+            v.extend_from_slice(&content);
+            s.set_owned(newline_position, v);
+        }
+    }
+
+    let content = s.bytes(newline_position).to_vec();
+    if nb_newlines > 1 {
+        let (head, tail) = split_trailing_newline(&content);
+        let indent = nb_detect_indent(s, newline_position - 1);
+        let mut v = head.to_vec();
+        v.push(b'\n');
+        v.extend_from_slice(&indent);
+        s.set_owned(newline_position, v);
+        newline_position += 1;
+        s.insert_owned(newline_position, Kind::Whitespace, tail.to_vec());
+    }
+
+    s.insert_owned(newline_position, Kind::Comment, b"// no break".to_vec());
+    nb_ensure_newline_at(s, newline_position);
+}
+
+fn remove_no_break_comment(s: &mut Stream, comment_position: usize) {
+    let prev_nw = get_prev_non_whitespace(s, comment_position);
+    let after_open_tag = matches!(prev_nw, Some(p) if s.kind(p) == Kind::OpenTag);
+
+    let whitespace_position = if after_open_tag {
+        comment_position + 1
+    } else {
+        if comment_position == 0 {
+            return;
+        }
+        comment_position - 1
+    };
+
+    let mut comment_position = comment_position;
+    if whitespace_position < s.len() && s.kind(whitespace_position) == Kind::Whitespace {
+        let v = if after_open_tag {
+            strip_leading_newline_indent(s.bytes(whitespace_position))
+        } else {
+            strip_trailing_newline_indent(s.bytes(whitespace_position))
+        };
+        if v.is_empty() {
+            s.remove_at(whitespace_position);
+            if whitespace_position < comment_position {
+                comment_position -= 1;
+            }
+        } else {
+            s.set_owned(whitespace_position, v);
+        }
+    }
+
+    s.remove_at(comment_position);
+}
+
+fn handle_next_case(
+    s: &mut Stream,
+    case_pos: usize,
+    empty: bool,
+    fall_through: bool,
+    comment_position: Option<usize>,
+) {
+    if !empty && fall_through {
+        let mut cp = comment_position;
+        if let Some(c) = cp {
+            if get_prev_non_whitespace(s, case_pos) != Some(c) {
+                remove_no_break_comment(s, c);
+                cp = None;
+            }
+        }
+        match cp {
+            None => insert_no_break_comment_at(s, case_pos),
+            Some(c) => {
+                nb_ensure_newline_at(s, c);
+            }
+        }
+        return;
+    }
+    if let Some(c) = comment_position {
+        remove_no_break_comment(s, c);
+    }
+}
+
+fn fix_no_break_case(s: &mut Stream, case_position: usize) {
+    let mut empty = true;
+    let mut fall_through = true;
+    let mut comment_position: Option<usize> = None;
+
+    let mut i = case_position + 1;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword {
+            let lv = s.bytes(i).to_ascii_lowercase();
+            if nb_is_structure_kind(&lv) || lv == b"else" || lv == b"do" || lv == b"class" {
+                empty = false;
+                i = no_break_structure_end(s, i);
+                i += 1;
+                continue;
+            }
+            match lv.as_slice() {
+                b"break" | b"continue" | b"return" | b"exit" | b"die" | b"goto" => {
+                    fall_through = false;
+                    i += 1;
+                    continue;
+                }
+                b"throw" => {
+                    if let Some(prev) = sig_prev(s, i) {
+                        if prev == case_position || is_throw_statement_start(s, prev) {
+                            fall_through = false;
+                        }
+                    }
+                    i += 1;
+                    continue;
+                }
+                b"endswitch" => {
+                    if let Some(c) = comment_position {
+                        remove_no_break_comment(s, c);
+                    }
+                    return;
+                }
+                b"case" | b"default" => {
+                    handle_next_case(s, i, empty, fall_through, comment_position);
+                    return;
+                }
+                _ => {}
+            }
+        }
+
+        if is_punct_val(s, i, b"}") {
+            if let Some(c) = comment_position {
+                remove_no_break_comment(s, c);
+            }
+            return;
+        }
+
+        if is_no_break_comment_token(s, i) {
+            comment_position = Some(i);
+            i += 1;
+            continue;
+        }
+
+        let k = s.kind(i);
+        if k != Kind::Comment && k != Kind::DocComment && k != Kind::Whitespace {
+            empty = false;
+        }
+        i += 1;
+    }
+}
+
+fn no_break_comment(s: &mut Stream) -> bool {
+    let mut has_switch = false;
+    let mut has_enum = false;
+    for i in 0..s.len() {
+        if s.kind(i) == Kind::Keyword {
+            let lo = s.bytes(i).to_ascii_lowercase();
+            if lo == b"switch" {
+                has_switch = true;
+            } else if lo == b"enum" {
+                has_enum = true;
+            }
+        }
+    }
+    if !has_switch {
+        return false;
+    }
+
+    let before = s.render();
+    let start = s.len();
+    let mut i = start;
+    while i > 0 {
+        i -= 1;
+        if kw_is(s, i, b"default") {
+            if let Some(n) = sig_next(s, i) {
+                if is_punct_val(s, n, b"=>") {
+                    continue;
+                }
+            }
+        } else if !kw_is(s, i, b"case") || is_enum_case(s, i, has_enum) {
+            continue;
+        }
+
+        if let Some(colon) = next_punct_of_kind(s, i, &[b":", b";"]) {
+            fix_no_break_case(s, colon);
+        }
+    }
+    s.render() != before
 }
 
 fn collapse_space(s: &mut Stream, i: usize) -> bool {

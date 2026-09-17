@@ -177,6 +177,7 @@ func ConstructFixers() []fixer.Fixer {
 		StandaloneLinePlainConstructorParam{},
 		StandaloneLineRequiredParam{},
 		StandaloneLineSymfonyAttributeParam{},
+		NoBreakComment{},
 		ReturnTypeDeclaration{},
 		NewWithParentheses{},
 		FunctionDeclaration{},
