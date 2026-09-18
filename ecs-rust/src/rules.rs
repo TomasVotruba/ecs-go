@@ -28,6 +28,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocSeparationFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocToCommentFixer",
     r"Symplify\CodingStandard\Fixer\Commenting\ParamReturnAndVarTagMalformsFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\GeneralPhpdocTagRenameFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -179,6 +180,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= phpdoc_separation(s);
     changed |= phpdoc_to_comment(s);
     changed |= param_return_and_var_tag_malforms(s);
+    changed |= general_phpdoc_tag_rename(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -8408,6 +8410,11 @@ fn phpdoc_to_comment(s: &mut Stream) -> bool {
         i += 1;
     }
     changed
+}
+
+fn general_phpdoc_tag_rename(_s: &mut Stream) -> bool {
+    // configured with no replacements in the ECS set: no-op
+    false
 }
 
 fn param_return_and_var_tag_malforms(_s: &mut Stream) -> bool {

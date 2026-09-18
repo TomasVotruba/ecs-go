@@ -184,6 +184,7 @@ func ConstructFixers() []fixer.Fixer {
 		PhpdocSeparation{},
 		PhpdocToComment{},
 		ParamReturnAndVarTagMalforms{},
+		GeneralPhpdocTagRename{},
 	}
 }
 
