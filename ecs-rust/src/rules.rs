@@ -128,6 +128,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ControlStructure\SwitchCaseSemicolonToColonFixer",
     r"PhpCsFixer\Fixer\ControlStructure\SwitchCaseSpaceFixer",
     r"PhpCsFixer\Fixer\ClassNotation\VisibilityRequiredFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\ModifierKeywordsFixer",
     r"PhpCsFixer\Fixer\ClassNotation\NoBlankLinesAfterClassOpeningFixer",
     r"PhpCsFixer\Fixer\PhpTag\NoClosingTagFixer",
     r"PhpCsFixer\Fixer\Whitespace\TypesSpacesFixer",
@@ -281,6 +282,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= switch_case_semicolon_to_colon(s);
     changed |= switch_case_space(s);
     changed |= visibility_required(s);
+    changed |= modifier_keywords(s);
     changed |= no_blank_lines_after_class_opening(s);
     changed |= no_closing_tag(s);
     changed |= types_spaces(s);
@@ -8652,6 +8654,119 @@ fn visibility_required(s: &mut Stream) -> bool {
         let starts = class_member_starts(s, i);
         for &m in starts.iter().rev() {
             if add_visibility(s, m) {
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn order_modifier_keywords(s: &mut Stream, m: usize) -> bool {
+    let mut abs_final: Vec<Vec<u8>> = Vec::new();
+    let mut visibility: Vec<u8> = Vec::new();
+    let mut static_kw: Vec<u8> = Vec::new();
+    let mut readonly_kw: Vec<u8> = Vec::new();
+    let mut has_visibility = false;
+
+    let mut k = m;
+    while k < s.len() {
+        match s.kind(k) {
+            Kind::Whitespace => {
+                k += 1;
+                continue;
+            }
+            Kind::Comment | Kind::DocComment => return false,
+            Kind::Keyword => {}
+            _ => break,
+        }
+        let lw = s.bytes(k).to_ascii_lowercase();
+        if lw == b"use" || lw == b"case" {
+            return false;
+        }
+        if !is_property_modifier(&lw) {
+            break;
+        }
+        let next = skip_ws(s, k + 1);
+        if next < s.len() && s.kind(next) == Kind::Punct && s.bytes(next) == b"(" {
+            return false; // "public(set)" is not representable on the flat lexer
+        }
+        if lw == b"abstract" || lw == b"final" {
+            abs_final.push(s.bytes(k).to_vec());
+        } else if lw == b"static" {
+            static_kw = s.bytes(k).to_vec();
+        } else if lw == b"readonly" {
+            readonly_kw = s.bytes(k).to_vec();
+        } else if lw == b"var" {
+            visibility = b"public".to_vec();
+            has_visibility = true;
+        } else if lw == b"public" || lw == b"private" || lw == b"protected" {
+            visibility = s.bytes(k).to_vec();
+            has_visibility = true;
+        }
+        k += 1;
+    }
+    let after = k;
+    if after < s.len() && matches!(s.kind(after), Kind::Comment | Kind::DocComment) {
+        return false;
+    }
+    if visibility.is_empty() {
+        visibility = b"public".to_vec();
+    }
+
+    let mut ordered: Vec<Vec<u8>> = Vec::new();
+    ordered.extend(abs_final);
+    ordered.push(visibility);
+    if !static_kw.is_empty() {
+        ordered.push(static_kw);
+    }
+    if !readonly_kw.is_empty() {
+        ordered.push(readonly_kw);
+    }
+
+    let mut want: Vec<u8> = Vec::new();
+    for mod_ in &ordered {
+        want.extend_from_slice(mod_);
+        want.push(b' ');
+    }
+    let mut cur: Vec<u8> = Vec::new();
+    for x in m..after {
+        cur.extend_from_slice(s.bytes(x));
+    }
+    if has_visibility && cur == want {
+        return false;
+    }
+
+    let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
+    for mod_ in &ordered {
+        repl.push((Kind::Keyword, mod_.clone()));
+        repl.push((Kind::Whitespace, b" ".to_vec()));
+    }
+    if after == m {
+        for (idx, (kind, v)) in repl.into_iter().enumerate() {
+            s.insert_owned(m + idx, kind, v);
+        }
+        return true;
+    }
+    replace_range(s, m, after - 1, repl);
+    true
+}
+
+fn modifier_keywords(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct || s.bytes(i) != b"{" {
+            i += 1;
+            continue;
+        }
+        if classify_brace(s, i).0 != BraceKind::ClassLike {
+            i += 1;
+            continue;
+        }
+        let starts = class_member_starts(s, i);
+        for &m in starts.iter().rev() {
+            if order_modifier_keywords(s, m) {
                 changed = true;
             }
         }

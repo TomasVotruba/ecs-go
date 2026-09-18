@@ -197,6 +197,7 @@ func StructuralFixers() []fixer.Fixer {
 		BracesPosition{},
 		SingleLineEmptyBody{},
 		VisibilityRequired{},
+		ModifierKeywords{},
 		SingleTraitInsertPerStatement{},
 		SingleClassElementPerStatement{},
 		OrderedClassElements{},
