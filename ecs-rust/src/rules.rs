@@ -29,6 +29,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocToCommentFixer",
     r"Symplify\CodingStandard\Fixer\Commenting\ParamReturnAndVarTagMalformsFixer",
     r"PhpCsFixer\Fixer\Phpdoc\GeneralPhpdocTagRenameFixer",
+    r"PhpCsFixer\Fixer\FunctionNotation\LambdaNotUsedImportFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -183,6 +184,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= phpdoc_to_comment(s);
     changed |= param_return_and_var_tag_malforms(s);
     changed |= general_phpdoc_tag_rename(s);
+    changed |= lambda_not_used_import(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
     changed |= method_chaining_newline(s);
@@ -12070,4 +12072,448 @@ fn operator_linebreak(s: &mut Stream) -> bool {
         changed = true;
     }
     changed
+}
+
+// --- LambdaNotUsedImport ---
+
+const LAMBDA_SUPERGLOBALS: &[&[u8]] = &[
+    b"$GLOBALS", b"$_SERVER", b"$_GET", b"$_POST", b"$_REQUEST", b"$_SESSION", b"$_ENV",
+    b"$_COOKIE", b"$_FILES",
+];
+
+fn lambda_is_global_function_call(s: &Stream, i: usize) -> bool {
+    match sig_prev(s, i) {
+        None => true,
+        Some(p) => {
+            if s.kind(p) == Kind::Punct {
+                match s.bytes(p) {
+                    b"->" | b"?->" | b"::" => return false,
+                    b"\\" => {
+                        if let Some(before) = sig_prev(s, p) {
+                            if s.kind(before) == Kind::Ident {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                    _ => {}
+                }
+            }
+            if s.kind(p) == Kind::Keyword {
+                match s.bytes(p).to_ascii_lowercase().as_slice() {
+                    b"function" | b"const" | b"new" | b"goto" => return false,
+                    _ => {}
+                }
+            }
+            true
+        }
+    }
+}
+
+fn lambda_is_global_call(s: &Stream, i: usize) -> bool {
+    matches!(sig_next(s, i), Some(n) if is_punct_val(s, n, b"(")) && lambda_is_global_function_call(s, i)
+}
+
+fn is_lambda_function(s: &Stream, index: usize) -> bool {
+    matches!(sig_next(s, index), Some(n) if is_punct_val(s, n, b"(") || is_punct_val(s, n, b"&"))
+}
+
+fn lambda_use_index(s: &Stream, index: usize) -> Option<usize> {
+    if !kw_is(s, index, b"function") || !is_lambda_function(s, index) {
+        return None;
+    }
+    let mut u = sig_next(s, index)?;
+    if is_punct_val(s, u, b"&") {
+        u = sig_next(s, u)?;
+    }
+    if !is_punct_val(s, u, b"(") {
+        return None;
+    }
+    let close_idx = match_forward(s, u)?;
+    let use_idx = sig_next(s, close_idx)?;
+    if !kw_is(s, use_idx, b"use") {
+        return None;
+    }
+    Some(use_idx)
+}
+
+fn lambda_is_trivia(s: &Stream, i: usize) -> bool {
+    matches!(s.kind(i), Kind::Whitespace | Kind::Comment | Kind::DocComment)
+}
+
+fn lambda_argument_spans(s: &Stream, open: usize, close_idx: usize) -> Vec<(usize, usize)> {
+    let mut spans = Vec::new();
+    let mut depth = 0i32;
+    let mut start: isize = -1;
+    let mut flush = |s: &Stream, spans: &mut Vec<(usize, usize)>, start: &mut isize, end: usize| {
+        if *start < 0 {
+            return;
+        }
+        let mut e = end as isize;
+        while e >= *start && lambda_is_trivia(s, e as usize) {
+            e -= 1;
+        }
+        let mut st = *start;
+        while st <= e && lambda_is_trivia(s, st as usize) {
+            st += 1;
+        }
+        if st <= e {
+            spans.push((st as usize, e as usize));
+        }
+        *start = -1;
+    };
+    let mut j = open + 1;
+    while j < close_idx {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b"," if depth == 0 => {
+                    flush(s, &mut spans, &mut start, j - 1);
+                    j += 1;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        if start < 0 && !lambda_is_trivia(s, j) {
+            start = j as isize;
+        }
+        j += 1;
+    }
+    flush(s, &mut spans, &mut start, close_idx - 1);
+    spans
+}
+
+fn filter_lambda_imports(s: &Stream, args: &[(usize, usize)]) -> Vec<(Vec<u8>, usize)> {
+    let mut imports = Vec::new();
+    for &(a, b) in args {
+        let mut var_idx = None;
+        for j in a..=b {
+            if s.kind(j) == Kind::Variable {
+                var_idx = Some(j);
+                break;
+            }
+        }
+        let var_idx = match var_idx {
+            Some(v) => v,
+            None => continue,
+        };
+        if let Some(p) = sig_prev(s, var_idx) {
+            if is_punct_val(s, p, b"&") {
+                continue;
+            }
+        }
+        let name = s.bytes(var_idx);
+        if name == b"$this" || LAMBDA_SUPERGLOBALS.contains(&name) {
+            continue;
+        }
+        imports.push((name.to_vec(), var_idx));
+    }
+    imports
+}
+
+fn lambda_arg_name(s: &Stream, sp: (usize, usize)) -> Option<Vec<u8>> {
+    let mut var_idx = None;
+    for j in sp.0..=sp.1 {
+        if s.kind(j) == Kind::Variable {
+            if var_idx.is_some() {
+                return None;
+            }
+            var_idx = Some(j);
+        }
+    }
+    let var_idx = var_idx?;
+    if let Some(n) = sig_next(s, var_idx) {
+        if n <= sp.1 && !is_punct_val(s, n, b"=") {
+            return None;
+        }
+    }
+    Some(s.bytes(var_idx).to_vec())
+}
+
+fn count_imports_used_as_argument(
+    s: &Stream,
+    remaining: &mut std::collections::HashSet<Vec<u8>>,
+    args: &[(usize, usize)],
+) {
+    for &sp in args {
+        if let Some(name) = lambda_arg_name(s, sp) {
+            remaining.remove(&name);
+        }
+    }
+}
+
+fn is_lambda_bailout_keyword(s: &Stream, i: usize) -> bool {
+    if s.kind(i) != Kind::Keyword {
+        return false;
+    }
+    matches!(
+        s.bytes(i).to_ascii_lowercase().as_slice(),
+        b"eval" | b"include" | b"include_once" | b"require" | b"require_once"
+    )
+}
+
+fn find_not_used_lambda_imports(
+    s: &Stream,
+    imports: &[(Vec<u8>, usize)],
+    use_close_brace: usize,
+) -> Vec<(Vec<u8>, usize)> {
+    let lambda_open = match next_punct_of_kind(s, use_close_brace, &[b"{"]) {
+        Some(o) => o,
+        None => return Vec::new(),
+    };
+    let mut remaining: std::collections::HashSet<Vec<u8>> =
+        imports.iter().map(|(n, _)| n.clone()).collect();
+    let mut level = 0i32;
+    let mut i = lambda_open;
+    while i < s.len() {
+        if is_punct_val(s, i, b"{") {
+            level += 1;
+            i += 1;
+            continue;
+        }
+        if is_punct_val(s, i, b"}") {
+            level -= 1;
+            if level == 0 {
+                break;
+            }
+            i += 1;
+            continue;
+        }
+        if s.kind(i) == Kind::Ident
+            && s.bytes(i).eq_ignore_ascii_case(b"compact")
+            && lambda_is_global_call(s, i)
+        {
+            return Vec::new();
+        }
+        if is_lambda_bailout_keyword(s, i) {
+            return Vec::new();
+        }
+        if is_punct_val(s, i, b"$") {
+            if let Some(n) = sig_next(s, i) {
+                if s.kind(n) == Kind::Variable || is_punct_val(s, n, b"{") {
+                    return Vec::new();
+                }
+            }
+        }
+        if s.kind(i) == Kind::Variable && remaining.contains(s.bytes(i)) {
+            remaining.remove(s.bytes(i));
+            if remaining.is_empty() {
+                return Vec::new();
+            }
+        }
+        if s.kind(i) == Kind::Keyword && is_classy_keyword(&s.bytes(i).to_ascii_lowercase()) {
+            let mut j = match next_punct_of_kind(s, i, &[b"(", b"{"]) {
+                Some(x) => x,
+                None => break,
+            };
+            if is_punct_val(s, j, b"(") {
+                let cb = match match_forward(s, j) {
+                    Some(x) => x,
+                    None => break,
+                };
+                let spans = lambda_argument_spans(s, j, cb);
+                count_imports_used_as_argument(s, &mut remaining, &spans);
+                j = match next_punct_of_kind(s, cb, &[b"{"]) {
+                    Some(x) => x,
+                    None => break,
+                };
+            }
+            i = match match_forward(s, j) {
+                Some(x) => x,
+                None => break,
+            };
+            i += 1;
+            continue;
+        }
+        if kw_is(s, i, b"function") {
+            let o = match next_punct_of_kind(s, i, &[b"("]) {
+                Some(x) => x,
+                None => break,
+            };
+            let c = match match_forward(s, o) {
+                Some(x) => x,
+                None => break,
+            };
+            let spans = lambda_argument_spans(s, o, c);
+            count_imports_used_as_argument(s, &mut remaining, &spans);
+            let mut j = match lambda_next_use_or_brace(s, i) {
+                Some(x) => x,
+                None => break,
+            };
+            if kw_is(s, j, b"use") {
+                let o2 = match next_punct_of_kind(s, j, &[b"("]) {
+                    Some(x) => x,
+                    None => break,
+                };
+                let c2 = match match_forward(s, o2) {
+                    Some(x) => x,
+                    None => break,
+                };
+                let spans2 = lambda_argument_spans(s, o2, c2);
+                count_imports_used_as_argument(s, &mut remaining, &spans2);
+                j = match next_punct_of_kind(s, c2, &[b"{"]) {
+                    Some(x) => x,
+                    None => break,
+                };
+            }
+            i = match match_forward(s, j) {
+                Some(x) => x,
+                None => break,
+            };
+            i += 1;
+            continue;
+        }
+        i += 1;
+    }
+    imports
+        .iter()
+        .filter(|(n, _)| remaining.contains(n))
+        .cloned()
+        .collect()
+}
+
+fn lambda_next_use_or_brace(s: &Stream, idx: usize) -> Option<usize> {
+    let mut j = idx + 1;
+    while j < s.len() {
+        if kw_is(s, j, b"use") || is_punct_val(s, j, b"{") {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+fn lambda_non_empty_sibling(s: &Stream, i: usize, dir: i32) -> Option<usize> {
+    let mut j = i as isize + dir as isize;
+    while j >= 0 && (j as usize) < s.len() {
+        if !s.bytes(j as usize).is_empty() {
+            return Some(j as usize);
+        }
+        j += dir as isize;
+    }
+    None
+}
+
+fn lambda_clear_token_at(s: &mut Stream, i: usize) {
+    s.set_owned(i, Vec::new());
+    s.set_kind(i, Kind::Whitespace);
+}
+
+fn lambda_clear_and_merge_ws(s: &mut Stream, index: usize) {
+    if index >= s.len() {
+        return;
+    }
+    let count = s.len();
+    lambda_clear_token_at(s, index);
+    if index == count - 1 {
+        return;
+    }
+    let next_idx = match lambda_non_empty_sibling(s, index, 1) {
+        Some(n) if s.kind(n) == Kind::Whitespace => n,
+        _ => return,
+    };
+    let prev_idx = lambda_non_empty_sibling(s, index, -1);
+    match prev_idx {
+        Some(p) if s.kind(p) == Kind::Whitespace => {
+            let mut merged = s.bytes(p).to_vec();
+            merged.extend_from_slice(s.bytes(next_idx));
+            s.set_owned(p, merged);
+        }
+        Some(p) if p + 1 < s.len() && s.bytes(p + 1).is_empty() => {
+            let v = s.bytes(next_idx).to_vec();
+            s.set_owned(p + 1, v);
+            s.set_kind(p + 1, Kind::Whitespace);
+        }
+        _ => {}
+    }
+    lambda_clear_token_at(s, next_idx);
+}
+
+fn clear_lambda_import(s: &mut Stream, remove_idx: usize) {
+    lambda_clear_and_merge_ws(s, remove_idx);
+    let prev = sig_prev(s, remove_idx);
+    match prev {
+        Some(p) if is_punct_val(s, p, b",") => lambda_clear_and_merge_ws(s, p),
+        Some(p) if is_punct_val(s, p, b"(") => {
+            if let Some(n) = sig_next(s, remove_idx) {
+                lambda_clear_and_merge_ws(s, n);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn clear_imports_and_use(s: &mut Stream, use_idx: usize, use_close_brace: usize) {
+    let mut i = use_close_brace as isize;
+    while i >= use_idx as isize {
+        let ii = i as usize;
+        if matches!(s.kind(ii), Kind::Comment | Kind::DocComment) {
+            i -= 1;
+            continue;
+        }
+        if s.kind(ii) == Kind::Whitespace {
+            if let Some(pv) = get_prev_non_whitespace(s, ii) {
+                if matches!(s.kind(pv), Kind::Comment | Kind::DocComment) {
+                    i -= 1;
+                    continue;
+                }
+            }
+        }
+        lambda_clear_and_merge_ws(s, ii);
+        i -= 1;
+    }
+}
+
+fn fix_lambda_imports(s: &mut Stream, use_idx: usize) {
+    let open = match next_punct_of_kind(s, use_idx, &[b"("]) {
+        Some(o) => o,
+        None => return,
+    };
+    let close_idx = match match_forward(s, open) {
+        Some(c) => c,
+        None => return,
+    };
+    let args = lambda_argument_spans(s, open, close_idx);
+    let imports = filter_lambda_imports(s, &args);
+    if imports.is_empty() {
+        return;
+    }
+    let not_used = find_not_used_lambda_imports(s, &imports, close_idx);
+    if not_used.is_empty() {
+        return;
+    }
+    if not_used.len() == args.len() {
+        clear_imports_and_use(s, use_idx, close_idx);
+        return;
+    }
+    for (_, idx) in not_used.iter().rev() {
+        clear_lambda_import(s, *idx);
+    }
+}
+
+fn lambda_compact_empty_tokens(s: &mut Stream) {
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if s.kind(i) == Kind::Whitespace && s.bytes(i).is_empty() {
+            s.remove_at(i);
+        }
+    }
+}
+
+fn lambda_not_used_import(s: &mut Stream) -> bool {
+    let before = s.render();
+    if s.len() >= 4 {
+        let mut i = s.len() - 4;
+        while i > 0 {
+            if let Some(use_idx) = lambda_use_index(s, i) {
+                fix_lambda_imports(s, use_idx);
+            }
+            i -= 1;
+        }
+    }
+    lambda_compact_empty_tokens(s);
+    s.render() != before
 }

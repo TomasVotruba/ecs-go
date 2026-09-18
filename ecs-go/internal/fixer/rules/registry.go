@@ -161,6 +161,7 @@ func ConstructFixers() []fixer.Fixer {
 		DeclareEqualNormalize{},
 		SingleSpaceAroundConstruct{},
 		NoSpacesAfterFunctionName{},
+		LambdaNotUsedImport{},
 		NoSpacesInsideParenthesis{},
 		UnaryOperatorSpaces{},
 		NotOperatorWithSuccessorSpace{},
