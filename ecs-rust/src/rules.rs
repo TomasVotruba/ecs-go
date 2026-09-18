@@ -39,6 +39,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NoMultilineWhitespaceAroundDoubleArrowFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\FunctionDeclarationFixer",
+    r"PhpCsFixer\Fixer\Operator\OperatorLinebreakFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\NoUnreachableDefaultArgumentValueFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\MethodArgumentSpaceFixer",
     r"PhpCsFixer\Fixer\Whitespace\ArrayIndentationFixer",
@@ -191,6 +192,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_trait_insert_per_statement(s);
     changed |= no_multiline_whitespace_around_double_arrow(s);
     changed |= function_declaration(s);
+    changed |= operator_linebreak(s);
     changed |= no_unreachable_default_argument_value(s);
     changed |= method_argument_space(s);
     changed |= array_indentation(s);
@@ -11883,6 +11885,74 @@ fn no_unreachable_default_argument_value(s: &mut Stream) -> bool {
         {
             changed |= nud_fix_function(s, i);
         }
+    }
+    changed
+}
+
+const OP_LB_PUNCT: &[&[u8]] = &[
+    b"||", b"&&", b".", b"+", b"-", b"*", b"/", b"%", b"**", b"==", b"===", b"!=", b"!==",
+    b"<>", b"<", b">", b"<=", b">=", b"<=>", b"??", b"=>", b"=", b".=", b"+=", b"-=", b"*=",
+    b"/=", b"%=", b"**=", b"&=", b"|=", b"^=", b"<<=", b">>=", b"??=",
+];
+
+fn is_op_lb_token(s: &Stream, i: usize) -> bool {
+    match s.kind(i) {
+        Kind::Keyword => matches!(
+            s.bytes(i).to_ascii_lowercase().as_slice(),
+            b"and" | b"or" | b"xor"
+        ),
+        Kind::Punct => OP_LB_PUNCT.contains(&s.bytes(i)),
+        _ => false,
+    }
+}
+
+fn operator_span_multiline(s: &Stream, from: usize, to: usize) -> bool {
+    let mut j = from;
+    while j <= to && j < s.len() {
+        if s.bytes(j).contains(&b'\n') || s.bytes(j).contains(&b'\r') {
+            return true;
+        }
+        j += 1;
+    }
+    false
+}
+
+// Documented safe subset of OperatorLinebreak: moves a multiline operator to the
+// start of the next line, only for unambiguous single-token operators (never
+// ":" "?" "|" "&" or object operators). Mirrors the Go fixer.
+fn operator_linebreak(s: &mut Stream) -> bool {
+    let mut changed = false;
+    if s.len() == 0 {
+        return false;
+    }
+    let mut i = s.len();
+    while i > 1 {
+        i -= 1;
+        if !is_op_lb_token(s, i) {
+            continue;
+        }
+        let (pm, nm) = match (sig_prev(s, i), sig_next(s, i)) {
+            (Some(a), Some(b)) => (a, b),
+            _ => continue,
+        };
+        if !operator_span_multiline(s, pm + 1, nm - 1) {
+            continue;
+        }
+        if !operator_span_multiline(s, i, nm - 1) {
+            continue;
+        }
+        let op_val = s.bytes(i).to_vec();
+        let op_kind = s.kind(i);
+        let had_space = i > 0 && s.kind(i - 1) == Kind::Whitespace;
+        if had_space {
+            s.set_owned(i - 1, Vec::new());
+        }
+        s.set_owned(i, Vec::new());
+        s.insert_owned(nm, op_kind, op_val);
+        if had_space {
+            s.insert_owned(nm + 1, Kind::Whitespace, b" ".to_vec());
+        }
+        changed = true;
     }
     changed
 }

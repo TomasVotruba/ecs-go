@@ -181,6 +181,7 @@ func ConstructFixers() []fixer.Fixer {
 		ReturnTypeDeclaration{},
 		NewWithParentheses{},
 		FunctionDeclaration{},
+		OperatorLinebreak{},
 		PhpdocSeparation{},
 		PhpdocToComment{},
 		ParamReturnAndVarTagMalforms{},
