@@ -54,6 +54,7 @@ var fixerPriority = map[string]int{
 	"LineEndingFixer":                                 0,
 	"ListSyntaxFixer":                                 2,
 	"LongToShorthandOperatorFixer":                    17,
+	"LambdaNotUsedImportFixer":                        31,
 	"LowercaseCastFixer":                              0,
 	"LowercaseKeywordsFixer":                          0,
 	"LowercaseStaticReferenceFixer":                   0,

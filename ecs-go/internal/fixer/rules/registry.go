@@ -161,6 +161,7 @@ func ConstructFixers() []fixer.Fixer {
 		DeclareEqualNormalize{},
 		SingleSpaceAroundConstruct{},
 		NoSpacesAfterFunctionName{},
+		LambdaNotUsedImport{},
 		NoSpacesInsideParenthesis{},
 		UnaryOperatorSpaces{},
 		NotOperatorWithSuccessorSpace{},
@@ -181,9 +182,11 @@ func ConstructFixers() []fixer.Fixer {
 		ReturnTypeDeclaration{},
 		NewWithParentheses{},
 		FunctionDeclaration{},
+		OperatorLinebreak{},
 		PhpdocSeparation{},
 		PhpdocToComment{},
 		ParamReturnAndVarTagMalforms{},
+		GeneralPhpdocTagRename{},
 	}
 }
 
@@ -195,6 +198,7 @@ func StructuralFixers() []fixer.Fixer {
 		BracesPosition{},
 		SingleLineEmptyBody{},
 		VisibilityRequired{},
+		ModifierKeywords{},
 		SingleTraitInsertPerStatement{},
 		SingleClassElementPerStatement{},
 		OrderedClassElements{},
