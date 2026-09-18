@@ -195,7 +195,6 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_trait_insert_per_statement(s);
     changed |= no_multiline_whitespace_around_double_arrow(s);
     changed |= function_declaration(s);
-    changed |= operator_linebreak(s);
     changed |= no_unreachable_default_argument_value(s);
     changed |= method_argument_space(s);
     changed |= array_indentation(s);
@@ -277,6 +276,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_leading_namespace_whitespace(s);
     changed |= no_singleline_whitespace_before_semicolons(s);
     changed |= concat_space(s);
+    changed |= operator_linebreak(s);
     changed |= no_trailing_whitespace(s);
     changed |= no_trailing_whitespace_in_comment(s);
     changed |= declare_equal_normalize(s);
