@@ -27,6 +27,8 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ControlStructure\NoBreakCommentFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocSeparationFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocToCommentFixer",
+    r"PhpCsFixer\Fixer\DoctrineAnnotation\DoctrineAnnotationArrayAssignmentFixer",
+    r"PhpCsFixer\Fixer\DoctrineAnnotation\DoctrineAnnotationIndentationFixer",
     r"Symplify\CodingStandard\Fixer\Commenting\ParamReturnAndVarTagMalformsFixer",
     r"PhpCsFixer\Fixer\Phpdoc\GeneralPhpdocTagRenameFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\LambdaNotUsedImportFixer",
@@ -226,6 +228,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= blank_line_after_opening_tag(s);
     changed |= single_import_per_statement(s);
     changed |= line_ending(s);
+    changed |= doctrine_annotation_array_assignment(s);
+    changed |= doctrine_annotation_indentation(s);
     changed |= yoda_style(s);
     changed |= no_whitespace_before_comma_in_array(s);
     changed |= whitespace_after_comma_in_array(s);
@@ -12516,4 +12520,685 @@ fn lambda_not_used_import(s: &mut Stream) -> bool {
     }
     lambda_compact_empty_tokens(s);
     s.render() != before
+}
+
+// --- Doctrine annotation parser (DocLexer + Tokens) ---
+
+const DA_T_NONE: i32 = 1;
+const DA_T_STRING: i32 = 3;
+const DA_T_IDENTIFIER: i32 = 100;
+const DA_T_AT: i32 = 101;
+const DA_T_CLOSE_CURLY: i32 = 102;
+const DA_T_CLOSE_PAREN: i32 = 103;
+const DA_T_EQUALS: i32 = 105;
+const DA_T_OPEN_CURLY: i32 = 108;
+const DA_T_OPEN_PAREN: i32 = 109;
+const DA_T_COLON: i32 = 112;
+
+struct DaToken {
+    typ: i32,
+    content: Vec<u8>,
+    pos: usize,
+}
+
+fn da_is_alpha_us(b: u8) -> bool {
+    b.is_ascii_alphabetic() || b == b'_'
+}
+fn da_is_word(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+fn da_is_word_cb(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b':' || b == b'\\'
+}
+fn da_is_space(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
+}
+
+// mirrors DocLexer identifier pattern [a-z_\\][a-z0-9_:\\]*[a-z_][a-z0-9_]* (i)
+fn da_match_identifier(b: &[u8], i: usize) -> Option<usize> {
+    if !(da_is_alpha_us(b[i]) || b[i] == b'\\') {
+        return None;
+    }
+    let mut k = i;
+    while k < b.len() && da_is_word_cb(b[k]) {
+        k += 1;
+    }
+    let mut e = k;
+    while e > i + 1 && (b[e - 1] == b':' || b[e - 1] == b'\\') {
+        e -= 1;
+    }
+    if e < i + 2 {
+        return None;
+    }
+    // need a Z (alpha_) at some z in [i+1, e) with b[z+1..e) all word
+    let mut m = e;
+    while m > i && da_is_word(b[m - 1]) {
+        m -= 1;
+    }
+    let lo = if m > i + 1 { m } else { i + 1 };
+    let mut z = lo;
+    while z < e {
+        if da_is_alpha_us(b[z]) {
+            return Some(e);
+        }
+        z += 1;
+    }
+    None
+}
+
+fn da_match_number(b: &[u8], i: usize) -> Option<usize> {
+    let mut j = i;
+    if j < b.len() && (b[j] == b'+' || b[j] == b'-') {
+        j += 1;
+    }
+    let ds = j;
+    while j < b.len() && b[j].is_ascii_digit() {
+        j += 1;
+    }
+    if j == ds {
+        return None;
+    }
+    // (?:\.[0-9]+)*
+    loop {
+        if j < b.len() && b[j] == b'.' && j + 1 < b.len() && b[j + 1].is_ascii_digit() {
+            j += 1;
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+        } else {
+            break;
+        }
+    }
+    // (?:[eE][+-]?[0-9]+)?
+    if j < b.len() && (b[j] == b'e' || b[j] == b'E') {
+        let mut p = j + 1;
+        if p < b.len() && (b[p] == b'+' || b[p] == b'-') {
+            p += 1;
+        }
+        let es = p;
+        while p < b.len() && b[p].is_ascii_digit() {
+            p += 1;
+        }
+        if p > es {
+            j = p;
+        }
+    }
+    Some(j)
+}
+
+fn da_match_string(b: &[u8], i: usize) -> Option<usize> {
+    if b[i] != b'"' {
+        return None;
+    }
+    let mut j = i + 1;
+    while j < b.len() {
+        if b[j] == b'"' {
+            if j + 1 < b.len() && b[j + 1] == b'"' {
+                j += 2;
+                continue;
+            }
+            return Some(j + 1);
+        }
+        j += 1;
+    }
+    // unterminated: PCRE would not match the string branch
+    None
+}
+
+fn da_get_type(value: &[u8]) -> i32 {
+    if value.is_empty() {
+        return DA_T_NONE;
+    }
+    if value[0] == b'"' {
+        return DA_T_STRING;
+    }
+    match value {
+        b"@" => return DA_T_AT,
+        b"," => return 104,
+        b"(" => return DA_T_OPEN_PAREN,
+        b")" => return DA_T_CLOSE_PAREN,
+        b"{" => return DA_T_OPEN_CURLY,
+        b"}" => return DA_T_CLOSE_CURLY,
+        b"=" => return DA_T_EQUALS,
+        b":" => return DA_T_COLON,
+        b"-" => return 113,
+        b"\\" => return 107,
+        _ => {}
+    }
+    if value[0] == b'_' || value[0] == b'\\' || value[0].is_ascii_alphabetic() {
+        return DA_T_IDENTIFIER;
+    }
+    if da_is_numeric(value) {
+        return if value.iter().any(|&c| c == b'.' || c == b'e' || c == b'E') {
+            4
+        } else {
+            2
+        };
+    }
+    DA_T_NONE
+}
+
+fn da_is_numeric(v: &[u8]) -> bool {
+    if v.is_empty() {
+        return false;
+    }
+    let mut i = 0;
+    if v[0] == b'+' || v[0] == b'-' {
+        i += 1;
+    }
+    let (mut digits, mut dot, mut e) = (false, false, false);
+    while i < v.len() {
+        let c = v[i];
+        if c.is_ascii_digit() {
+            digits = true;
+        } else if c == b'.' && !dot && !e {
+            dot = true;
+        } else if (c == b'e' || c == b'E') && !e && digits {
+            e = true;
+            if i + 1 < v.len() && (v[i + 1] == b'+' || v[i + 1] == b'-') {
+                i += 1;
+            }
+        } else {
+            return false;
+        }
+        i += 1;
+    }
+    digits
+}
+
+// mirrors DocLexer::scan: tokens keep offsets; whitespace and "*" runs are dropped
+fn da_scan(input: &[u8]) -> Vec<DaToken> {
+    let mut toks = Vec::new();
+    let mut i = 0;
+    while i < input.len() {
+        if let Some(e) = da_match_identifier(input, i) {
+            toks.push(DaToken { typ: DA_T_IDENTIFIER, content: input[i..e].to_vec(), pos: i });
+            i = e;
+            continue;
+        }
+        if let Some(e) = da_match_number(input, i) {
+            let v = &input[i..e];
+            toks.push(DaToken { typ: da_get_type(v), content: v.to_vec(), pos: i });
+            i = e;
+            continue;
+        }
+        if let Some(e) = da_match_string(input, i) {
+            let unq = da_unquote(&input[i..e]);
+            toks.push(DaToken { typ: DA_T_STRING, content: unq, pos: i });
+            i = e;
+            continue;
+        }
+        if da_is_space(input[i]) {
+            while i < input.len() && da_is_space(input[i]) {
+                i += 1;
+            }
+            continue;
+        }
+        if input[i] == b'*' {
+            while i < input.len() && input[i] == b'*' {
+                i += 1;
+            }
+            continue;
+        }
+        // single char; a lone `"` types as a string whose unquoted content is
+        // empty (DocLexer::getType does substr($value, 1, strlen-2))
+        let v = &input[i..i + 1];
+        let typ = da_get_type(v);
+        let content = if typ == DA_T_STRING { Vec::new() } else { v.to_vec() };
+        toks.push(DaToken { typ, content, pos: i });
+        i += 1;
+    }
+    toks
+}
+
+fn da_unquote(s: &[u8]) -> Vec<u8> {
+    // strip outer quotes, "" -> "
+    let inner = &s[1..s.len() - 1];
+    let mut out = Vec::with_capacity(inner.len());
+    let mut i = 0;
+    while i < inner.len() {
+        if inner[i] == b'"' && i + 1 < inner.len() && inner[i + 1] == b'"' {
+            out.push(b'"');
+            i += 2;
+        } else {
+            out.push(inner[i]);
+            i += 1;
+        }
+    }
+    out
+}
+
+fn da_requote(unq: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(unq.len() + 2);
+    out.push(b'"');
+    for &c in unq {
+        if c == b'"' {
+            out.push(b'"');
+            out.push(b'"');
+        } else {
+            out.push(c);
+        }
+    }
+    out.push(b'"');
+    out
+}
+
+fn da_create_from_doc_comment(content: &[u8], ignored: &[&[u8]]) -> Vec<DaToken> {
+    let mut toks: Vec<DaToken> = Vec::new();
+    let mut ignored_text_position = 0usize;
+    let mut current_position = 0usize;
+    while let Some(rel) = content[current_position..].iter().position(|&c| c == b'@') {
+        let next_at = current_position + rel;
+        if next_at != 0 && !da_is_space(content[next_at - 1]) {
+            current_position = next_at + 1;
+            continue;
+        }
+        let scanned = da_scan(&content[next_at..]);
+        let mut used: Vec<&DaToken> = Vec::new();
+        let mut nb_to_use = 0usize;
+        let mut nb_scopes: i32 = 0;
+        let mut index = 0usize;
+        let mut broke_clean = true;
+        while index < scanned.len() {
+            let tk = &scanned[index];
+            if index == 0 && tk.typ != DA_T_AT {
+                break;
+            }
+            if index == 1 {
+                let is_ignored = ignored.iter().any(|t| *t == tk.content.as_slice());
+                if tk.typ != DA_T_IDENTIFIER || is_ignored {
+                    break;
+                }
+                nb_to_use = 2;
+            }
+            if index >= 2 && nb_scopes == 0 && tk.typ != DA_T_NONE && tk.typ != DA_T_OPEN_PAREN {
+                break;
+            }
+            used.push(tk);
+            if tk.typ == DA_T_OPEN_PAREN {
+                nb_scopes += 1;
+            } else if tk.typ == DA_T_CLOSE_PAREN {
+                nb_scopes -= 1;
+                if nb_scopes == 0 {
+                    nb_to_use = used.len();
+                    broke_clean = true;
+                    break;
+                }
+            }
+            index += 1;
+        }
+        let _ = broke_clean;
+        if nb_scopes != 0 {
+            break;
+        }
+        if nb_to_use != 0 {
+            let ignored_text_length = next_at - ignored_text_position;
+            if ignored_text_length != 0 {
+                toks.push(DaToken {
+                    typ: DA_T_NONE,
+                    content: content[ignored_text_position..ignored_text_position + ignored_text_length].to_vec(),
+                    pos: 0,
+                });
+            }
+            let mut last_end = 0usize;
+            let mut last_pos = 0usize;
+            let mut last_len = 0usize;
+            for st in used.iter().take(nb_to_use) {
+                let (rewrapped, cpos, clen);
+                if st.typ == DA_T_STRING {
+                    let rq = da_requote(&st.content);
+                    clen = rq.len();
+                    cpos = st.pos;
+                    rewrapped = rq;
+                } else {
+                    cpos = st.pos;
+                    clen = st.content.len();
+                    rewrapped = st.content.clone();
+                }
+                if cpos > last_end {
+                    let missing = cpos - last_end;
+                    toks.push(DaToken {
+                        typ: DA_T_NONE,
+                        content: content[next_at + last_end..next_at + last_end + missing].to_vec(),
+                        pos: 0,
+                    });
+                }
+                toks.push(DaToken { typ: st.typ, content: rewrapped, pos: 0 });
+                last_end = cpos + clen;
+                last_pos = cpos;
+                last_len = clen;
+            }
+            current_position = next_at + last_pos + last_len;
+            ignored_text_position = current_position;
+        } else {
+            current_position = next_at + 1;
+        }
+    }
+    if ignored_text_position < content.len() {
+        toks.push(DaToken { typ: DA_T_NONE, content: content[ignored_text_position..].to_vec(), pos: 0 });
+    }
+    toks
+}
+
+fn da_get_code(toks: &[DaToken]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for t in toks {
+        out.extend_from_slice(&t.content);
+    }
+    out
+}
+
+// mirrors /^(\r?\n\s*\*\s*)*\s*$/ on a T_NONE gap
+fn da_annotation_end_none(content: &[u8]) -> bool {
+    let mut i = 0;
+    loop {
+        let start = i;
+        if i < content.len() && content[i] == b'\r' {
+            i += 1;
+        }
+        if i < content.len() && content[i] == b'\n' {
+            i += 1;
+            while i < content.len() && da_is_space(content[i]) {
+                i += 1;
+            }
+            if i < content.len() && content[i] == b'*' {
+                i += 1;
+                while i < content.len() && da_is_space(content[i]) {
+                    i += 1;
+                }
+            } else {
+                i = start;
+                break;
+            }
+        } else {
+            i = start;
+            break;
+        }
+    }
+    while i < content.len() && da_is_space(content[i]) {
+        i += 1;
+    }
+    i == content.len()
+}
+
+fn da_get_annotation_end(toks: &[DaToken], index: usize) -> Option<usize> {
+    let mut current: Option<usize> = None;
+    if index + 2 < toks.len() {
+        if toks[index + 2].typ == DA_T_OPEN_PAREN {
+            current = Some(index + 2);
+        } else if index + 3 < toks.len()
+            && toks[index + 2].typ == DA_T_NONE
+            && toks[index + 3].typ == DA_T_OPEN_PAREN
+            && da_annotation_end_none(&toks[index + 2].content)
+        {
+            current = Some(index + 3);
+        }
+    }
+    if let Some(mut c) = current {
+        let mut level = 0i32;
+        while c < toks.len() {
+            match toks[c].typ {
+                DA_T_OPEN_PAREN => level += 1,
+                DA_T_CLOSE_PAREN => level -= 1,
+                _ => {}
+            }
+            if level == 0 {
+                return Some(c);
+            }
+            c += 1;
+        }
+        return None;
+    }
+    Some(index + 1)
+}
+
+const DA_IGNORED_TAGS: &[&[u8]] = &[
+    b"abstract", b"access", b"code", b"deprec", b"encode", b"exception", b"final", b"ingroup",
+    b"inheritdoc", b"inheritDoc", b"magic", b"name", b"toc", b"tutorial", b"private", b"static",
+    b"staticvar", b"staticVar", b"throw", b"api", b"author", b"category", b"copyright", b"deprecated",
+    b"example", b"filesource", b"global", b"ignore", b"internal", b"license", b"link", b"method",
+    b"package", b"property", b"property-read", b"property-write", b"return", b"see", b"since",
+    b"source", b"subpackage", b"throws", b"todo", b"TODO", b"usedBy", b"uses", b"var", b"version",
+    b"param", b"after", b"afterClass", b"backupGlobals", b"backupStaticAttributes", b"before",
+    b"beforeClass", b"codeCoverageIgnore", b"codeCoverageIgnoreStart", b"codeCoverageIgnoreEnd",
+    b"covers", b"coversDefaultClass", b"coversNothing", b"dataProvider", b"depends",
+    b"expectedException", b"expectedExceptionCode", b"expectedExceptionMessage",
+    b"expectedExceptionMessageRegExp", b"group", b"large", b"medium", b"preserveGlobalState",
+    b"requires", b"runTestsInSeparateProcesses", b"runInSeparateProcess", b"small", b"test",
+    b"testdox", b"ticket", b"SuppressWarnings", b"noinspection", b"package_version", b"enduml",
+    b"startuml", b"psalm", b"phpstan", b"template", b"fix", b"FIXME", b"fixme", b"override",
+];
+
+fn da_is_class_modifier(lo: &[u8]) -> bool {
+    matches!(lo, b"abstract" | b"final" | b"readonly")
+}
+fn da_is_member_modifier(lo: &[u8]) -> bool {
+    matches!(lo, b"public" | b"protected" | b"private" | b"final" | b"abstract" | b"readonly")
+}
+
+fn da_enclosing_class_is_class(s: &Stream, idx: usize) -> bool {
+    let mut depth = 0i32;
+    let mut j = idx as isize - 1;
+    while j >= 0 {
+        let k = j as usize;
+        if s.kind(k) == Kind::Punct {
+            match s.bytes(k) {
+                b"}" => depth += 1,
+                b"{" => {
+                    if depth == 0 {
+                        let (bk, kw) = classify_brace(s, k);
+                        return bk == BraceKind::ClassLike
+                            && matches!(kw, Some(w) if s.bytes(w).eq_ignore_ascii_case(b"class"));
+                    }
+                    depth -= 1;
+                }
+                _ => {}
+            }
+        }
+        j -= 1;
+    }
+    false
+}
+
+fn da_eligible(s: &Stream, index: usize) -> bool {
+    let mut i = sig_next(s, index);
+    while let Some(x) = i {
+        if s.kind(x) == Kind::Keyword && da_is_class_modifier(&s.bytes(x).to_ascii_lowercase()) {
+            i = sig_next(s, x);
+        } else {
+            break;
+        }
+    }
+    let x = match i {
+        Some(x) => x,
+        None => return false,
+    };
+    if s.kind(x) == Kind::Keyword && s.bytes(x).eq_ignore_ascii_case(b"class") {
+        return true;
+    }
+    let mut i = Some(x);
+    while let Some(x) = i {
+        if s.kind(x) == Kind::Keyword && da_is_member_modifier(&s.bytes(x).to_ascii_lowercase()) {
+            i = sig_next(s, x);
+        } else {
+            break;
+        }
+    }
+    match i {
+        Some(x) => da_enclosing_class_is_class(s, x),
+        None => false,
+    }
+}
+
+fn da_apply<F: FnMut(&mut Vec<DaToken>) -> bool>(s: &mut Stream, mut fixfn: F) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        if !da_eligible(s, i) {
+            i += 1;
+            continue;
+        }
+        let mut toks = da_create_from_doc_comment(s.bytes(i), DA_IGNORED_TAGS);
+        if fixfn(&mut toks) {
+            let rebuilt = da_get_code(&toks);
+            if rebuilt != s.bytes(i) {
+                s.set_owned(i, rebuilt);
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn doctrine_annotation_array_assignment(s: &mut Stream) -> bool {
+    da_apply(s, |toks| {
+        let mut changed = false;
+        let mut scopes: Vec<u8> = Vec::new(); // 0=annotation, 1=array
+        for t in toks.iter_mut() {
+            match t.typ {
+                DA_T_OPEN_PAREN => scopes.push(0),
+                DA_T_OPEN_CURLY => scopes.push(1),
+                DA_T_CLOSE_PAREN | DA_T_CLOSE_CURLY => {
+                    scopes.pop();
+                }
+                DA_T_EQUALS | DA_T_COLON => {
+                    if scopes.last() == Some(&1) && t.content != b"=" {
+                        t.content = b"=".to_vec();
+                        changed = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        changed
+    })
+}
+
+// mirrors /(\n( +\*)?) *$/ with PCRE `$`; returns (match_start, group1_end) if it matches
+fn da_indent_apply(content: &[u8], indent_spaces: usize) -> Option<Vec<u8>> {
+    // find the last '\n'
+    let nl = content.iter().rposition(|&c| c == b'\n')?;
+    // group1 = '\n' + optional ( +\*)
+    let mut g1_end = nl + 1;
+    // optional: one-or-more spaces then '*'
+    let mut p = nl + 1;
+    let mut spaces = 0;
+    while p < content.len() && content[p] == b' ' {
+        p += 1;
+        spaces += 1;
+    }
+    if spaces >= 1 && p < content.len() && content[p] == b'*' {
+        g1_end = p + 1;
+    }
+    // then ` *` (spaces) then optional (\r?\n) then end
+    let mut q = g1_end;
+    while q < content.len() && content[q] == b' ' {
+        q += 1;
+    }
+    let mut r = q;
+    if r < content.len() && content[r] == b'\r' {
+        r += 1;
+    }
+    if r < content.len() && content[r] == b'\n' {
+        r += 1;
+    }
+    if r != content.len() {
+        return None;
+    }
+    // rebuild: content[..g1_end] + spaces + (trailing newline preserved from [q..])
+    let mut out = content[..g1_end].to_vec();
+    out.extend(std::iter::repeat(b' ').take(indent_spaces));
+    out.extend_from_slice(&content[q..]);
+    Some(out)
+}
+
+fn da_line_braces_count(toks: &[DaToken], index: usize) -> (i32, i32) {
+    let mut opening = 0i32;
+    let mut closing = 0i32;
+    let mut i = index + 1;
+    while i < toks.len() {
+        if toks[i].typ == DA_T_NONE && toks[i].content.contains(&b'\n') {
+            break;
+        }
+        match toks[i].typ {
+            DA_T_OPEN_PAREN | DA_T_OPEN_CURLY => opening += 1,
+            DA_T_CLOSE_PAREN | DA_T_CLOSE_CURLY => {
+                if opening > 0 {
+                    opening -= 1;
+                } else {
+                    closing += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    (opening, closing)
+}
+
+fn da_indentation_can_be_fixed(toks: &[DaToken], nl_index: usize, positions: &[(usize, usize)]) -> bool {
+    for &(st, en) in positions {
+        if nl_index >= st && nl_index <= en {
+            return true;
+        }
+    }
+    if nl_index + 1 < toks.len() {
+        if toks[nl_index + 1].content.contains(&b'\n') {
+            return false;
+        }
+        return toks[nl_index + 1].typ == DA_T_AT;
+    }
+    false
+}
+
+fn doctrine_annotation_indentation(s: &mut Stream) -> bool {
+    da_apply(s, |toks| {
+        let mut positions: Vec<(usize, usize)> = Vec::new();
+        let mut index = 0usize;
+        while index < toks.len() {
+            if toks[index].typ != DA_T_AT {
+                index += 1;
+                continue;
+            }
+            match da_get_annotation_end(toks, index) {
+                Some(end) => {
+                    positions.push((index, end));
+                    index = end + 1;
+                }
+                None => return false,
+            }
+        }
+        let mut changed = false;
+        let mut indent_level: i32 = 0;
+        for idx in 0..toks.len() {
+            if toks[idx].typ != DA_T_NONE || !toks[idx].content.contains(&b'\n') {
+                continue;
+            }
+            if !da_indentation_can_be_fixed(toks, idx, &positions) {
+                continue;
+            }
+            let (opening, closing) = da_line_braces_count(toks, idx);
+            let delta = opening - closing;
+            let mixed = delta == 0 && opening > 0;
+            if indent_level > 0 && (delta < 0 || mixed) {
+                indent_level -= 1;
+            }
+            let spaces = (4 * indent_level + 1) as usize;
+            if let Some(fixed) = da_indent_apply(&toks[idx].content, spaces) {
+                if fixed != toks[idx].content {
+                    toks[idx].content = fixed;
+                    changed = true;
+                }
+            }
+            if delta > 0 || mixed {
+                indent_level += 1;
+            }
+        }
+        changed
+    })
 }

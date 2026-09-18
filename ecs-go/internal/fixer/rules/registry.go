@@ -124,6 +124,8 @@ func CommonFixers() []fixer.Fixer {
 func PhpdocFixers() []fixer.Fixer {
 	return []fixer.Fixer{
 		DoctrineAnnotationSpaces{},
+		DoctrineAnnotationArrayAssignment{},
+		DoctrineAnnotationIndentation{},
 		NoSuperfluousPhpdocTags{},
 		PhpdocNoUselessInheritdoc{},
 		PhpdocScalar{},
