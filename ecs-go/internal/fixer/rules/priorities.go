@@ -13,6 +13,7 @@ var fixerPriority = map[string]int{
 	"BinaryOperatorSpacesFixer":                -32,
 	"BlankLineAfterNamespaceFixer":             -20,
 	"BlankLineAfterOpeningTagFixer":            1,
+	"DoctrineAnnotationArrayAssignmentFixer":   1,
 	"DoctrineAnnotationSpacesFixer":            0,
 	// getPriority() is 0 upstream; raised to run before blank_line_after_opening_tag
 	// so ecs-go reaches the same output in a single pass (PHP-CS-Fixer loops to fixpoint)
