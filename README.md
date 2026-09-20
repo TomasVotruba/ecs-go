@@ -79,30 +79,30 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 ## Performance
 
 The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
-(in `ecs-rust/`) over the same rule subset (the 84 fixers both ports implement)
+(in `ecs-rust/`) over the same rule subset (the 151 fixers both ports implement)
 on real codebases and compares wall time. All three run `--fix` in parallel
 across every core; Go and Rust also produce byte-for-byte identical output. Mean
-of 10 runs on a 24-core Linux box:
+of 10 runs on the CI `ubuntu-latest` runner (4 vCPU):
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 8.611s | 0.113s | 0.095s |
-| rectorphp/rector-src | 3403 | 5.586s | 0.133s | 0.113s |
-| symfony/symfony (src) | 11581 | 18.729s | 0.708s | 0.471s |
+| laravel/framework (src) | 1703 | 37.646s | 3.926s | 0.647s |
+| symfony/symfony (src) | 11887 | 111.387s | 4.997s | 3.951s |
 
-Both compiled tools are far faster than the original PHP ECS - roughly 40-90x -
-and run close to each other: ecs-go is level with the Rust port on the smaller
-trees, and ecs-rust pulls ahead on the large one. All three fix in place with
+Both compiled tools are far faster than the original PHP ECS - roughly 10-60x -
+and ecs-rust leads ecs-go on this runner, by up to ~6x on the smaller tree, where
+Go has fewer cores to spread its parallelism across. All three fix in place with
 diff rendering off (ECS via `--no-diffs`; ecs-go and ecs-rust skip it in `--fix`
 mode), so each does the same work: lex, fix, write.
 
-Peak memory (max resident set size, single `--fix` run):
+Peak memory (max resident set size, single `--fix` run, measured separately on a
+24-core box - the CI runner does not track memory):
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 66 MB | 92 MB | 316 MB |
-| rectorphp/rector-src | 3403 | 81 MB | 49 MB | 199 MB |
-| symfony/symfony (src) | 11581 | 152 MB | 458 MB | 536 MB |
+| laravel/framework (src) | 1703 | 66 MB | 92 MB | 316 MB |
+| rectorphp/rector-src | 3421 | 81 MB | 49 MB | 199 MB |
+| symfony/symfony (src) | 11887 | 152 MB | 458 MB | 536 MB |
 
 The compiled tools trade memory for speed: both fan files across every core, so
 peak RSS scales with how many files are in flight at once, while the PHP ECS
