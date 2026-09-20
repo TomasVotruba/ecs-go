@@ -10,20 +10,24 @@ import (
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Operator/OperatorLinebreakFixer.php
 //
 // OperatorLinebreak moves a multiline operator to the beginning of the next line
-// (default position). This is a DOCUMENTED SAFE SUBSET: it only handles operators
-// that are a single, unambiguous token in the flat lexer. It deliberately never
-// touches ":" "?" "|" "&" or the object operators "->"/"?->", because telling a
-// ternary/switch/return-type/nullable/union/reference apart needs a CT-token
-// classification layer the lexer does not have; guessing there would corrupt code.
+// (default position). It handles the full operator set, including ":", "?", "|"
+// and "&", by classifying those ambiguous tokens the way PHP-CS-Fixer's
+// tokenizer transformers + analyzers do: a ":" that is a type-colon, named
+// argument, switch case, goto label or alternative-syntax colon is left alone; a
+// "?" that is a nullable type marker is left alone; a "|"/"&" that is a union or
+// intersection type separator is left alone; and a "&" that is a return-ref or a
+// reference is left alone. Object operators "->"/"?->" are not operators here.
 type OperatorLinebreak struct{}
 
+// operatorLinebreakPunct are the always-unambiguous operator tokens.
 var operatorLinebreakPunct = map[string]bool{
 	"||": true, "&&": true, ".": true, "+": true, "-": true, "*": true,
 	"/": true, "%": true, "**": true, "==": true, "===": true, "!=": true,
 	"!==": true, "<>": true, "<": true, ">": true, "<=": true, ">=": true,
 	"<=>": true, "??": true, "=>": true, "=": true, ".=": true, "+=": true,
 	"-=": true, "*=": true, "/=": true, "%=": true, "**=": true, "&=": true,
-	"|=": true, "^=": true, "<<=": true, ">>=": true, "??=": true,
+	"|=": true, "^=": true, "<<=": true, ">>=": true, "??=": true, "^": true,
+	"<<": true, ">>": true, "|": true, "&": true, ":": true, "?": true,
 }
 
 func (OperatorLinebreak) Name() string {
@@ -47,15 +51,50 @@ func isOperatorLinebreakToken(t token.Token) bool {
 	return false
 }
 
+// operatorLinebreakExcluded reports whether the token at i, although in the
+// operator set, must be left alone because of its context (mirrors what the
+// PHP-CS-Fixer tokenizer transforms into a CT token, plus the fixer's own
+// goto-label / reference / alternative-syntax / switch guards).
+func operatorLinebreakExcluded(s *tokens.Stream, i int, switchColons map[int]bool) bool {
+	if s.At(i).Kind != token.Punct {
+		return false
+	}
+	switch s.At(i).Value {
+	case ":":
+		return isTypeColon(s, i) || isNamedArgumentColon(s, i) ||
+			belongsToGotoLabel(s, i) || belongsToAlternativeSyntax(s, i) || switchColons[i]
+	case "?":
+		return isNullableType(s, i)
+	case "|":
+		return isPartOfType(s, i)
+	case "&":
+		return isPartOfType(s, i) || isReturnRef(s, i) || isReferenceAmp(s, i)
+	}
+	return false
+}
+
 func (OperatorLinebreak) Fix(s *tokens.Stream) bool {
 	changed := false
-	// bottom-up: inserting tokens only shifts indices after the operator
+	switchColons := switchCaseColons(s)
 	for i := s.Len() - 1; i > 0; i-- {
 		if !isOperatorLinebreakToken(s.At(i)) {
 			continue
 		}
-		prevM := sigPrev(s, i)
-		nextM := sigNext(s, i)
+		if operatorLinebreakExcluded(s, i, switchColons) {
+			continue
+		}
+
+		opIndices := []int{i}
+		// short-ternary "?:" is moved as a single unit
+		if s.At(i).Kind == token.Punct && s.At(i).Value == ":" {
+			if p := sigPrev(s, i); p >= 0 && s.At(p).Kind == token.Punct && s.At(p).Value == "?" {
+				opIndices = []int{p, i}
+			}
+		}
+
+		lo, hi := opIndices[0], opIndices[len(opIndices)-1]
+		prevM := sigPrev(s, lo)
+		nextM := sigNext(s, hi)
 		if prevM < 0 || nextM < 0 {
 			continue
 		}
@@ -64,11 +103,12 @@ func (OperatorLinebreak) Fix(s *tokens.Stream) bool {
 			continue
 		}
 		// already at the beginning of a line if there is no newline after it
-		if !operatorSpanMultiline(s, i, nextM-1) {
+		if !operatorSpanMultiline(s, hi, nextM-1) {
 			continue
 		}
-		moveOperatorToLineStart(s, i, nextM)
+		moveOperatorToLineStart(s, opIndices, nextM)
 		changed = true
+		i = lo // resume before the moved group
 	}
 	return changed
 }
@@ -87,19 +127,32 @@ func operatorSpanMultiline(s *tokens.Stream, from, to int) bool {
 	return false
 }
 
-// moveOperatorToLineStart clears the operator (and the space before it) and
-// re-inserts it just before the next meaningful token, adding a single space
-// after it when a space preceded it - matching fixMoveToTheBeginning.
-func moveOperatorToLineStart(s *tokens.Stream, opIndex, nextM int) {
-	opVal := s.At(opIndex).Value
-	opKind := s.At(opIndex).Kind
-	hadSpaceBefore := opIndex > 0 && s.At(opIndex-1).Kind == token.Whitespace
-	if hadSpaceBefore {
-		s.SetValue(opIndex-1, "")
+// moveOperatorToLineStart mirrors fixMoveToTheBeginning: it clears each operator
+// (and the whitespace immediately before it) and re-inserts the operators just
+// before the next meaningful token, keeping a single leading space when a space
+// preceded the group.
+func moveOperatorToLineStart(s *tokens.Stream, opIndices []int, nextM int) {
+	lo := opIndices[0]
+	hadSpaceBefore := lo > 0 && s.At(lo-1).Kind == token.Whitespace
+
+	// clone operator tokens and clear them plus the whitespace directly before each
+	clones := make([]token.Token, len(opIndices))
+	for k, idx := range opIndices {
+		clones[k] = token.Token{Kind: s.At(idx).Kind, Value: s.At(idx).Value}
 	}
-	s.SetValue(opIndex, "")
-	s.InsertAt(nextM, token.Token{Kind: opKind, Value: opVal})
+	for _, idx := range opIndices {
+		if idx > 0 && s.At(idx-1).Kind == token.Whitespace {
+			s.SetValue(idx-1, "")
+		}
+		s.SetValue(idx, "")
+	}
+
+	at := nextM
+	for _, c := range clones {
+		s.InsertAt(at, c)
+		at++
+	}
 	if hadSpaceBefore {
-		s.InsertAt(nextM+1, token.Token{Kind: token.Whitespace, Value: " "})
+		s.InsertAt(at, token.Token{Kind: token.Whitespace, Value: " "})
 	}
 }

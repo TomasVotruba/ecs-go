@@ -12013,7 +12013,8 @@ fn no_unreachable_default_argument_value(s: &mut Stream) -> bool {
 const OP_LB_PUNCT: &[&[u8]] = &[
     b"||", b"&&", b".", b"+", b"-", b"*", b"/", b"%", b"**", b"==", b"===", b"!=", b"!==",
     b"<>", b"<", b">", b"<=", b">=", b"<=>", b"??", b"=>", b"=", b".=", b"+=", b"-=", b"*=",
-    b"/=", b"%=", b"**=", b"&=", b"|=", b"^=", b"<<=", b">>=", b"??=",
+    b"/=", b"%=", b"**=", b"&=", b"|=", b"^=", b"<<=", b">>=", b"??=", b"^", b"<<", b">>",
+    b"|", b"&", b":", b"?",
 ];
 
 fn is_op_lb_token(s: &Stream, i: usize) -> bool {
@@ -12038,42 +12039,423 @@ fn operator_span_multiline(s: &Stream, from: usize, to: usize) -> bool {
     false
 }
 
-// Documented safe subset of OperatorLinebreak: moves a multiline operator to the
-// start of the next line, only for unambiguous single-token operators (never
-// ":" "?" "|" "&" or object operators). Mirrors the Go fixer.
+fn ol_kw_lower(s: &Stream, i: usize) -> Vec<u8> {
+    if s.kind(i) == Kind::Keyword {
+        s.bytes(i).to_ascii_lowercase()
+    } else {
+        Vec::new()
+    }
+}
+
+fn is_type_colon(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b":") {
+        return false;
+    }
+    let end_index = match sig_prev(s, index) {
+        Some(e) => e,
+        None => return false,
+    };
+    if let Some(pe) = sig_prev(s, end_index) {
+        if kw_is(s, pe, b"enum") {
+            return true;
+        }
+    }
+    if !is_punct_val(s, end_index, b")") {
+        return false;
+    }
+    let start_index = match match_backward(s, end_index) {
+        Some(x) => x,
+        None => return false,
+    };
+    let mut prev_index = match sig_prev(s, start_index) {
+        Some(p) => p,
+        None => return false,
+    };
+    if s.kind(prev_index) == Kind::Ident {
+        prev_index = match sig_prev(s, prev_index) {
+            Some(p) => p,
+            None => return false,
+        };
+    }
+    matches!(ol_kw_lower(s, prev_index).as_slice(), b"function" | b"fn" | b"use")
+        || (is_punct_val(s, prev_index, b"&") && is_return_ref(s, prev_index))
+}
+
+fn is_named_argument_colon(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b":") {
+        return false;
+    }
+    let string_index = match sig_prev(s, index) {
+        Some(x) if s.kind(x) == Kind::Ident => x,
+        _ => return false,
+    };
+    match sig_prev(s, string_index) {
+        Some(p) => is_punct_val(s, p, b",") || is_punct_val(s, p, b"("),
+        None => false,
+    }
+}
+
+fn is_nullable_type(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b"?") {
+        return false;
+    }
+    let prev_index = match sig_prev(s, index) {
+        Some(p) => p,
+        None => return false,
+    };
+    let mut ok = is_punct_val(s, prev_index, b"(")
+        || is_punct_val(s, prev_index, b",")
+        || is_type_colon(s, prev_index);
+    if !ok {
+        ok = matches!(
+            ol_kw_lower(s, prev_index).as_slice(),
+            b"public" | b"protected" | b"private" | b"var" | b"static" | b"const" | b"abstract"
+                | b"final" | b"readonly"
+        );
+    }
+    if !ok {
+        return false;
+    }
+    if ol_kw_lower(s, prev_index) == b"static" {
+        if let Some(pp) = sig_prev(s, prev_index) {
+            if kw_is(s, pp, b"instanceof") {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn is_return_ref(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b"&") {
+        return false;
+    }
+    match sig_prev(s, index) {
+        Some(p) => kw_is(s, p, b"function") || kw_is(s, p, b"fn"),
+        None => false,
+    }
+}
+
+fn is_reference_amp(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b"&") {
+        return false;
+    }
+    let mut idx = match sig_prev(s, index) {
+        Some(p) => p,
+        None => return false,
+    };
+    if is_punct_val(s, idx, b"=")
+        || is_punct_val(s, idx, b"=>")
+        || kw_is(s, idx, b"as")
+        || kw_is(s, idx, b"callable")
+        || kw_is(s, idx, b"array")
+    {
+        return true;
+    }
+    if s.kind(idx) == Kind::Ident {
+        idx = match sig_prev(s, idx) {
+            Some(p) => p,
+            None => return false,
+        };
+    }
+    is_punct_val(s, idx, b"(")
+        || is_punct_val(s, idx, b",")
+        || is_punct_val(s, idx, b"\\")
+        || (is_punct_val(s, idx, b"?") && is_nullable_type(s, idx))
+}
+
+fn belongs_to_goto_label(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b":") {
+        return false;
+    }
+    let prev = match sig_prev(s, index) {
+        Some(p) if s.kind(p) == Kind::Ident => p,
+        _ => return false,
+    };
+    let prev2 = match sig_prev(s, prev) {
+        Some(p) => p,
+        None => return false,
+    };
+    is_punct_val(s, prev2, b":")
+        || is_punct_val(s, prev2, b";")
+        || is_punct_val(s, prev2, b"{")
+        || is_punct_val(s, prev2, b"}")
+        || s.kind(prev2) == Kind::OpenTag
+}
+
+fn belongs_to_alternative_syntax(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b":") {
+        return false;
+    }
+    let prev = match sig_prev(s, index) {
+        Some(p) => p,
+        None => return false,
+    };
+    if kw_is(s, prev, b"else") {
+        return true;
+    }
+    if !is_punct_val(s, prev, b")") {
+        return false;
+    }
+    let open = match match_backward(s, prev) {
+        Some(x) => x,
+        None => return false,
+    };
+    let before = match sig_prev(s, open) {
+        Some(b) => b,
+        None => return false,
+    };
+    matches!(
+        ol_kw_lower(s, before).as_slice(),
+        b"declare" | b"elseif" | b"for" | b"foreach" | b"if" | b"switch" | b"while"
+    )
+}
+
+fn ol_type_skip_token(s: &Stream, j: usize) -> bool {
+    match s.kind(j) {
+        Kind::Whitespace | Kind::Comment | Kind::DocComment | Kind::Ident => true,
+        Kind::Punct => matches!(s.bytes(j), b"|" | b"&" | b"(" | b")" | b"\\"),
+        Kind::Keyword => matches!(
+            s.bytes(j).to_ascii_lowercase().as_slice(),
+            b"callable" | b"static" | b"array"
+        ),
+        _ => false,
+    }
+}
+
+fn ol_not_of_kind_sibling_type(s: &Stream, index: usize, dir: i32) -> Option<usize> {
+    let mut j = index as isize + dir as isize;
+    while j >= 0 && (j as usize) < s.len() {
+        if !ol_type_skip_token(s, j as usize) {
+            return Some(j as usize);
+        }
+        j += dir as isize;
+    }
+    None
+}
+
+fn ol_is_type_end_token(s: &Stream, idx: usize) -> bool {
+    if is_punct_val(s, idx, b")") || is_punct_val(s, idx, b"\\") {
+        return true;
+    }
+    if s.kind(idx) == Kind::Ident {
+        return true;
+    }
+    matches!(
+        ol_kw_lower(s, idx).as_slice(),
+        b"callable" | b"static" | b"array"
+    )
+}
+
+fn ol_get_prev_token_of_kind_type(s: &Stream, index: usize) -> Option<usize> {
+    let mut j = index as isize - 1;
+    while j >= 0 {
+        let k = j as usize;
+        if is_punct_val(s, k, b"{")
+            || is_punct_val(s, k, b"}")
+            || is_punct_val(s, k, b";")
+            || s.kind(k) == Kind::CloseTag
+            || kw_is(s, k, b"fn")
+            || kw_is(s, k, b"function")
+        {
+            return Some(k);
+        }
+        j -= 1;
+    }
+    None
+}
+
+fn is_part_of_type(s: &Stream, index: usize) -> bool {
+    if !is_punct_val(s, index, b"|") && !is_punct_val(s, index, b"&") {
+        return false;
+    }
+    if let Some(tc) = ol_not_of_kind_sibling_type(s, index, -1) {
+        if kw_is(s, tc, b"catch") || kw_is(s, tc, b"const") || is_type_colon(s, tc) {
+            return true;
+        }
+    }
+    let after_type_index = match ol_not_of_kind_sibling_type(s, index, 1) {
+        Some(a) => a,
+        None => return false,
+    };
+    if is_punct_val(s, after_type_index, b"...") {
+        return true;
+    }
+    if s.kind(after_type_index) != Kind::Variable {
+        return false;
+    }
+    let before_var = match sig_prev(s, after_type_index) {
+        Some(b) => b,
+        None => return false,
+    };
+    if is_punct_val(s, before_var, b"&") {
+        return match ol_get_prev_token_of_kind_type(s, index) {
+            Some(p) => kw_is(s, p, b"fn") || kw_is(s, p, b"function"),
+            None => false,
+        };
+    }
+    ol_is_type_end_token(s, before_var)
+}
+
+fn ol_case_colon_after(s: &Stream, case_idx: usize, limit: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut j = case_idx + 1;
+    while j < limit && j < s.len() {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b":" if depth == 0 => return Some(j),
+                b";" if depth == 0 => return None,
+                _ => {}
+            }
+        }
+        j += 1;
+    }
+    None
+}
+
+fn ol_alt_switch_end(s: &Stream, colon_index: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut j = colon_index + 1;
+    while j < s.len() {
+        if kw_is(s, j, b"switch") {
+            depth += 1;
+        } else if kw_is(s, j, b"endswitch") {
+            if depth == 0 {
+                return Some(j);
+            }
+            depth -= 1;
+        }
+        j += 1;
+    }
+    None
+}
+
+fn ol_scan_case_colons(s: &Stream, from: usize, to: usize, result: &mut std::collections::HashSet<usize>) {
+    let mut depth = 0i32;
+    let mut j = from;
+    while j < to && j < s.len() {
+        if is_punct_val(s, j, b"{") {
+            depth += 1;
+        } else if is_punct_val(s, j, b"}") {
+            depth -= 1;
+        } else if depth == 0 && (kw_is(s, j, b"case") || kw_is(s, j, b"default")) {
+            if let Some(c) = ol_case_colon_after(s, j, to) {
+                result.insert(c);
+            }
+        }
+        j += 1;
+    }
+}
+
+fn switch_case_colons(s: &Stream) -> std::collections::HashSet<usize> {
+    let mut result = std::collections::HashSet::new();
+    let mut i = 0;
+    while i < s.len() {
+        if kw_is(s, i, b"switch") {
+            if let Some(open) = next_punct_of_kind(s, i, &[b"("]) {
+                if let Some(close_idx) = match_forward(s, open) {
+                    if let Some(body_start) = sig_next(s, close_idx) {
+                        if is_punct_val(s, body_start, b"{") {
+                            if let Some(body_end) = match_forward(s, body_start) {
+                                ol_scan_case_colons(s, body_start + 1, body_end, &mut result);
+                            }
+                        } else if is_punct_val(s, body_start, b":") {
+                            result.insert(body_start);
+                            if let Some(end) = ol_alt_switch_end(s, body_start) {
+                                if end > body_start {
+                                    ol_scan_case_colons(s, body_start + 1, end, &mut result);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    result
+}
+
+fn operator_linebreak_excluded(s: &Stream, i: usize, switch_colons: &std::collections::HashSet<usize>) -> bool {
+    if s.kind(i) != Kind::Punct {
+        return false;
+    }
+    match s.bytes(i) {
+        b":" => {
+            is_type_colon(s, i)
+                || is_named_argument_colon(s, i)
+                || belongs_to_goto_label(s, i)
+                || belongs_to_alternative_syntax(s, i)
+                || switch_colons.contains(&i)
+        }
+        b"?" => is_nullable_type(s, i),
+        b"|" => is_part_of_type(s, i),
+        b"&" => is_part_of_type(s, i) || is_return_ref(s, i) || is_reference_amp(s, i),
+        _ => false,
+    }
+}
+
+// OperatorLinebreak: moves a multiline operator to the start of the next line,
+// handling the full operator set incl ":" "?" "|" "&" via CT-context classifiers
+// (type/nullable/union/intersection/named-arg/reference/label/switch/alt-syntax).
 fn operator_linebreak(s: &mut Stream) -> bool {
     let mut changed = false;
     if s.len() == 0 {
         return false;
     }
+    let switch_colons = switch_case_colons(s);
     let mut i = s.len();
     while i > 1 {
         i -= 1;
         if !is_op_lb_token(s, i) {
             continue;
         }
-        let (pm, nm) = match (sig_prev(s, i), sig_next(s, i)) {
+        if operator_linebreak_excluded(s, i, &switch_colons) {
+            continue;
+        }
+
+        let mut op_indices = vec![i];
+        if is_punct_val(s, i, b":") {
+            if let Some(p) = sig_prev(s, i) {
+                if is_punct_val(s, p, b"?") {
+                    op_indices = vec![p, i];
+                }
+            }
+        }
+        let lo = op_indices[0];
+        let hi = op_indices[op_indices.len() - 1];
+        let (pm, nm) = match (sig_prev(s, lo), sig_next(s, hi)) {
             (Some(a), Some(b)) => (a, b),
             _ => continue,
         };
         if !operator_span_multiline(s, pm + 1, nm - 1) {
             continue;
         }
-        if !operator_span_multiline(s, i, nm - 1) {
+        if !operator_span_multiline(s, hi, nm - 1) {
             continue;
         }
-        let op_val = s.bytes(i).to_vec();
-        let op_kind = s.kind(i);
-        let had_space = i > 0 && s.kind(i - 1) == Kind::Whitespace;
-        if had_space {
-            s.set_owned(i - 1, Vec::new());
+
+        let had_space = lo > 0 && s.kind(lo - 1) == Kind::Whitespace;
+        let clones: Vec<(Kind, Vec<u8>)> =
+            op_indices.iter().map(|&idx| (s.kind(idx), s.bytes(idx).to_vec())).collect();
+        for &idx in &op_indices {
+            if idx > 0 && s.kind(idx - 1) == Kind::Whitespace {
+                s.set_owned(idx - 1, Vec::new());
+            }
+            s.set_owned(idx, Vec::new());
         }
-        s.set_owned(i, Vec::new());
-        s.insert_owned(nm, op_kind, op_val);
+        let mut at = nm;
+        for (k, v) in clones {
+            s.insert_owned(at, k, v);
+            at += 1;
+        }
         if had_space {
-            s.insert_owned(nm + 1, Kind::Whitespace, b" ".to_vec());
+            s.insert_owned(at, Kind::Whitespace, b" ".to_vec());
         }
         changed = true;
+        i = lo;
     }
     changed
 }
