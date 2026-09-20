@@ -79,16 +79,16 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 ## Performance
 
 The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
-(in `ecs-rust/`) over the same rule subset (the 84 fixers both ports implement)
+(in `ecs-rust/`) over the same rule subset (the 151 fixers both ports implement)
 on real codebases and compares wall time. All three run `--fix` in parallel
 across every core; Go and Rust also produce byte-for-byte identical output. Mean
 of 10 runs on a 24-core Linux box:
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 8.611s | 0.113s | 0.095s |
-| rectorphp/rector-src | 3403 | 5.586s | 0.133s | 0.113s |
-| symfony/symfony (src) | 11581 | 18.729s | 0.708s | 0.471s |
+| laravel/framework (src) | 1703 | 8.611s | 0.113s | 0.095s |
+| rectorphp/rector-src | 3421 | 5.586s | 0.133s | 0.113s |
+| symfony/symfony (src) | 11887 | 18.729s | 0.708s | 0.471s |
 
 Both compiled tools are far faster than the original PHP ECS - roughly 40-90x -
 and run close to each other: ecs-go is level with the Rust port on the smaller
@@ -100,9 +100,9 @@ Peak memory (max resident set size, single `--fix` run):
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1696 | 66 MB | 92 MB | 316 MB |
-| rectorphp/rector-src | 3403 | 81 MB | 49 MB | 199 MB |
-| symfony/symfony (src) | 11581 | 152 MB | 458 MB | 536 MB |
+| laravel/framework (src) | 1703 | 66 MB | 92 MB | 316 MB |
+| rectorphp/rector-src | 3421 | 81 MB | 49 MB | 199 MB |
+| symfony/symfony (src) | 11887 | 152 MB | 458 MB | 536 MB |
 
 The compiled tools trade memory for speed: both fan files across every core, so
 peak RSS scales with how many files are in flight at once, while the PHP ECS
