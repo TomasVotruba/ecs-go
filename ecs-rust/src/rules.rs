@@ -16058,39 +16058,44 @@ fn fq_is_reserved_type(lower: &[u8]) -> bool {
     FQ_RESERVED.iter().any(|r| *r == lower)
 }
 
+// Keyed by full name (like ECS's $uses): importing the same class twice keeps
+// only the last alias; caches are derived from that in build().
 struct FqUses {
-    // (long, short); plus derived lookups computed lazily as linear scans
-    entries: Vec<(Vec<u8>, Vec<u8>)>,
+    long_to_short: Vec<(Vec<u8>, Vec<u8>)>,
+    nbsl: Vec<(Vec<u8>, Vec<u8>)>,   // (lower(short), long)
+    sbn: Vec<(Vec<u8>, Vec<u8>)>,    // (long, short)
+    sbnorm: Vec<(Vec<u8>, Vec<u8>)>, // (normalize(long), short)
 }
 
 impl FqUses {
     fn new() -> Self {
-        FqUses { entries: Vec::new() }
+        FqUses { long_to_short: Vec::new(), nbsl: Vec::new(), sbn: Vec::new(), sbnorm: Vec::new() }
     }
     fn add(&mut self, long: Vec<u8>, short: Vec<u8>) {
-        self.entries.push((long, short));
+        if let Some(e) = self.long_to_short.iter_mut().find(|(l, _)| *l == long) {
+            e.1 = short;
+        } else {
+            self.long_to_short.push((long, short));
+        }
+    }
+    fn build(&mut self) {
+        for (long, short) in &self.long_to_short {
+            self.nbsl.push((short.to_ascii_lowercase(), long.clone()));
+            self.sbn.push((long.clone(), short.clone()));
+            self.sbnorm.push((fq_normalize(long), short.clone()));
+        }
     }
     fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.long_to_short.is_empty()
     }
-    // ECS builds its caches by overwriting, so a duplicate key keeps the LAST
-    // entry - mirror that with rev().find().
     fn name_by_short_lower(&self, short_lower: &[u8]) -> Option<&[u8]> {
-        self.entries
-            .iter()
-            .rev()
-            .find(|(_, s)| s.to_ascii_lowercase() == short_lower)
-            .map(|(l, _)| l.as_slice())
+        self.nbsl.iter().rev().find(|(k, _)| k.as_slice() == short_lower).map(|(_, l)| l.as_slice())
     }
     fn short_by_name(&self, name: &[u8]) -> Option<&[u8]> {
-        self.entries.iter().rev().find(|(l, _)| l.as_slice() == name).map(|(_, s)| s.as_slice())
+        self.sbn.iter().rev().find(|(k, _)| k.as_slice() == name).map(|(_, s)| s.as_slice())
     }
     fn short_by_normalized(&self, norm: &[u8]) -> Option<&[u8]> {
-        self.entries
-            .iter()
-            .rev()
-            .find(|(l, _)| fq_normalize(l) == norm)
-            .map(|(_, s)| s.as_slice())
+        self.sbnorm.iter().rev().find(|(k, _)| k.as_slice() == norm).map(|(_, s)| s.as_slice())
     }
 }
 
@@ -16400,6 +16405,7 @@ fn fq_collect_uses_region(s: &Stream, start: usize, end: usize) -> FqUses {
             None => i += 1,
         }
     }
+    u.build();
     u
 }
 
@@ -16458,6 +16464,12 @@ fn fq_prev_name(s: &Stream, idx: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u
         return None;
     }
     let (content, start) = fq_read_run_backward(s, p)?;
+    // a name after an object operator (`$this->grammar::`) is a member, not a class
+    if let Some(b) = sig_prev(s, start) {
+        if s.kind(b) == Kind::Punct && (s.bytes(b) == b"->" || s.bytes(b) == b"?->") {
+            return None;
+        }
+    }
     let repl = fq_determine_short(&content, u, ns, reserved)?;
     Some(FqRepl { start, end: p, tokens: fq_string_to_tokens(&repl) })
 }
@@ -16648,6 +16660,11 @@ fn fq_name_char(c: u8) -> bool {
 
 // shorten each class-name atom in a type, skipping variables/keys/members.
 fn fq_shorten_doc_type(type_str: &[u8], u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<u8> {
+    // a wildcard type argument (`*`) makes the whole expression unparseable for
+    // ECS's TypeExpression, which then leaves it entirely fully qualified.
+    if type_str.contains(&b'*') {
+        return type_str.to_vec();
+    }
     let mut out: Vec<u8> = Vec::new();
     let mut i = 0;
     let n = type_str.len();
@@ -16711,6 +16728,10 @@ fn fq_doc_atom_shortenable(b: &[u8], start: usize, end: usize, n: usize) -> bool
         }
     }
     if end < n && b[end] == b':' && !(end + 1 < n && b[end + 1] == b':') {
+        return false;
+    }
+    // generic base (`Foo<...>`): kept fully qualified (never over-shortens)
+    if end < n && b[end] == b'<' {
         return false;
     }
     true

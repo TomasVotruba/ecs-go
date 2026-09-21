@@ -177,6 +177,12 @@ func fqPhpDocContent(content string, uses *fqUses, ns string, reserved map[strin
 // fqShortenDocType shortens each class-name atom in a type expression, skipping
 // variables ($x), string keys, array-shape keys and `::` members.
 func fqShortenDocType(typeStr string, uses *fqUses, ns string, reserved map[string]bool) string {
+	// a wildcard type argument (`*`, e.g. `Foo<*>` or `Rel<T, *, *>`) makes the
+	// whole type expression unparseable for ECS's TypeExpression, which then
+	// leaves it entirely fully qualified.
+	if strings.Contains(typeStr, "*") {
+		return typeStr
+	}
 	b := []byte(typeStr)
 	n := len(b)
 	var out []byte
@@ -241,6 +247,13 @@ func fqDocAtomShortenable(b []byte, start, end, n int) bool {
 	}
 	// array-shape / object-shape key: atom immediately followed by a single `:`
 	if end < n && b[end] == ':' && (end+1 >= n || b[end+1] != ':') {
+		return false
+	}
+	// generic base (`Foo<...>`): ECS shortens some but keeps others (wildcards,
+	// multi-arg spaced generics its parser rejects); leaving every generic base
+	// fully qualified is byte-safe and never over-shortens. (Valid callable
+	// bases `Closure(...)` are not guarded - ECS shortens those.)
+	if end < n && b[end] == '<' {
 		return false
 	}
 	return true

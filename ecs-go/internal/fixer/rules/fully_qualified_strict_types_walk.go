@@ -121,6 +121,7 @@ func fqCollectUsesRegion(s *tokens.Stream, reg fqRegion) *fqUses {
 		}
 		u.add(fqcn, short)
 	}
+	u.build()
 	return u
 }
 
@@ -255,6 +256,10 @@ func fqPrevName(s *tokens.Stream, idx int, uses *fqUses, ns string, reserved map
 	}
 	content, start, ok := fqReadRunBackward(s, p)
 	if !ok {
+		return fqReplace{}, false
+	}
+	// a name after an object operator (`$this->grammar::`) is a member, not a class
+	if b := sigPrev(s, start); b >= 0 && s.At(b).Kind == token.Punct && (s.At(b).Value == "->" || s.At(b).Value == "?->") {
 		return fqReplace{}, false
 	}
 	repl, changed := fqDetermineShort(content, uses, ns, reserved)
