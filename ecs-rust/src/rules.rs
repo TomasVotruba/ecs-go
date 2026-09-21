@@ -9,6 +9,16 @@ use crate::token::Kind;
 // FQCNs of the ported fixers, matching ecs-go's names. Used to build the Go-side
 // `--rules` subset for a fair, identical-work comparison.
 pub const RULE_NAMES: &[&str] = &[
+    r"PhpCsFixer\Fixer\ClassNotation\ProtectedToPrivateFixer",
+    r"PhpCsFixer\Fixer\Alias\NoAliasFunctionsFixer",
+    r"PhpCsFixer\Fixer\Operator\IncrementStyleFixer",
+    r"PhpCsFixer\Fixer\LanguageConstruct\FunctionToConstantFixer",
+    r"PhpCsFixer\Fixer\Alias\NoAliasLanguageConstructCallFixer",
+    r"PhpCsFixer\Fixer\Alias\NoMixedEchoPrintFixer",
+    r"PhpCsFixer\Fixer\Operator\NotOperatorWithSuccessorSpaceFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\SelfStaticAccessorFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer",
+    r"PhpCsFixer\Fixer\Basic\SingleLineEmptyBodyFixer",
     r"PhpCsFixer\Fixer\Basic\EncodingFixer",
     r"PhpCsFixer\Fixer\PhpTag\FullOpeningTagFixer",
     r"PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer",
@@ -25,6 +35,16 @@ pub const RULE_NAMES: &[&str] = &[
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer",
     r"PhpCsFixer\Fixer\ControlStructure\NoBreakCommentFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocSummaryFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocTagTypeFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocOrderFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\GeneralPhpdocAnnotationRemoveFixer",
+    r"PhpCsFixer\Fixer\Whitespace\MethodChainingIndentationFixer",
+    r"PhpCsFixer\Fixer\Semicolon\MultilineWhitespaceBeforeSemicolonsFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\AddMissingParamNameFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\OrderedTypesFixer",
+    r"PhpCsFixer\Fixer\DoctrineAnnotation\DoctrineAnnotationSpacesFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocSeparationFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocToCommentFixer",
     r"PhpCsFixer\Fixer\DoctrineAnnotation\DoctrineAnnotationArrayAssignmentFixer",
@@ -160,6 +180,15 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocTrimConsecutiveBlankLineSeparationFixer",
     r"PhpCsFixer\Fixer\Whitespace\NoWhitespaceInBlankLineFixer",
     r"PhpCsFixer\Fixer\Whitespace\SingleBlankLineAtEofFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\ControlStructureContinuationPositionFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\NoUnneededControlParenthesesFixer",
+    r"PhpCsFixer\Fixer\NamespaceNotation\SingleBlankLineBeforeNamespaceFixer",
+    r"PhpCsFixer\Fixer\PhpTag\LinebreakAfterOpeningTagFixer",
+    r"PhpCsFixer\Fixer\ReturnNotation\NoUselessReturnFixer",
+    r"PhpCsFixer\Fixer\ReturnNotation\SimplifiedNullReturnFixer",
+    r"PhpCsFixer\Fixer\Whitespace\BlankLineBeforeStatementFixer",
+    r"Symplify\CodingStandard\Fixer\Strict\BlankLineAfterStrictTypesFixer",
+    r"PhpCsFixer\Fixer\LanguageConstruct\NullableTypeDeclarationFixer",
 ];
 
 // Rules run in ecs-go's rules.All() order, restricted to the ported set, so the
@@ -168,6 +197,7 @@ pub fn fix(s: &mut Stream) -> bool {
     let mut changed = false;
     changed |= encoding(s);
     changed |= full_opening_tag(s);
+    changed |= protected_to_private(s);
     changed |= ordered_class_elements(s);
     changed |= single_class_element_per_statement(s);
     changed |= class_attributes_separation(s);
@@ -175,6 +205,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_empty_statement(s);
     changed |= no_binary_string(s);
     changed |= no_alternative_syntax(s);
+    changed |= remove_useless_default_comment(s);
     changed |= elseif(s);
     changed |= control_structure_braces(s);
     changed |= standalone_line_promoted_property(s);
@@ -183,6 +214,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= standalone_line_symfony_attribute_param(s);
     changed |= no_break_comment(s);
     changed |= phpdoc_separation(s);
+    changed |= phpdoc_summary(s);
+    changed |= phpdoc_tag_type(s);
     changed |= phpdoc_to_comment(s);
     changed |= param_return_and_var_tag_malforms(s);
     changed |= general_phpdoc_tag_rename(s);
@@ -197,6 +230,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_trait_insert_per_statement(s);
     changed |= no_multiline_whitespace_around_double_arrow(s);
     changed |= function_declaration(s);
+    changed |= no_unneeded_control_parentheses(s);
+    changed |= add_missing_param_name(s);
     changed |= no_unreachable_default_argument_value(s);
     changed |= method_argument_space(s);
     changed |= array_indentation(s);
@@ -204,6 +239,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= phpdoc_indent(s);
     changed |= long_to_shorthand_operator(s);
     changed |= standardize_increment(s);
+    changed |= increment_style(s);
+    changed |= simplified_null_return(s);
     changed |= single_quote(s);
     changed |= clean_namespace(s);
     changed |= phpdoc_return_self_reference(s);
@@ -219,6 +256,9 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= spaces_inside_parentheses(s);
     changed |= list_syntax(s);
     changed |= no_empty_comment(s);
+    changed |= function_to_constant(s);
+    changed |= nullable_type_declaration(s);
+    changed |= linebreak_after_opening_tag(s);
     changed |= is_null(s);
     changed |= single_line_comment_spacing(s);
     changed |= no_space_around_double_colon(s);
@@ -229,6 +269,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_import_per_statement(s);
     changed |= line_ending(s);
     changed |= doctrine_annotation_array_assignment(s);
+    changed |= doctrine_annotation_spaces(s);
     changed |= doctrine_annotation_indentation(s);
     changed |= yoda_style(s);
     changed |= no_whitespace_before_comma_in_array(s);
@@ -247,14 +288,18 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= normalize_index_brace(s);
     changed |= switch_continue_to_break(s);
     changed |= no_unneeded_braces(s);
+    changed |= no_alias_functions(s);
     changed |= multiline_comment_opening_closing(s);
     changed |= declare_parentheses(s);
     changed |= type_declaration_spaces(s);
     changed |= compact_nullable_type_declaration(s);
+    changed |= ordered_types(s);
     changed |= explicit_indirect_variable(s);
     changed |= no_null_property_initialization(s);
     changed |= include(s);
+    changed |= no_alias_language_construct_call(s);
     changed |= phpdoc_scalar(s);
+    changed |= general_phpdoc_annotation_remove(s);
     changed |= phpdoc_types(s);
     changed |= phpdoc_no_alias_tag(s);
     changed |= phpdoc_no_package(s);
@@ -279,36 +324,49 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= class_reference_name_casing(s);
     changed |= no_leading_namespace_whitespace(s);
     changed |= no_singleline_whitespace_before_semicolons(s);
+    changed |= multiline_whitespace_before_semicolons(s);
     changed |= concat_space(s);
+    changed |= blank_line_after_strict_types(s);
     changed |= operator_linebreak(s);
     changed |= no_trailing_whitespace(s);
     changed |= no_trailing_whitespace_in_comment(s);
     changed |= declare_equal_normalize(s);
     changed |= unary_operator_spaces(s);
+    changed |= control_structure_continuation_position(s);
     changed |= switch_case_semicolon_to_colon(s);
     changed |= switch_case_space(s);
     changed |= visibility_required(s);
     changed |= modifier_keywords(s);
+    changed |= single_blank_line_before_namespace(s);
     changed |= no_blank_lines_after_class_opening(s);
+    changed |= method_chaining_indentation(s);
     changed |= no_closing_tag(s);
     changed |= types_spaces(s);
     changed |= assign_null_coalescing_to_coalesce_equal(s);
     changed |= space_after_semicolon(s);
     changed |= no_multiple_statements_per_line(s);
+    changed |= phpdoc_order(s);
     changed |= braces_position(s);
     changed |= statement_indentation(s);
     changed |= phpdoc_trim(s);
     changed |= no_short_bool_cast(s);
+    changed |= no_mixed_echo_print(s);
     changed |= phpdoc_single_line_var_spacing(s);
     changed |= phpdoc_order_by_value(s);
     changed |= cast_spaces(s);
+    changed |= not_operator_with_successor_space(s);
+    changed |= self_static_accessor(s);
     changed |= no_unused_imports(s);
+    changed |= self_accessor(s);
     changed |= single_line_after_imports(s);
     changed |= return_type_declaration(s);
+    changed |= no_useless_return(s);
+    changed |= single_line_empty_body(s);
     changed |= no_blank_lines_after_phpdoc(s);
     changed |= no_leading_import_slash(s);
     changed |= blank_line_after_namespace(s);
     changed |= no_extra_blank_lines(s);
+    changed |= blank_line_before_statement(s);
     changed |= ordered_imports(s);
     changed |= single_line_comment_style(s);
     changed |= blank_lines_before_namespace(s);
@@ -9464,6 +9522,7 @@ fn method_chaining_newline(s: &mut Stream) -> bool {
 
 // --- ported batch: phpdoc infrastructure + content rules --------------------
 
+#[derive(Clone)]
 struct DocLine {
     prefix: Vec<u8>,
     content: Vec<u8>,
@@ -13583,4 +13642,2404 @@ fn doctrine_annotation_indentation(s: &mut Stream) -> bool {
         }
         changed
     })
+}
+
+// ===== Mirrored fixers (set A) =====
+
+fn inline_ws_between(s: &Stream, a: usize, b: usize) -> bool {
+    let mut j = a + 1;
+    while j < b {
+        if s.kind(j) != Kind::Whitespace || has_newline(s.bytes(j)) {
+            return false;
+        }
+        j += 1;
+    }
+    true
+}
+
+fn sa_is_modifier_keyword(v: &[u8]) -> bool {
+    matches!(
+        v.to_ascii_lowercase().as_slice(),
+        b"public" | b"private" | b"protected" | b"static" | b"final" | b"abstract" | b"readonly" | b"var"
+    )
+}
+
+fn sa_is_class_like_keyword(lw: &[u8]) -> bool {
+    matches!(lw, b"class" | b"interface" | b"trait" | b"enum")
+}
+
+fn sa_find_body_brace(s: &Stream, name_idx: usize) -> Option<usize> {
+    let mut k = name_idx + 1;
+    while k < s.len() {
+        if s.kind(k) == Kind::Punct {
+            match s.bytes(k) {
+                b"{" => return Some(k),
+                b";" => return None,
+                _ => {}
+            }
+        }
+        k += 1;
+    }
+    None
+}
+
+fn sa_class_extends(s: &Stream, name_idx: usize, open: usize) -> bool {
+    let mut k = name_idx + 1;
+    while k < open {
+        if s.kind(k) == Kind::Keyword && s.bytes(k).eq_ignore_ascii_case(b"extends") {
+            return true;
+        }
+        k += 1;
+    }
+    false
+}
+
+fn no_mixed_echo_print(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"print") {
+            if let Some(p) = sig_prev(s, i) {
+                let convertible = s.kind(p) == Kind::OpenTag
+                    || (s.kind(p) == Kind::Punct && matches!(s.bytes(p), b";" | b"{" | b"}" | b")"))
+                    || (s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"else"));
+                if convertible {
+                    s.set_owned(i, b"echo".to_vec());
+                    changed = true;
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+const FUNCTION_ALIASES: &[(&[u8], &[u8])] = &[
+    (b"diskfreespace", b"disk_free_space"),
+    (b"dns_check_record", b"checkdnsrr"),
+    (b"dns_get_mx", b"getmxrr"),
+    (b"session_commit", b"session_write_close"),
+    (b"stream_register_wrapper", b"stream_wrapper_register"),
+    (b"set_file_buffer", b"stream_set_write_buffer"),
+    (b"socket_set_blocking", b"stream_set_blocking"),
+    (b"socket_get_status", b"stream_get_meta_data"),
+    (b"socket_set_timeout", b"stream_set_timeout"),
+    (b"socket_getopt", b"socket_get_option"),
+    (b"socket_setopt", b"socket_set_option"),
+    (b"chop", b"rtrim"),
+    (b"close", b"closedir"),
+    (b"doubleval", b"floatval"),
+    (b"fputs", b"fwrite"),
+    (b"get_required_files", b"get_included_files"),
+    (b"ini_alter", b"ini_set"),
+    (b"is_double", b"is_float"),
+    (b"is_integer", b"is_int"),
+    (b"is_long", b"is_int"),
+    (b"is_real", b"is_float"),
+    (b"is_writeable", b"is_writable"),
+    (b"join", b"implode"),
+    (b"key_exists", b"array_key_exists"),
+    (b"magic_quotes_runtime", b"set_magic_quotes_runtime"),
+    (b"pos", b"current"),
+    (b"show_source", b"highlight_file"),
+    (b"sizeof", b"count"),
+    (b"strchr", b"strstr"),
+    (b"user_error", b"trigger_error"),
+    (b"imap_create", b"imap_createmailbox"),
+    (b"imap_fetchtext", b"imap_body"),
+    (b"imap_header", b"imap_headerinfo"),
+    (b"imap_listmailbox", b"imap_list"),
+    (b"imap_listsubscribed", b"imap_lsub"),
+    (b"imap_rename", b"imap_renamemailbox"),
+    (b"imap_scan", b"imap_listscan"),
+    (b"imap_scanmailbox", b"imap_listscan"),
+    (b"pg_exec", b"pg_query"),
+];
+
+fn function_alias(name: &[u8]) -> Option<&'static [u8]> {
+    let lo = name.to_ascii_lowercase();
+    for (a, c) in FUNCTION_ALIASES {
+        if *a == lo.as_slice() {
+            return Some(c);
+        }
+    }
+    None
+}
+
+fn is_global_function_call(s: &Stream, i: usize) -> bool {
+    let p = match sig_prev(s, i) {
+        Some(p) => p,
+        None => return true,
+    };
+    if s.kind(p) == Kind::Punct {
+        match s.bytes(p) {
+            b"->" | b"?->" | b"::" => return false,
+            b"\\" => {
+                if let Some(before) = sig_prev(s, p) {
+                    if s.kind(before) == Kind::Ident {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            _ => {}
+        }
+    }
+    if s.kind(p) == Kind::Keyword {
+        match s.bytes(p).to_ascii_lowercase().as_slice() {
+            b"function" | b"const" | b"new" | b"goto" => return false,
+            _ => {}
+        }
+    }
+    true
+}
+
+fn no_alias_functions(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Ident {
+            if let Some(canon) = function_alias(s.bytes(i)) {
+                if next_significant_value(s, i) == b"(" && is_global_function_call(s, i) {
+                    s.set_owned(i, canon.to_vec());
+                    changed = true;
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn no_alias_language_construct_call(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Ident && s.bytes(i).eq_ignore_ascii_case(b"die") && !member_prev(s, i) {
+            let mut skip = false;
+            if let Some(p) = sig_prev(s, i) {
+                if s.kind(p) == Kind::Punct && s.bytes(p) == b"\\" {
+                    skip = true;
+                }
+                if s.kind(p) == Kind::Keyword {
+                    match s.bytes(p).to_ascii_lowercase().as_slice() {
+                        b"function" | b"const" | b"class" | b"namespace" | b"use" => skip = true,
+                        _ => {}
+                    }
+                }
+            }
+            if !skip {
+                s.set_owned(i, b"exit".to_vec());
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn not_operator_with_successor_space(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Punct && s.bytes(i) == b"!" {
+            if i + 1 >= s.len() {
+                i += 1;
+                continue;
+            }
+            if s.kind(i + 1) == Kind::Whitespace {
+                if s.bytes(i + 1) != b" " {
+                    s.set_owned(i + 1, b" ".to_vec());
+                    changed = true;
+                }
+            } else {
+                s.insert_owned(i + 1, Kind::Whitespace, b" ".to_vec());
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn increment_style(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Punct && (s.bytes(i) == b"++" || s.bytes(i) == b"--") {
+            let op = s.bytes(i).to_vec();
+            let lv = match sig_prev(s, i) {
+                Some(l) if s.kind(l) == Kind::Variable => l,
+                _ => {
+                    i += 1;
+                    continue;
+                }
+            };
+            if !inline_ws_between(s, lv, i) {
+                i += 1;
+                continue;
+            }
+            let p = match sig_prev(s, lv) {
+                Some(p) => p,
+                None => {
+                    i += 1;
+                    continue;
+                }
+            };
+            if lvalue_prefix(s.bytes(p)) {
+                i += 1;
+                continue;
+            }
+            if s.bytes(p) != b";" && s.bytes(p) != b"{" && s.bytes(p) != b"}" && s.kind(p) != Kind::OpenTag {
+                i += 1;
+                continue;
+            }
+            match sig_next(s, i) {
+                Some(e) if s.bytes(e) == b";" => {}
+                _ => {
+                    i += 1;
+                    continue;
+                }
+            }
+            let mut k = i;
+            while k >= lv + 1 {
+                s.remove_at(k);
+                k -= 1;
+            }
+            s.insert_owned(lv, Kind::Punct, op);
+            changed = true;
+            i = lv + 1;
+        } else {
+            i += 1;
+        }
+    }
+    changed
+}
+
+fn single_line_empty_body(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Punct && s.bytes(i) == b"{" {
+            let (kind, _) = classify_brace(s, i);
+            if matches!(kind, BraceKind::ClassLike | BraceKind::FunctionDecl) {
+                if let Some(close_idx) = match_forward(s, i) {
+                    let mut empty = true;
+                    let mut k = i + 1;
+                    while k < close_idx {
+                        if s.kind(k) != Kind::Whitespace {
+                            empty = false;
+                            break;
+                        }
+                        k += 1;
+                    }
+                    if empty && close_idx != i + 1 {
+                        let mut k = close_idx - 1;
+                        while k > i {
+                            s.remove_at(k);
+                            k -= 1;
+                        }
+                        if i > 0 && s.kind(i - 1) == Kind::Whitespace && has_newline(s.bytes(i - 1)) {
+                            s.set_owned(i - 1, b" ".to_vec());
+                        }
+                        changed = true;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn is_const_name_position(s: &Stream, k: usize) -> bool {
+    let mut j = prev_significant_index(s, k);
+    while let Some(ji) = j {
+        if s.kind(ji) == Kind::Keyword && s.bytes(ji).eq_ignore_ascii_case(b"const") {
+            return true;
+        }
+        let is_type = s.kind(ji) == Kind::Ident
+            || (s.kind(ji) == Kind::Keyword && !s.bytes(ji).eq_ignore_ascii_case(b"const"))
+            || (s.kind(ji) == Kind::Punct && (s.bytes(ji) == b"?" || s.bytes(ji) == b"\\"));
+        if is_type {
+            if s.kind(ji) == Kind::Keyword && sa_is_modifier_keyword(s.bytes(ji)) {
+                return false;
+            }
+            j = prev_significant_index(s, ji);
+            continue;
+        }
+        return false;
+    }
+    false
+}
+
+fn protected_to_private(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"class") {
+            let is_final = matches!(sig_prev(s, i), Some(p) if s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"final"));
+            if is_final {
+                if let Some(name_idx) = next_significant_index(s, i) {
+                    if s.kind(name_idx) == Kind::Ident {
+                        if let Some(open) = sa_find_body_brace(s, name_idx) {
+                            if !sa_class_extends(s, name_idx, open) {
+                                if let Some(close_idx) = match_forward(s, open) {
+                                    let mut depth = 0i32;
+                                    let mut k = open;
+                                    while k < close_idx {
+                                        if s.kind(k) == Kind::Punct {
+                                            match s.bytes(k) {
+                                                b"{" => depth += 1,
+                                                b"}" => depth -= 1,
+                                                _ => {}
+                                            }
+                                        } else if depth == 1
+                                            && s.kind(k) == Kind::Keyword
+                                            && s.bytes(k).eq_ignore_ascii_case(b"protected")
+                                            && !is_const_name_position(s, k)
+                                        {
+                                            s.set_owned(k, b"private".to_vec());
+                                            changed = true;
+                                        }
+                                        k += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn self_accessor_in_return_type(s: &Stream, k: usize) -> bool {
+    let mut j = k;
+    loop {
+        let p = match prev_significant_index(s, j) {
+            Some(p) => p,
+            None => return false,
+        };
+        if s.kind(p) == Kind::Punct && s.bytes(p) == b":" {
+            return is_return_type_colon(s, p);
+        }
+        if s.kind(p) == Kind::Ident
+            || (s.kind(p) == Kind::Punct
+                && (s.bytes(p) == b"?" || s.bytes(p) == b"|" || s.bytes(p) == b"&" || s.bytes(p) == b"\\"))
+        {
+            j = p;
+            continue;
+        }
+        return false;
+    }
+}
+
+fn self_accessor_ref(s: &Stream, k: usize) -> bool {
+    let prev = sig_prev(s, k);
+    let next_idx = next_significant_index(s, k);
+    if let Some(p) = prev {
+        if s.kind(p) == Kind::Punct {
+            match s.bytes(p) {
+                b"->" | b"?->" | b"::" | b"\\" => return false,
+                _ => {}
+            }
+        }
+        if s.kind(p) == Kind::Keyword {
+            match s.bytes(p).to_ascii_lowercase().as_slice() {
+                b"function" | b"const" | b"extends" | b"implements" | b"use" | b"namespace" | b"as" => {
+                    return false
+                }
+                b"new" | b"instanceof" => return true,
+                _ => {}
+            }
+        }
+    }
+    if let Some(ni) = next_idx {
+        if s.kind(ni) == Kind::Punct && s.bytes(ni) == b"\\" {
+            return false;
+        }
+        if s.kind(ni) == Kind::Punct && s.bytes(ni) == b"::" {
+            return true;
+        }
+    }
+    if enclosing_func_param_open(s, k).is_some() {
+        return true;
+    }
+    self_accessor_in_return_type(s, k)
+}
+
+fn self_accessor(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && sa_is_class_like_keyword(&s.bytes(i).to_ascii_lowercase()) {
+            let mut skip = false;
+            if let Some(p) = sig_prev(s, i) {
+                if s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"new") {
+                    skip = true;
+                }
+                if s.kind(p) == Kind::Punct && matches!(s.bytes(p), b"->" | b"?->" | b"::") {
+                    skip = true;
+                }
+            }
+            if !skip {
+                if let Some(name_idx) = next_significant_index(s, i) {
+                    if s.kind(name_idx) == Kind::Ident {
+                        let class_name = s.bytes(name_idx).to_vec();
+                        if let Some(open) = sa_find_body_brace(s, name_idx) {
+                            if let Some(close_idx) = match_forward(s, open) {
+                                let mut k = open + 1;
+                                while k < close_idx {
+                                    if s.kind(k) == Kind::Ident
+                                        && s.bytes(k) == class_name.as_slice()
+                                        && self_accessor_ref(s, k)
+                                    {
+                                        s.set_owned(k, b"self".to_vec());
+                                        changed = true;
+                                    }
+                                    k += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+struct SelfStaticFrame {
+    class_like: bool,
+    final_: bool,
+}
+
+fn is_final_class_like(s: &Stream, kw: usize) -> bool {
+    if s.bytes(kw).eq_ignore_ascii_case(b"enum") {
+        return true;
+    }
+    let mut j = kw as isize - 1;
+    while j >= 0 {
+        let t = j as usize;
+        match s.kind(t) {
+            Kind::Whitespace | Kind::Comment | Kind::DocComment => {
+                j -= 1;
+                continue;
+            }
+            Kind::Keyword => {
+                return match s.bytes(t).to_ascii_lowercase().as_slice() {
+                    b"final" => true,
+                    b"new" => false,
+                    b"abstract" | b"readonly" => {
+                        j -= 1;
+                        continue;
+                    }
+                    _ => false,
+                };
+            }
+            Kind::Punct => {
+                return false;
+            }
+            _ => return false,
+        }
+    }
+    false
+}
+
+fn ssa_is_static_accessor(s: &Stream, i: usize) -> bool {
+    if next_significant_value(s, i) == b"::" {
+        return true;
+    }
+    matches!(sig_prev(s, i), Some(p) if s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"new"))
+}
+
+fn self_static_accessor(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut stack: Vec<SelfStaticFrame> = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Punct {
+            match s.bytes(i) {
+                b"{" => {
+                    let (kind, kw) = classify_brace(s, i);
+                    if kind == BraceKind::ClassLike {
+                        let f = matches!(kw, Some(k) if is_final_class_like(s, k));
+                        stack.push(SelfStaticFrame { class_like: true, final_: f });
+                    } else {
+                        stack.push(SelfStaticFrame { class_like: false, final_: false });
+                    }
+                }
+                b"}" => {
+                    stack.pop();
+                }
+                _ => {}
+            }
+            i += 1;
+            continue;
+        }
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"static") {
+            let enclosing_final = stack
+                .iter()
+                .rev()
+                .find(|f| f.class_like)
+                .map(|f| f.final_)
+                .unwrap_or(false);
+            if enclosing_final && ssa_is_static_accessor(s, i) {
+                s.set_owned(i, b"self".to_vec());
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn static_class_tokens() -> Vec<(Kind, Vec<u8>)> {
+    vec![
+        (Kind::Keyword, b"static".to_vec()),
+        (Kind::Punct, b"::".to_vec()),
+        (Kind::Ident, b"class".to_vec()),
+    ]
+}
+
+fn function_to_constant(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Ident {
+            i += 1;
+            continue;
+        }
+        let name = s.bytes(i).to_ascii_lowercase();
+        let no_arg: Option<&[u8]> = match name.as_slice() {
+            b"pi" => Some(b"M_PI"),
+            b"phpversion" => Some(b"PHP_VERSION"),
+            b"php_sapi_name" => Some(b"PHP_SAPI"),
+            _ => None,
+        };
+        if no_arg.is_none() && name != b"get_called_class" && name != b"get_class" {
+            i += 1;
+            continue;
+        }
+        let mut start = i;
+        if let Some(p) = sig_prev(s, i) {
+            if s.kind(p) == Kind::Punct && matches!(s.bytes(p), b"->" | b"?->" | b"::") {
+                i += 1;
+                continue;
+            }
+            if s.kind(p) == Kind::Keyword && s.bytes(p).eq_ignore_ascii_case(b"function") {
+                i += 1;
+                continue;
+            }
+            if s.kind(p) == Kind::Punct && s.bytes(p) == b"\\" {
+                if let Some(before) = sig_prev(s, p) {
+                    if s.kind(before) == Kind::Ident || s.bytes(before) == b"\\" {
+                        i += 1;
+                        continue;
+                    }
+                }
+                start = p;
+            }
+        }
+        let open = match next_significant_index(s, i) {
+            Some(o) if s.kind(o) == Kind::Punct && s.bytes(o) == b"(" => o,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        let close_idx = match match_forward(s, open) {
+            Some(c) => c,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let repl: Vec<(Kind, Vec<u8>)>;
+        if let Some(c) = no_arg {
+            if next_significant_index(s, open) != Some(close_idx) {
+                i += 1;
+                continue;
+            }
+            repl = vec![(Kind::Ident, c.to_vec())];
+        } else if name == b"get_called_class" {
+            if next_significant_index(s, open) != Some(close_idx) {
+                i += 1;
+                continue;
+            }
+            repl = static_class_tokens();
+        } else {
+            let arg = match next_significant_index(s, open) {
+                Some(a) if s.kind(a) == Kind::Variable && s.bytes(a).eq_ignore_ascii_case(b"$this") => a,
+                _ => {
+                    i += 1;
+                    continue;
+                }
+            };
+            if next_significant_index(s, arg) != Some(close_idx) {
+                i += 1;
+                continue;
+            }
+            repl = static_class_tokens();
+        }
+        let mut k = close_idx;
+        loop {
+            s.remove_at(k);
+            if k == start {
+                break;
+            }
+            k -= 1;
+        }
+        let mut ins = start;
+        for (kind, v) in repl {
+            s.insert_owned(ins, kind, v);
+            ins += 1;
+        }
+        changed = true;
+        i = start;
+    }
+    changed
+}
+
+// ---- set B mirrors (byte-identical to the go fixers) ----
+
+fn closes_do_block(s: &Stream, idx: usize) -> bool {
+    match match_backward(s, idx) {
+        Some(open) => {
+            let (k, kw) = classify_brace(s, open);
+            matches!(k, BraceKind::Control)
+                && matches!(kw, Some(kwi) if s.bytes(kwi).eq_ignore_ascii_case(b"do"))
+        }
+        None => false,
+    }
+}
+
+fn control_structure_continuation_position(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword {
+            let lw = s.bytes(i).to_ascii_lowercase();
+            if matches!(lw.as_slice(), b"else" | b"elseif" | b"catch" | b"finally" | b"while") {
+                if let Some(pi) = prev_significant_index(s, i) {
+                    if i == pi + 2
+                        && is_punct_val(s, pi, b"}")
+                        && s.kind(pi + 1) == Kind::Whitespace
+                        && has_newline(s.bytes(pi + 1))
+                    {
+                        let ok = if lw == b"while" { closes_do_block(s, pi) } else { true };
+                        if ok {
+                            s.set_owned(pi + 1, b" ".to_vec());
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn no_unneeded_control_parentheses(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword {
+            let term: Option<u8> = match s.bytes(i).to_ascii_lowercase().as_slice() {
+                b"return" | b"echo" | b"print" | b"yield" | b"break" | b"continue" | b"clone" => {
+                    Some(b';')
+                }
+                b"case" => Some(b':'),
+                _ => None,
+            };
+            if let Some(term) = term {
+                if !member_prev(s, i) {
+                    loop {
+                        let j = match next_significant_index(s, i) {
+                            Some(j) if is_punct_val(s, j, b"(") => j,
+                            _ => break,
+                        };
+                        let k = match match_forward(s, j) {
+                            Some(k) => k,
+                            None => break,
+                        };
+                        match next_significant_index(s, k) {
+                            Some(nj) if is_punct_val(s, nj, &[term]) => {}
+                            _ => break,
+                        }
+                        match next_significant_index(s, j) {
+                            Some(x) if x < k => {}
+                            _ => break,
+                        }
+                        s.remove_at(k);
+                        if j == i + 1 {
+                            s.remove_at(j);
+                            s.insert_owned(j, Kind::Whitespace, b" ".to_vec());
+                        } else {
+                            s.remove_at(j);
+                        }
+                        changed = true;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn nullable_type_declaration(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if !(s.kind(i) == Kind::Punct && s.bytes(i) == b"|" && is_type_union_operator(s, i)) {
+            i += 1;
+            continue;
+        }
+        let start_i: isize = match type_run_boundary_prev(s, i) {
+            Some(x) => x as isize,
+            None => -1,
+        };
+        let end = match type_run_boundary_next(s, i) {
+            Some(e) => e,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let mut parts: Vec<usize> = Vec::new();
+        let mut j = (start_i + 1) as usize;
+        while j < end {
+            match s.kind(j) {
+                Kind::Whitespace | Kind::Comment | Kind::DocComment => {}
+                _ => parts.push(j),
+            }
+            j += 1;
+        }
+        if parts.is_empty() {
+            i += 1;
+            continue;
+        }
+        let mut pipes = 0;
+        let mut bad = false;
+        for &p in &parts {
+            if s.kind(p) == Kind::Punct {
+                match s.bytes(p) {
+                    b"|" => pipes += 1,
+                    b"&" | b"?" => bad = true,
+                    _ => {}
+                }
+            }
+        }
+        if bad || pipes != 1 {
+            i += 1;
+            continue;
+        }
+        let mut left: Vec<usize> = Vec::new();
+        let mut right: Vec<usize> = Vec::new();
+        let mut seen = false;
+        for &p in &parts {
+            if !seen && s.kind(p) == Kind::Punct && s.bytes(p) == b"|" {
+                seen = true;
+                continue;
+            }
+            if seen {
+                right.push(p);
+            } else {
+                left.push(p);
+            }
+        }
+        let right_null = right.len() == 1 && s.bytes(right[0]).eq_ignore_ascii_case(b"null");
+        let left_null = left.len() == 1 && s.bytes(left[0]).eq_ignore_ascii_case(b"null");
+        let typ: Vec<usize> = if right_null {
+            left
+        } else if left_null {
+            right
+        } else {
+            i += 1;
+            continue;
+        };
+        if typ.is_empty() {
+            i += 1;
+            continue;
+        }
+        let first = parts[0];
+        let last = parts[parts.len() - 1];
+        let mut repl: Vec<(Kind, Vec<u8>)> = vec![(Kind::Punct, b"?".to_vec())];
+        for &p in &typ {
+            repl.push((s.kind(p), s.bytes(p).to_vec()));
+        }
+        for idx in (first..=last).rev() {
+            s.remove_at(idx);
+        }
+        for (off, (k, v)) in repl.into_iter().enumerate() {
+            s.insert_owned(first + off, k, v);
+        }
+        changed = true;
+        i = first + 1;
+    }
+    changed
+}
+
+fn simplified_null_return(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"return") && !member_prev(s, i)
+        {
+            if let Some(j) = next_significant_index(s, i) {
+                if is_null_literal(s, j) {
+                    if let Some(k) = next_significant_index(s, j) {
+                        if is_punct_val(s, k, b";") && !enclosing_return_type_nullable(s, i) {
+                            let mut x = k - 1;
+                            while x > i {
+                                s.remove_at(x);
+                                x -= 1;
+                            }
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn enclosing_return_type_nullable(s: &Stream, at: usize) -> bool {
+    let mut depth = 0i32;
+    let mut j = at as isize - 1;
+    while j >= 0 {
+        let k = j as usize;
+        if s.kind(k) == Kind::Punct {
+            match s.bytes(k) {
+                b"}" => depth += 1,
+                b"{" => {
+                    if depth > 0 {
+                        depth -= 1;
+                    } else {
+                        let (kind, kw) = classify_brace(s, k);
+                        match kind {
+                            BraceKind::FunctionDecl | BraceKind::Closure => {
+                                return func_return_type_nullable(s, kw, k);
+                            }
+                            BraceKind::ClassLike => return false,
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        j -= 1;
+    }
+    false
+}
+
+fn func_return_type_nullable(s: &Stream, kw: Option<usize>, brace: usize) -> bool {
+    let kw = match kw {
+        Some(k) => k,
+        None => return false,
+    };
+    let mut params_open: Option<usize> = None;
+    let mut x = kw + 1;
+    while x < brace {
+        if is_punct_val(s, x, b"(") {
+            params_open = Some(x);
+            break;
+        }
+        x += 1;
+    }
+    let params_open = match params_open {
+        Some(o) => o,
+        None => return false,
+    };
+    let params_close = match match_forward(s, params_open) {
+        Some(c) if c < brace => c,
+        _ => return false,
+    };
+    let mut c = match next_significant_index(s, params_close) {
+        Some(c) => c,
+        None => return false,
+    };
+    if s.kind(c) == Kind::Keyword && s.bytes(c).eq_ignore_ascii_case(b"use") {
+        let uo = match next_significant_index(s, c) {
+            Some(o) if is_punct_val(s, o, b"(") => o,
+            _ => return false,
+        };
+        let uc = match match_forward(s, uo) {
+            Some(u) if u < brace => u,
+            _ => return false,
+        };
+        c = match next_significant_index(s, uc) {
+            Some(c) => c,
+            None => return false,
+        };
+    }
+    if !is_punct_val(s, c, b":") {
+        return false;
+    }
+    let mut typ: Vec<u8> = Vec::new();
+    let mut y = c + 1;
+    while y < brace {
+        match s.kind(y) {
+            Kind::Whitespace | Kind::Comment | Kind::DocComment => {}
+            _ => typ.extend_from_slice(s.bytes(y)),
+        }
+        y += 1;
+    }
+    let typ = typ.to_ascii_lowercase();
+    if typ.is_empty() {
+        return false;
+    }
+    if typ.starts_with(b"?") {
+        return true;
+    }
+    for part in typ.split(|&c| c == b'|' || c == b'&') {
+        let trimmed: Vec<u8> = part.iter().copied().filter(|&c| c != b'(' && c != b')').collect();
+        if trimmed == b"null" || trimmed == b"mixed" {
+            return true;
+        }
+    }
+    false
+}
+
+fn no_useless_return(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"return") {
+            let member = match prev_significant_index(s, i) {
+                Some(p) => s.kind(p) == Kind::Punct && matches!(s.bytes(p), b"->" | b"?->" | b"::"),
+                None => false,
+            };
+            if !member {
+                if let Some(semi) = next_significant_index(s, i) {
+                    if is_punct_val(s, semi, b";") {
+                        if let Some(after) = next_significant_index(s, semi) {
+                            if is_punct_val(s, after, b"}") {
+                                if let Some(open) = match_backward(s, after) {
+                                    let (kind, _) = classify_brace(s, open);
+                                    if matches!(kind, BraceKind::FunctionDecl | BraceKind::Closure) {
+                                        let mut kk = semi as isize;
+                                        while kk >= i as isize {
+                                            s.remove_at(kk as usize);
+                                            kk -= 1;
+                                        }
+                                        changed = true;
+                                        if i > 0 {
+                                            i -= 1;
+                                        }
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn single_blank_line_before_namespace(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword
+            && s.bytes(i).eq_ignore_ascii_case(b"namespace")
+            && !member_prev(s, i)
+            && i > 0
+        {
+            let prev = i - 1;
+            if s.kind(prev) == Kind::Whitespace
+                && has_newline(s.bytes(prev))
+                && s.bytes(prev) != b"\n\n"
+            {
+                s.set_owned(prev, b"\n\n".to_vec());
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn linebreak_after_opening_tag(s: &mut Stream) -> bool {
+    if s.len() < 3 {
+        return false;
+    }
+    if s.kind(0) != Kind::OpenTag || s.bytes(0) != b"<?php" {
+        return false;
+    }
+    if s.kind(1) != Kind::Whitespace {
+        return false;
+    }
+    if has_newline(s.bytes(1)) {
+        return false;
+    }
+    if s.kind(2) == Kind::CloseTag {
+        return false;
+    }
+    s.set_owned(1, b"\n".to_vec());
+    true
+}
+
+fn declare_is_strict_types(s: &Stream, open: usize, close: usize) -> bool {
+    let mut k = open + 1;
+    while k < close {
+        if s.kind(k) == Kind::Ident && s.bytes(k).eq_ignore_ascii_case(b"strict_types") {
+            return true;
+        }
+        k += 1;
+    }
+    false
+}
+
+fn blank_line_after_strict_types(s: &mut Stream) -> bool {
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"declare") {
+            let open = match next_significant_index(s, i) {
+                Some(o) if is_punct_val(s, o, b"(") => o,
+                _ => {
+                    i += 1;
+                    continue;
+                }
+            };
+            let close = match match_forward(s, open) {
+                Some(c) => c,
+                None => {
+                    i += 1;
+                    continue;
+                }
+            };
+            if !declare_is_strict_types(s, open, close) {
+                i += 1;
+                continue;
+            }
+            let semi = match next_significant_index(s, close) {
+                Some(sm) if is_punct_val(s, sm, b";") => sm,
+                _ => {
+                    i += 1;
+                    continue;
+                }
+            };
+            if semi + 1 >= s.len() {
+                return false;
+            }
+            if s.kind(semi + 1) != Kind::Whitespace || !s.bytes(semi + 1).contains(&b'\n') {
+                return false;
+            }
+            if semi + 2 >= s.len() || s.kind(semi + 2) == Kind::CloseTag {
+                return false;
+            }
+            let ws = s.bytes(semi + 1).to_vec();
+            let nl = ws.iter().rposition(|&c| c == b'\n').unwrap();
+            let indent = &ws[nl + 1..];
+            let mut want = b"\n\n".to_vec();
+            want.extend_from_slice(indent);
+            if ws != want {
+                s.set_owned(semi + 1, want);
+                return true;
+            }
+            return false;
+        }
+        i += 1;
+    }
+    false
+}
+
+fn blbs_is_comment(s: &Stream, i: usize) -> bool {
+    matches!(s.kind(i), Kind::Comment | Kind::DocComment)
+}
+
+fn blbs_prev_non_whitespace(s: &Stream, i: usize) -> isize {
+    let mut j = i as isize - 1;
+    while j >= 0 {
+        if s.kind(j as usize) != Kind::Whitespace {
+            return j;
+        }
+        j -= 1;
+    }
+    -1
+}
+
+fn blbs_count_newlines(v: &[u8]) -> usize {
+    v.iter().filter(|&&c| c == b'\n').count()
+}
+
+fn blbs_insert_index(s: &Stream, index: usize) -> usize {
+    let mut index = index;
+    while index > 0 {
+        if s.kind(index - 1) == Kind::Whitespace && blbs_count_newlines(s.bytes(index - 1)) > 1 {
+            break;
+        }
+        let prev_index = blbs_prev_non_whitespace(s, index);
+        if prev_index < 0 || !blbs_is_comment(s, prev_index as usize) {
+            break;
+        }
+        let pi = prev_index as usize;
+        if pi < 1 || s.kind(pi - 1) != Kind::Whitespace {
+            break;
+        }
+        if blbs_count_newlines(s.bytes(pi - 1)) != 1 {
+            break;
+        }
+        index = pi;
+    }
+    index
+}
+
+fn blbs_should_add(s: &Stream, prev_nw: usize) -> bool {
+    if blbs_is_comment(s, prev_nw) {
+        let mut j = prev_nw as isize - 1;
+        while j >= 0 {
+            let k = j as usize;
+            if s.bytes(k).contains(&b'\n') {
+                return false;
+            }
+            if s.kind(k) == Kind::Whitespace || blbs_is_comment(s, k) {
+                j -= 1;
+                continue;
+            }
+            return s.kind(k) == Kind::Punct && matches!(s.bytes(k), b";" | b"}");
+        }
+        return false;
+    }
+    s.kind(prev_nw) == Kind::Punct && matches!(s.bytes(prev_nw), b";" | b"}")
+}
+
+fn blbs_insert(s: &mut Stream, index: usize) -> bool {
+    if index >= 1 && s.kind(index - 1) == Kind::Whitespace {
+        let v = s.bytes(index - 1).to_vec();
+        match blbs_count_newlines(&v) {
+            0 => {
+                let mut nv: Vec<u8> = v.clone();
+                while matches!(nv.last(), Some(b' ') | Some(b'\t')) {
+                    nv.pop();
+                }
+                nv.extend_from_slice(b"\n\n");
+                s.set_owned(index - 1, nv);
+                true
+            }
+            1 => {
+                let mut nv = b"\n".to_vec();
+                nv.extend_from_slice(&v);
+                s.set_owned(index - 1, nv);
+                true
+            }
+            _ => false,
+        }
+    } else {
+        s.insert_owned(index, Kind::Whitespace, b"\n\n".to_vec());
+        true
+    }
+}
+
+fn blank_line_before_statement(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = s.len() as isize - 1;
+    while i > 0 {
+        let idx = i as usize;
+        if s.kind(idx) == Kind::Keyword {
+            let lw = s.bytes(idx).to_ascii_lowercase();
+            if matches!(
+                lw.as_slice(),
+                b"break" | b"continue" | b"declare" | b"return" | b"throw" | b"try"
+            ) {
+                let insert_idx = blbs_insert_index(s, idx);
+                let prev_nw = blbs_prev_non_whitespace(s, insert_idx);
+                if prev_nw >= 0 && blbs_should_add(s, prev_nw as usize) {
+                    if blbs_insert(s, insert_idx) {
+                        changed = true;
+                    }
+                }
+                i = prev_nw;
+                if i < 1 {
+                    break;
+                }
+                continue;
+            }
+        }
+        i -= 1;
+    }
+    changed
+}
+
+// ---- mirrored fixers (set C): byte-identical to the ecs-go implementations ----
+
+fn trim_right_ws_st(b: &[u8]) -> &[u8] {
+    let mut e = b.len();
+    while e > 0 && (b[e - 1] == b' ' || b[e - 1] == b'\t') {
+        e -= 1;
+    }
+    &b[..e]
+}
+
+fn trim_right_space_st(b: &[u8]) -> &[u8] {
+    let mut e = b.len();
+    while e > 0 && b[e - 1] == b' ' {
+        e -= 1;
+    }
+    &b[..e]
+}
+
+const SUMMARY_PUNCT: &[&[u8]] = &[
+    b".",
+    b":",
+    "\u{3002}".as_bytes(),
+    b"!",
+    b"?",
+    "\u{a1}".as_bytes(),
+    "\u{bf}".as_bytes(),
+    "\u{ff01}".as_bytes(),
+    "\u{ff1f}".as_bytes(),
+];
+
+fn summary_correctly_formatted(content: &[u8]) -> bool {
+    let lc = content.to_ascii_lowercase();
+    if bytes_contains(&lc, b"{@inheritdoc}") {
+        return true;
+    }
+    SUMMARY_PUNCT.iter().any(|p| content.ends_with(p))
+}
+
+fn summary_range(d: &Doc) -> (isize, isize) {
+    let mut first: isize = -1;
+    let mut last: isize = -1;
+    for (i, l) in d.inner.iter().enumerate() {
+        let c = trim_ascii(&l.content);
+        if c.is_empty() {
+            if first >= 0 {
+                break;
+            }
+            continue;
+        }
+        if c.first() == Some(&b'@') {
+            break;
+        }
+        if first < 0 {
+            first = i as isize;
+        }
+        last = i as isize;
+    }
+    (first, last)
+}
+
+fn phpdoc_summary(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let (first, last) = summary_range(d);
+        if first < 0 {
+            return false;
+        }
+        let li = last as usize;
+        let content = trim_right_ws_st(&d.inner[li].content).to_vec();
+        if summary_correctly_formatted(&content) {
+            return false;
+        }
+        if first != last {
+            let fl = trim_right_ws_st(&d.inner[first as usize].content);
+            if fl.last() == Some(&b':') {
+                return false;
+            }
+        }
+        let mut nc = content;
+        nc.push(b'.');
+        d.inner[li].content = nc;
+        true
+    })
+}
+
+fn phpdoc_tag_type(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            let lead_len = l.content.len() - trim_left_space(&l.content).len();
+            let inner = trim_right_space_st(trim_left_space(&l.content));
+            // ^\{@([a-zA-Z]+)\}$
+            if inner.len() < 4 || inner[0] != b'{' || inner[1] != b'@' || *inner.last().unwrap() != b'}' {
+                continue;
+            }
+            let name = &inner[2..inner.len() - 1];
+            if name.is_empty() || !name.iter().all(|c| c.is_ascii_alphabetic()) {
+                continue;
+            }
+            if !name.eq_ignore_ascii_case(b"inheritDoc") {
+                continue;
+            }
+            let mut nc = l.content[..lead_len].to_vec();
+            nc.push(b'@');
+            nc.extend_from_slice(name);
+            l.content = nc;
+            changed = true;
+        }
+        changed
+    })
+}
+
+fn general_phpdoc_annotation_remove(_s: &mut Stream) -> bool {
+    // ECS's psr12+common configures no annotations to remove: no-op
+    false
+}
+
+fn method_chaining_indentation(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 1;
+    while i < s.len() {
+        if s.kind(i) == Kind::Punct && (s.bytes(i) == b"->" || s.bytes(i) == b"?->") {
+            if s.kind(i - 1) == Kind::Whitespace && s.bytes(i - 1).contains(&b'\n') {
+                let ws = s.bytes(i - 1).to_vec();
+                let nl = ws.iter().rposition(|&c| c == b'\n').unwrap();
+                let mut want = chain_first_line_indent(s, i);
+                want.extend_from_slice(b"    ");
+                if &ws[nl + 1..] != want.as_slice() {
+                    let mut nv = ws[..nl + 1].to_vec();
+                    nv.extend_from_slice(&want);
+                    s.set_owned(i - 1, nv);
+                    changed = true;
+                }
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+const PHPDOC_ORDER_RANK_NONE: i32 = -1;
+
+fn phpdoc_order_rank(tag: &[u8]) -> (i32, bool) {
+    let mut base = tag.to_ascii_lowercase();
+    for pre in [b"phpstan-".as_slice(), b"psalm-".as_slice()] {
+        if base.starts_with(pre) {
+            base = base[pre.len()..].to_vec();
+            break;
+        }
+    }
+    match base.as_slice() {
+        b"param" => (0, true),
+        b"throws" => (1, true),
+        b"return" => (2, true),
+        _ => (PHPDOC_ORDER_RANK_NONE, false),
+    }
+}
+
+// ^@([a-zA-Z][a-zA-Z0-9_-]*) on a whitespace-trimmed content
+fn phpdoc_tag_name_of(c: &[u8]) -> Option<Vec<u8>> {
+    if c.first() != Some(&b'@') {
+        return None;
+    }
+    if c.len() < 2 || !c[1].is_ascii_alphabetic() {
+        return None;
+    }
+    let mut j = 2;
+    while j < c.len() && (c[j].is_ascii_alphanumeric() || c[j] == b'_' || c[j] == b'-') {
+        j += 1;
+    }
+    Some(c[1..j].to_vec())
+}
+
+struct PhpdocBlock {
+    lines: Vec<DocLine>,
+    rank: i32,
+    target: bool,
+}
+
+fn split_phpdoc_blocks(inner: &[DocLine]) -> Vec<PhpdocBlock> {
+    let mut blocks = Vec::new();
+    let mut i = 0;
+    while i < inner.len() {
+        let c = trim_ascii(&inner[i].content);
+        if let Some(name) = phpdoc_tag_name_of(c) {
+            let (rank, target) = phpdoc_order_rank(&name);
+            let mut j = i + 1;
+            while j < inner.len() {
+                let cj = trim_ascii(&inner[j].content);
+                if cj.is_empty() || cj.first() == Some(&b'@') {
+                    break;
+                }
+                j += 1;
+            }
+            blocks.push(PhpdocBlock {
+                lines: inner[i..j].to_vec(),
+                rank,
+                target,
+            });
+            i = j;
+            continue;
+        }
+        blocks.push(PhpdocBlock {
+            lines: inner[i..i + 1].to_vec(),
+            rank: 0,
+            target: false,
+        });
+        i += 1;
+    }
+    blocks
+}
+
+fn doc_lines_eq(a: &[DocLine], b: &[DocLine]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter()
+        .zip(b.iter())
+        .all(|(x, y)| x.prefix == y.prefix && x.content == y.content)
+}
+
+fn phpdoc_order(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        if d.single {
+            return false;
+        }
+        let mut blocks = split_phpdoc_blocks(&d.inner);
+        let target_pos: Vec<usize> = (0..blocks.len()).filter(|&i| blocks[i].target).collect();
+        if target_pos.len() < 2 {
+            return false;
+        }
+        let mut order: Vec<usize> = (0..target_pos.len()).collect();
+        // stable insertion sort by rank
+        for i in 1..order.len() {
+            let mut j = i;
+            while j > 0 && blocks[target_pos[order[j - 1]]].rank > blocks[target_pos[order[j]]].rank {
+                order.swap(j - 1, j);
+                j -= 1;
+            }
+        }
+        // already ordered? (order is identity and lines unchanged)
+        if order.iter().enumerate().all(|(k, &v)| k == v) {
+            return false;
+        }
+        let sorted_lines: Vec<Vec<DocLine>> =
+            order.iter().map(|&k| blocks[target_pos[k]].lines.clone()).collect();
+        // compare original vs sorted at the target positions
+        let same = order.iter().enumerate().all(|(k, _)| {
+            doc_lines_eq(&blocks[target_pos[k]].lines, &sorted_lines[k])
+        });
+        if same {
+            return false;
+        }
+        for (k, &pos) in target_pos.iter().enumerate() {
+            blocks[pos].lines = sorted_lines[k].clone();
+        }
+        let mut inner = Vec::new();
+        for b in &blocks {
+            inner.extend_from_slice(&b.lines);
+        }
+        d.inner = inner;
+        true
+    })
+}
+
+fn prev_value_token_index(s: &Stream, i: usize) -> usize {
+    let mut j = i as isize - 1;
+    while j > 0 {
+        let k = j as usize;
+        let kind = s.kind(k);
+        if kind == Kind::Number
+            || kind == Kind::Ident
+            || kind == Kind::Variable
+            || kind == Kind::String
+            || (kind == Kind::Punct && s.bytes(k) == b")")
+        {
+            return k;
+        }
+        j -= 1;
+    }
+    i
+}
+
+fn multiline_whitespace_before_semicolons(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"const") {
+            let mut j = i + 1;
+            while j < s.len() {
+                if s.kind(j) == Kind::Punct && s.bytes(j) == b";" {
+                    i = j;
+                    break;
+                }
+                j += 1;
+            }
+            i += 1;
+            continue;
+        }
+        if s.kind(i) != Kind::Punct || s.bytes(i) != b";" {
+            i += 1;
+            continue;
+        }
+        if i == 0 {
+            i += 1;
+            continue;
+        }
+        let prev = i - 1;
+        if s.kind(prev) != Kind::Whitespace || !has_newline(s.bytes(prev)) {
+            i += 1;
+            continue;
+        }
+        let is_comment_prev2 = i >= 2 && matches!(s.kind(i - 2), Kind::Comment | Kind::DocComment);
+        let starts_nl = matches!(s.bytes(prev).first(), Some(&b'\n') | Some(&b'\r'));
+        if is_comment_prev2 && starts_nl {
+            let sig = prev_value_token_index(s, i);
+            s.remove_at(i);
+            s.remove_at(prev);
+            s.insert_owned(sig + 1, Kind::Punct, b";".to_vec());
+            changed = true;
+            i += 1;
+            continue;
+        }
+        // drop the multi-line whitespace so ";" follows the code; re-examine the
+        // token that now sits at index i (what previously followed the ";")
+        s.remove_at(prev);
+        changed = true;
+        // ";" is now at prev; next token to examine is at i (was i+1)
+    }
+    changed
+}
+
+fn is_func_modifier_kw(lo: &[u8]) -> bool {
+    matches!(
+        lo,
+        b"public" | b"protected" | b"private" | b"static" | b"final" | b"abstract"
+    )
+}
+
+fn amp_param_names_after(s: &Stream, fn_idx: usize) -> Vec<Vec<u8>> {
+    let mut open = next_significant_index(s, fn_idx);
+    while let Some(o) = open {
+        if s.kind(o) == Kind::Punct {
+            break;
+        }
+        open = next_significant_index(s, o);
+    }
+    let mut open = match open {
+        Some(o) => o,
+        None => return Vec::new(),
+    };
+    if s.bytes(open) == b"&" {
+        match next_significant_index(s, open) {
+            Some(o) => open = o,
+            None => return Vec::new(),
+        }
+    }
+    if s.bytes(open) != b"(" {
+        return Vec::new();
+    }
+    let close = match match_forward(s, open) {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+    let mut names = Vec::new();
+    let mut depth = 0i32;
+    let mut k = open + 1;
+    while k < close {
+        if s.kind(k) == Kind::Punct {
+            match s.bytes(k) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                _ => {}
+            }
+            k += 1;
+            continue;
+        }
+        if depth == 0 && s.kind(k) == Kind::Variable {
+            names.push(s.bytes(k).to_vec());
+        }
+        k += 1;
+    }
+    names
+}
+
+fn amp_doc_block_param_names(s: &Stream, i: usize) -> Vec<Vec<u8>> {
+    let mut j = i + 1;
+    while j < s.len() {
+        match s.kind(j) {
+            Kind::Whitespace | Kind::Comment => {
+                j += 1;
+                continue;
+            }
+            Kind::Keyword => {
+                if s.bytes(j).eq_ignore_ascii_case(b"function") {
+                    return amp_param_names_after(s, j);
+                }
+                let lo = s.bytes(j).to_ascii_lowercase();
+                if is_func_modifier_kw(&lo) {
+                    j += 1;
+                    continue;
+                }
+                return Vec::new();
+            }
+            _ => return Vec::new(),
+        }
+    }
+    Vec::new()
+}
+
+fn amp_add_param_names(d: &mut Doc, names: &[Vec<u8>]) -> bool {
+    let mut changed = false;
+    let mut idx = 0usize;
+    for l in d.inner.iter_mut() {
+        let trimmed = trim_left_space(&l.content);
+        if trimmed.len() < 6 || !trimmed[..6].eq_ignore_ascii_case(b"@param") {
+            continue;
+        }
+        let rest = &trimmed[6..];
+        if rest.is_empty() || (rest[0] != b' ' && rest[0] != b'\t') {
+            continue;
+        }
+        // fields = whitespace-split of rest
+        let fields: Vec<&[u8]> = rest
+            .split(|&c| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r')
+            .filter(|f| !f.is_empty())
+            .collect();
+        let pos = idx;
+        idx += 1;
+        if fields.len() != 1 {
+            continue;
+        }
+        if pos >= names.len() {
+            continue;
+        }
+        let mut nc = trim_right_ws_st(&l.content).to_vec();
+        nc.push(b' ');
+        nc.extend_from_slice(&names[pos]);
+        l.content = nc;
+        changed = true;
+    }
+    changed
+}
+
+fn add_missing_param_name(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        let names = amp_doc_block_param_names(s, i);
+        if names.is_empty() {
+            i += 1;
+            continue;
+        }
+        if let Some(mut d) = parse_doc(s.bytes(i)) {
+            if amp_add_param_names(&mut d, &names) {
+                s.set_owned(i, doc_render(&d));
+                changed = true;
+            }
+        }
+        i += 1;
+    }
+    changed
+}
+
+struct OtTypeMember {
+    toks: Vec<(Kind, Vec<u8>)>,
+    key: Vec<u8>,
+}
+
+fn ot_collect_type_members(s: &Stream, from: usize, to: usize, op: &[u8]) -> Option<Vec<OtTypeMember>> {
+    let mut members: Vec<OtTypeMember> = Vec::new();
+    let mut cur = OtTypeMember { toks: Vec::new(), key: Vec::new() };
+    let mut j = from;
+    while j < to {
+        match s.kind(j) {
+            Kind::Whitespace => {
+                if has_newline(s.bytes(j)) {
+                    return None;
+                }
+            }
+            Kind::Comment | Kind::DocComment => return None,
+            Kind::Punct => {
+                if s.bytes(j) == op {
+                    if cur.toks.is_empty() {
+                        return None;
+                    }
+                    cur.key = cur.key.to_ascii_lowercase();
+                    members.push(cur);
+                    cur = OtTypeMember { toks: Vec::new(), key: Vec::new() };
+                } else if s.bytes(j) == b"\\" {
+                    cur.toks.push((Kind::Punct, s.bytes(j).to_vec()));
+                    cur.key.extend_from_slice(s.bytes(j));
+                } else {
+                    return None;
+                }
+            }
+            k => {
+                cur.toks.push((k, s.bytes(j).to_vec()));
+                cur.key.extend_from_slice(s.bytes(j));
+            }
+        }
+        j += 1;
+    }
+    if cur.toks.is_empty() {
+        return None;
+    }
+    cur.key = cur.key.to_ascii_lowercase();
+    members.push(cur);
+    Some(members)
+}
+
+struct DsToken {
+    text: Vec<u8>,
+    is_punct: bool,
+    gap: Vec<u8>,
+}
+
+fn ds_is_annotation_name_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b'\\'
+}
+
+fn ds_is_doctrine_annotation_name(name: &[u8]) -> bool {
+    if name.contains(&b'\\') {
+        return true;
+    }
+    name[0].is_ascii_uppercase()
+}
+
+fn ds_is_punct_char(c: u8) -> bool {
+    matches!(c, b'(' | b')' | b'{' | b'}' | b',' | b'=')
+}
+
+fn ds_match_annotation_paren(s: &[u8], open: usize) -> isize {
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut i = open;
+    while i < s.len() {
+        let c = s[i];
+        if in_str {
+            if c == b'\\' {
+                i += 2;
+                continue;
+            }
+            if c == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'"' => in_str = true,
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return i as isize;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    -1
+}
+
+fn ds_tokenize(inner: &[u8]) -> Vec<DsToken> {
+    let mut toks: Vec<DsToken> = Vec::new();
+    let mut i = 0;
+    let n = inner.len();
+    while i < n {
+        let c = inner[i];
+        if c == b' ' || c == b'\t' {
+            let start = i;
+            while i < n && (inner[i] == b' ' || inner[i] == b'\t') {
+                i += 1;
+            }
+            if let Some(last) = toks.last_mut() {
+                last.gap = inner[start..i].to_vec();
+            }
+            continue;
+        }
+        if c == b'"' {
+            let start = i;
+            i += 1;
+            while i < n {
+                if inner[i] == b'\\' {
+                    i += 2;
+                    continue;
+                }
+                if inner[i] == b'"' {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            toks.push(DsToken { text: inner[start..i.min(n)].to_vec(), is_punct: false, gap: Vec::new() });
+            continue;
+        }
+        if ds_is_punct_char(c) {
+            toks.push(DsToken { text: vec![c], is_punct: true, gap: Vec::new() });
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < n {
+            let ch = inner[i];
+            if ch == b' ' || ch == b'\t' || ch == b'"' || ds_is_punct_char(ch) {
+                break;
+            }
+            i += 1;
+        }
+        toks.push(DsToken { text: inner[start..i].to_vec(), is_punct: false, gap: Vec::new() });
+    }
+    toks
+}
+
+fn ds_gap_between(a: &DsToken, next: &DsToken, a_depth: i32, next_depth: i32) -> Vec<u8> {
+    if a.is_punct && a.text == b"(" {
+        return Vec::new();
+    }
+    if next.is_punct && next.text == b")" {
+        return Vec::new();
+    }
+    if next.is_punct && next.text == b"," {
+        return Vec::new();
+    }
+    if a.is_punct && a.text == b"," {
+        if a.gap.is_empty() {
+            return b" ".to_vec();
+        }
+        return a.gap.clone();
+    }
+    if a.is_punct && a.text == b"=" {
+        if a_depth > 0 {
+            return b" ".to_vec();
+        }
+        return Vec::new();
+    }
+    if next.is_punct && next.text == b"=" {
+        if next_depth > 0 {
+            return b" ".to_vec();
+        }
+        return Vec::new();
+    }
+    a.gap.clone()
+}
+
+fn ds_normalize_inner(inner: &[u8]) -> Vec<u8> {
+    let toks = ds_tokenize(inner);
+    if toks.is_empty() {
+        return Vec::new();
+    }
+    let mut depth = vec![0i32; toks.len()];
+    let mut d = 0i32;
+    for (i, t) in toks.iter().enumerate() {
+        depth[i] = d;
+        if t.is_punct && t.text == b"{" {
+            d += 1;
+        } else if t.is_punct && t.text == b"}" && d > 0 {
+            d -= 1;
+        }
+    }
+    let mut out: Vec<u8> = Vec::new();
+    for i in 0..toks.len() {
+        out.extend_from_slice(&toks[i].text);
+        if i == toks.len() - 1 {
+            break;
+        }
+        out.extend_from_slice(&ds_gap_between(&toks[i], &toks[i + 1], depth[i], depth[i + 1]));
+    }
+    out
+}
+
+fn ds_fix_line(content: &[u8]) -> Option<Vec<u8>> {
+    let mut lead_len = 0;
+    while lead_len < content.len() && (content[lead_len] == b' ' || content[lead_len] == b'\t') {
+        lead_len += 1;
+    }
+    let lead = &content[..lead_len];
+    let rest = &content[lead_len..];
+    if rest.first() != Some(&b'@') {
+        return None;
+    }
+    let mut j = 1;
+    while j < rest.len() && ds_is_annotation_name_byte(rest[j]) {
+        j += 1;
+    }
+    let name = &rest[1..j];
+    if name.is_empty() || !ds_is_doctrine_annotation_name(name) {
+        return None;
+    }
+    let mut k = j;
+    while k < rest.len() && (rest[k] == b' ' || rest[k] == b'\t') {
+        k += 1;
+    }
+    if k >= rest.len() || rest[k] != b'(' {
+        return None;
+    }
+    let close_idx = ds_match_annotation_paren(rest, k);
+    if close_idx < 0 {
+        return None;
+    }
+    let close = close_idx as usize;
+    let tail = &rest[close + 1..];
+    if !trim_right_ws_st(tail).is_empty() {
+        return None;
+    }
+    let inner = ds_normalize_inner(&rest[k + 1..close]);
+    let mut out = lead.to_vec();
+    out.push(b'@');
+    out.extend_from_slice(name);
+    out.push(b'(');
+    out.extend_from_slice(&inner);
+    out.push(b')');
+    out.extend_from_slice(tail);
+    Some(out)
+}
+
+fn ruc_is_word(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_'
+}
+fn ruc_is_ws(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0c)
+}
+
+fn ruc_first_class_like_name(s: &Stream) -> Vec<u8> {
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && is_class_like_keyword(&s.bytes(i).to_ascii_lowercase()) {
+            if let Some(n) = next_significant_index(s, i) {
+                if s.kind(n) == Kind::Ident {
+                    return s.bytes(n).to_vec();
+                }
+            }
+        }
+        i += 1;
+    }
+    Vec::new()
+}
+
+// trims a set of trailing/leading bytes (like strings.Trim(line, "* "))
+fn ruc_trim_star_space(b: &[u8]) -> &[u8] {
+    let mut st = 0;
+    let mut en = b.len();
+    while st < en && (b[st] == b'*' || b[st] == b' ') {
+        st += 1;
+    }
+    while en > st && (b[en - 1] == b'*' || b[en - 1] == b' ') {
+        en -= 1;
+    }
+    &b[st..en]
+}
+
+// --- individual useless-comment patterns (each returns the line with the
+// matched span removed, mirroring Preg::replace(..., '', line)). ---
+
+fn ruc_strip_suffix(line: &[u8], suffix: &[u8]) -> Vec<u8> {
+    if line.ends_with(suffix) {
+        line[..line.len() - suffix.len()].to_vec()
+    } else {
+        line.to_vec()
+    }
+}
+
+// // TODO: Implement .*\(\) method.$
+fn ruc_todo_implement(line: &[u8]) -> Vec<u8> {
+    let head = b"// TODO: Implement ";
+    // leftmost occurrence of head
+    if line.len() < 10 {
+        return line.to_vec();
+    }
+    // tail must be "() method" + exactly one char at end
+    let n = line.len();
+    if &line[n - 10..n - 1] != b"() method" {
+        return line.to_vec();
+    }
+    // find head at or before n-10
+    let limit = n - 10;
+    let mut p = 0;
+    while p + head.len() <= line.len() {
+        if &line[p..p + head.len()] == head && p <= limit {
+            return line[..p].to_vec();
+        }
+        p += 1;
+    }
+    line.to_vec()
+}
+
+// (?i)^(//|(\s|\*)+)(\s\w+\s)?constructor(\.)?$  -> whole-line match => ""
+fn ruc_constructor_line(line: &[u8]) -> bool {
+    let lc = line.to_ascii_lowercase();
+    let n = lc.len();
+    // (\s\w+\s) then constructor(\.)? $
+    let matches_from = |start: usize| -> bool {
+        for cand in [ruc_opt_ws_word_ws(&lc, start), Some(start)] {
+            if let Some(mut q) = cand {
+                if n >= q + 11 && &lc[q..q + 11] == b"constructor" {
+                    q += 11;
+                    if q < n && lc[q] == b'.' {
+                        q += 1;
+                    }
+                    if q == n {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    };
+    // prefix "//"
+    if n >= 2 && &lc[0..2] == b"//" && matches_from(2) {
+        return true;
+    }
+    // prefix (\s|*)+ ; greedy with backtracking over its length
+    let mut max = 0;
+    while max < n && (ruc_is_ws(lc[max]) || lc[max] == b'*') {
+        max += 1;
+    }
+    let mut pe = max;
+    while pe >= 1 {
+        if matches_from(pe) {
+            return true;
+        }
+        pe -= 1;
+    }
+    false
+}
+
+// optional (\s\w+\s): a whitespace, word chars, a whitespace
+fn ruc_opt_ws_word_ws(lc: &[u8], start: usize) -> Option<usize> {
+    let n = lc.len();
+    let mut q = start;
+    if q >= n || !ruc_is_ws(lc[q]) {
+        return None;
+    }
+    q += 1;
+    let ws0 = q;
+    while q < n && ruc_is_word(lc[q]) {
+        q += 1;
+    }
+    if q == ws0 {
+        return None;
+    }
+    if q >= n || !ruc_is_ws(lc[q]) {
+        return None;
+    }
+    q += 1;
+    Some(q)
+}
+
+// generic: (?i)? PREFIX + one of KWs? — implement the four "class/trait/interface"
+// and "Class representing" suffix removers directly.
+
+// (?i)//\s+(class|trait|interface)\s+\w+$
+fn ruc_slashslash_class(line: &[u8]) -> Vec<u8> {
+    ruc_kw_suffix(line, b"//", true)
+}
+// (?i)\s\*\s(class|trait|interface)\s+(\w)+$
+fn ruc_star_class(line: &[u8]) -> Vec<u8> {
+    ruc_kw_suffix(line, b"*", false)
+}
+
+// removes a trailing "PREFIX \s+ (class|trait|interface) \s+ word+" ; when
+// star=false the prefix is "\s*\s" (a whitespace, "*", a whitespace).
+fn ruc_kw_suffix(line: &[u8], _p: &[u8], slashes: bool) -> Vec<u8> {
+    let lc = line.to_ascii_lowercase();
+    let n = lc.len();
+    // parse from end: word+ , \s+ , kw , \s+ , prefix
+    let mut e = n;
+    // trailing word+
+    let mut we = e;
+    while we > 0 && ruc_is_word(lc[we - 1]) {
+        we -= 1;
+    }
+    if we == e {
+        return line.to_vec();
+    }
+    e = we;
+    // \s+
+    let mut se = e;
+    while se > 0 && ruc_is_ws(lc[se - 1]) {
+        se -= 1;
+    }
+    if se == e {
+        return line.to_vec();
+    }
+    e = se;
+    // kw
+    let kw: &[u8] = if e >= 9 && &lc[e - 9..e] == b"interface" {
+        b"interface"
+    } else if e >= 5 && &lc[e - 5..e] == b"class" {
+        b"class"
+    } else if e >= 5 && &lc[e - 5..e] == b"trait" {
+        b"trait"
+    } else {
+        return line.to_vec();
+    };
+    e -= kw.len();
+    if slashes {
+        // //\s+  : need "//" then \s+ up to e ... prefix is "//" then \s+
+        // \s+ before kw
+        let mut ws = e;
+        while ws > 0 && ruc_is_ws(lc[ws - 1]) {
+            ws -= 1;
+        }
+        if ws == e {
+            return line.to_vec();
+        }
+        // now expect "//" ending at ws
+        if ws >= 2 && &lc[ws - 2..ws] == b"//" {
+            let start = ws - 2;
+            return line[..start].to_vec();
+        }
+        line.to_vec()
+    } else {
+        // \s\*\s : a whitespace, "*", a whitespace, then kw
+        // one \s before kw
+        if e == 0 || !ruc_is_ws(lc[e - 1]) {
+            return line.to_vec();
+        }
+        let mut m = e - 1;
+        if m == 0 || lc[m - 1] != b'*' {
+            return line.to_vec();
+        }
+        m -= 1;
+        if m == 0 || !ruc_is_ws(lc[m - 1]) {
+            return line.to_vec();
+        }
+        m -= 1;
+        line[..m].to_vec()
+    }
+}
+
+// (?i)\s\*\sClass\s+representing\s+(\w+)$  (case-insensitive on the whole)
+fn ruc_class_representing(line: &[u8]) -> Vec<u8> {
+    let lc = line.to_ascii_lowercase();
+    let n = lc.len();
+    let mut e = n;
+    // word+
+    let mut we = e;
+    while we > 0 && ruc_is_word(lc[we - 1]) {
+        we -= 1;
+    }
+    if we == e {
+        return line.to_vec();
+    }
+    e = we;
+    // \s+
+    let mut se = e;
+    while se > 0 && ruc_is_ws(lc[se - 1]) {
+        se -= 1;
+    }
+    if se == e {
+        return line.to_vec();
+    }
+    e = se;
+    if e < 12 || &lc[e - 12..e] != b"representing" {
+        return line.to_vec();
+    }
+    e -= 12;
+    // \s+
+    let mut s2 = e;
+    while s2 > 0 && ruc_is_ws(lc[s2 - 1]) {
+        s2 -= 1;
+    }
+    if s2 == e {
+        return line.to_vec();
+    }
+    e = s2;
+    if e < 5 || &lc[e - 5..e] != b"class" {
+        return line.to_vec();
+    }
+    e -= 5;
+    // \s\*\s
+    if e == 0 || !ruc_is_ws(lc[e - 1]) {
+        return line.to_vec();
+    }
+    let mut m = e - 1;
+    if m == 0 || lc[m - 1] != b'*' {
+        return line.to_vec();
+    }
+    m -= 1;
+    if m == 0 || !ruc_is_ws(lc[m - 1]) {
+        return line.to_vec();
+    }
+    m -= 1;
+    line[..m].to_vec()
+}
+
+fn ruc_apply_line_regexes(line: &[u8]) -> Vec<u8> {
+    let mut v = ruc_strip_suffix(line, b"// TODO: Change the autogenerated stub");
+    v = ruc_todo_implement(&v);
+    if ruc_constructor_line(&v) {
+        v = Vec::new();
+    }
+    v = ruc_class_representing(&v);
+    // R5 (single-line "/** * class X */") is extremely rare; handled by the
+    // whole-block empty check below when it applies.
+    v = ruc_slashslash_class(&v);
+    v = ruc_star_class(&v);
+    v
+}
+
+// (?i)^(/\*{2}\s+?)?(\*|//)\s+This class was generated by the Doctrine ORM\. Add
+//  your own custom\r?\n\s+\*\s+repository methods below\.(\s+\*/)$
+fn ruc_doctrine_generated(text: &[u8]) -> Vec<u8> {
+    let lc = text.to_ascii_lowercase();
+    let needle1 = b"this class was generated by the doctrine orm. add your own custom";
+    let needle2 = b"repository methods below.";
+    if bytes_contains(&lc, needle1) && bytes_contains(&lc, needle2) && lc.ends_with(b"*/") {
+        // conservative: matches the full generated block; ECS replaces it with ""
+        return Vec::new();
+    }
+    text.to_vec()
+}
+
+fn ruc_clear_useless_doc_content(content: &[u8], class_name: &[u8]) -> Vec<u8> {
+    let lines: Vec<&[u8]> = content.split(|&c| c == b'\n').collect();
+    let mut cleaned: Vec<Vec<u8>> = Vec::new();
+    for line in &lines {
+        if !class_name.is_empty() && ruc_trim_star_space(line) == class_name {
+            continue;
+        }
+        cleaned.push(ruc_apply_line_regexes(line));
+    }
+    let kept: Vec<Vec<u8>> = cleaned.into_iter().filter(|l| !l.is_empty()).collect();
+    if kept.len() == 2 && kept[0] == b"/**" && trim_ascii(&kept[1]) == b"*/" {
+        return Vec::new();
+    }
+    let joined = kept.join(&b'\n');
+    ruc_doctrine_generated(&joined)
+}
+
+fn remove_useless_default_comment(s: &mut Stream) -> bool {
+    let class_name = ruc_first_class_like_name(s);
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Comment && s.kind(i) != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        let original = s.bytes(i).to_vec();
+        let cleaned = ruc_clear_useless_doc_content(&original, &class_name);
+        if cleaned.is_empty() {
+            s.remove_at(i);
+            changed = true;
+            continue;
+        } else if cleaned != original {
+            s.set_owned(i, cleaned);
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+fn doctrine_annotation_spaces(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let mut changed = false;
+        for l in d.inner.iter_mut() {
+            if let Some(fixed) = ds_fix_line(&l.content) {
+                if fixed != l.content {
+                    l.content = fixed;
+                    changed = true;
+                }
+            }
+        }
+        changed
+    })
+}
+
+fn ordered_types(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Punct || (s.bytes(i) != b"|" && s.bytes(i) != b"&") {
+            i += 1;
+            continue;
+        }
+        if !is_type_union_operator(s, i) {
+            i += 1;
+            continue;
+        }
+        let start = match type_run_boundary_prev(s, i) {
+            Some(st) => st,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let end = match type_run_boundary_next(s, i) {
+            Some(e) => e,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let mut run_start = start + 1;
+        while run_start < end && s.kind(run_start) == Kind::Whitespace {
+            run_start += 1;
+        }
+        let mut run_end = end - 1;
+        while run_end > run_start && s.kind(run_end) == Kind::Whitespace {
+            run_end -= 1;
+        }
+        // process the run once, at its leftmost operator
+        let mut first = None;
+        let mut j = run_start;
+        while j <= run_end {
+            if s.kind(j) == Kind::Punct && (s.bytes(j) == b"|" || s.bytes(j) == b"&") {
+                first = Some(j);
+                break;
+            }
+            j += 1;
+        }
+        if first != Some(i) {
+            i += 1;
+            continue;
+        }
+        let op = s.bytes(i).to_vec();
+        let members = match ot_collect_type_members(s, run_start, run_end + 1, &op) {
+            Some(m) if m.len() >= 2 => m,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        let mut order: Vec<usize> = (0..members.len()).collect();
+        // stable sort: null first, then key ascending
+        order.sort_by(|&a, &b| {
+            let an = members[a].key == b"null";
+            let bn = members[b].key == b"null";
+            if an != bn {
+                return bn.cmp(&an); // null (true) sorts first
+            }
+            members[a].key.cmp(&members[b].key)
+        });
+        // already ordered? compare keys positionally (matches sameMemberOrder)
+        if (0..members.len()).all(|k| members[order[k]].key == members[k].key) {
+            i += 1;
+            continue;
+        }
+        // rebuild replacement tokens
+        let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
+        for (idx, &mi) in order.iter().enumerate() {
+            if idx > 0 {
+                repl.push((Kind::Punct, op.clone()));
+            }
+            for t in &members[mi].toks {
+                repl.push((t.0, t.1.clone()));
+            }
+        }
+        // remove [run_start..=run_end], insert repl at run_start
+        for k in (run_start..=run_end).rev() {
+            s.remove_at(k);
+        }
+        for (off, (k, v)) in repl.iter().enumerate() {
+            s.insert_owned(run_start + off, *k, v.clone());
+        }
+        changed = true;
+        i = run_start + repl.len();
+    }
+    changed
 }
