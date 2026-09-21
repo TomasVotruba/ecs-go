@@ -210,6 +210,7 @@ func StructuralFixers() []fixer.Fixer {
 		SingleBlankLineBeforeNamespace{},
 		BlankLineAfterNamespace{},
 		NoUnusedImports{},
+		FullyQualifiedStrictTypes{},
 		SingleImportPerStatement{},
 		OrderedImports{},
 		BlankLineBetweenImportGroups{},

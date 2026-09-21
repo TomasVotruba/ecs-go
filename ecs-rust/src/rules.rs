@@ -52,6 +52,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"Symplify\CodingStandard\Fixer\Commenting\ParamReturnAndVarTagMalformsFixer",
     r"PhpCsFixer\Fixer\Phpdoc\GeneralPhpdocTagRenameFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\LambdaNotUsedImportFixer",
+    r"PhpCsFixer\Fixer\Import\FullyQualifiedStrictTypesFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
@@ -244,6 +245,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_quote(s);
     changed |= clean_namespace(s);
     changed |= phpdoc_return_self_reference(s);
+    changed |= fully_qualified_strict_types(s);
     changed |= explicit_string_variable(s);
     changed |= no_superfluous_phpdoc_tags(s);
     changed |= phpdoc_no_useless_inheritdoc(s);
@@ -16042,4 +16044,910 @@ fn ordered_types(s: &mut Stream) -> bool {
         i = run_start + repl.len();
     }
     changed
+}
+
+// --- FullyQualifiedStrictTypes (full default-config fidelity) ---
+
+const FQ_RESERVED: &[&[u8]] = &[
+    b"array", b"bool", b"callable", b"false", b"float", b"int", b"iterable",
+    b"list", b"mixed", b"never", b"null", b"object", b"parent", b"resource",
+    b"self", b"static", b"string", b"true", b"void",
+];
+
+fn fq_is_reserved_type(lower: &[u8]) -> bool {
+    FQ_RESERVED.iter().any(|r| *r == lower)
+}
+
+struct FqUses {
+    // (long, short); plus derived lookups computed lazily as linear scans
+    entries: Vec<(Vec<u8>, Vec<u8>)>,
+}
+
+impl FqUses {
+    fn new() -> Self {
+        FqUses { entries: Vec::new() }
+    }
+    fn add(&mut self, long: Vec<u8>, short: Vec<u8>) {
+        self.entries.push((long, short));
+    }
+    fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+    // ECS builds its caches by overwriting, so a duplicate key keeps the LAST
+    // entry - mirror that with rev().find().
+    fn name_by_short_lower(&self, short_lower: &[u8]) -> Option<&[u8]> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|(_, s)| s.to_ascii_lowercase() == short_lower)
+            .map(|(l, _)| l.as_slice())
+    }
+    fn short_by_name(&self, name: &[u8]) -> Option<&[u8]> {
+        self.entries.iter().rev().find(|(l, _)| l.as_slice() == name).map(|(_, s)| s.as_slice())
+    }
+    fn short_by_normalized(&self, norm: &[u8]) -> Option<&[u8]> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|(l, _)| fq_normalize(l) == norm)
+            .map(|(_, s)| s.as_slice())
+    }
+}
+
+fn fq_normalize(input: &[u8]) -> Vec<u8> {
+    match input.iter().rposition(|&c| c == b'\\') {
+        None => input.to_ascii_lowercase(),
+        Some(bs) => {
+            let mut out = input[..bs + 1].to_vec();
+            out.extend_from_slice(&input[bs + 1..].to_ascii_lowercase());
+            out
+        }
+    }
+}
+
+fn fq_is_reserved(symbol: &[u8], reserved: &[Vec<u8>]) -> bool {
+    if symbol.contains(&b'\\') {
+        return false;
+    }
+    if fq_is_reserved_type(&symbol.to_ascii_lowercase()) {
+        return true;
+    }
+    reserved.iter().any(|r| r.as_slice() == symbol)
+}
+
+fn fq_cut<'a>(s: &'a [u8], sep: u8) -> (&'a [u8], Option<&'a [u8]>) {
+    match s.iter().position(|&c| c == sep) {
+        Some(i) => (&s[..i], Some(&s[i + 1..])),
+        None => (s, None),
+    }
+}
+
+fn fq_resolve_symbol(symbol: &[u8], u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<u8> {
+    if symbol.first() == Some(&b'\\') {
+        return symbol[1..].to_vec();
+    }
+    if fq_is_reserved(symbol, reserved) {
+        return symbol.to_vec();
+    }
+    let (first, rest) = fq_cut(symbol, b'\\');
+    if let Some(long) = u.name_by_short_lower(&first.to_ascii_lowercase()) {
+        let mut out = long.to_vec();
+        if let Some(r) = rest {
+            out.push(b'\\');
+            out.extend_from_slice(r);
+        }
+        return out;
+    }
+    if !ns.is_empty() {
+        let mut out = ns.to_vec();
+        out.push(b'\\');
+        out.extend_from_slice(symbol);
+        return out;
+    }
+    symbol.to_vec()
+}
+
+fn fq_count(hay: &[u8], b: u8) -> usize {
+    hay.iter().filter(|&&c| c == b).count()
+}
+
+fn fq_shorten_symbol(fqcn: &[u8], u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<u8> {
+    if fq_is_reserved(fqcn, reserved) {
+        return fqcn.to_vec();
+    }
+    let mut res: Option<Vec<u8>> = None;
+    let mut i_min: isize = 0;
+
+    if !ns.is_empty() {
+        let mut prefix = ns.to_vec();
+        prefix.push(b'\\');
+        if fqcn.starts_with(&prefix) {
+            let tmp_res = &fqcn[ns.len() + 1..];
+            let (first_seg, _) = fq_cut(tmp_res, b'\\');
+            if u.name_by_short_lower(&first_seg.to_ascii_lowercase()).is_none()
+                && !fq_is_reserved(tmp_res, reserved)
+            {
+                res = Some(tmp_res.to_vec());
+                i_min = fq_count(ns, b'\\') as isize + 1;
+            }
+        }
+    }
+
+    let mut tmp = fqcn.to_vec();
+    let mut i = fq_count(fqcn, b'\\') as isize;
+    while i >= i_min {
+        if let Some(short) = u.short_by_name(&tmp) {
+            let mut tmp_res = short.to_vec();
+            tmp_res.extend_from_slice(&fqcn[tmp.len()..]);
+            if !fq_is_reserved(&tmp_res, reserved) {
+                res = Some(tmp_res);
+                break;
+            }
+        }
+        if i > 0 {
+            if let Some(bs) = tmp.iter().rposition(|&c| c == b'\\') {
+                tmp.truncate(bs);
+            }
+        }
+        i -= 1;
+    }
+
+    if res.is_none() {
+        if let Some(short) = u.short_by_normalized(&fq_normalize(fqcn)) {
+            if !fq_is_reserved(short, reserved) {
+                res = Some(short.to_vec());
+            }
+        }
+    }
+
+    match res {
+        Some(r) => r,
+        None => {
+            let (first_seg, _) = fq_cut(fqcn, b'\\');
+            let collide = u.name_by_short_lower(&first_seg.to_ascii_lowercase()).is_some();
+            if !ns.is_empty() || collide {
+                let mut out = vec![b'\\'];
+                out.extend_from_slice(fqcn);
+                out
+            } else {
+                fqcn.to_vec()
+            }
+        }
+    }
+}
+
+fn fq_determine_short(type_name: &[u8], u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Option<Vec<u8>> {
+    let fqcn = fq_resolve_symbol(type_name, u, ns, reserved);
+    let shortened = fq_shorten_symbol(&fqcn, u, ns, reserved);
+    if shortened == type_name {
+        None
+    } else {
+        Some(shortened)
+    }
+}
+
+struct FqRepl {
+    start: usize,
+    end: usize,
+    tokens: Vec<(Kind, Vec<u8>)>,
+}
+
+fn fq_string_to_tokens(input: &[u8]) -> Vec<(Kind, Vec<u8>)> {
+    let mut out = Vec::new();
+    let mut inp = input;
+    if inp.first() == Some(&b'\\') {
+        out.push((Kind::Punct, b"\\".to_vec()));
+        inp = &inp[1..];
+    }
+    let parts: Vec<&[u8]> = inp.split(|&c| c == b'\\').collect();
+    for (i, p) in parts.iter().enumerate() {
+        out.push((Kind::Ident, p.to_vec()));
+        if i != parts.len() - 1 {
+            out.push((Kind::Punct, b"\\".to_vec()));
+        }
+    }
+    out
+}
+
+fn fq_read_namespace_name(s: &Stream, kw: usize) -> Option<(Vec<u8>, usize, usize)> {
+    let mut b: Vec<u8> = Vec::new();
+    let mut cur = sig_next(s, kw);
+    while let Some(i) = cur {
+        let k = s.kind(i);
+        if k == Kind::Ident {
+            b.extend_from_slice(s.bytes(i));
+            cur = sig_next(s, i);
+            continue;
+        }
+        if k == Kind::Punct && s.bytes(i) == b"\\" {
+            b.push(b'\\');
+            cur = sig_next(s, i);
+            continue;
+        }
+        if k == Kind::Punct && (s.bytes(i) == b";" || s.bytes(i) == b"{") {
+            return Some((b, i + 1, i));
+        }
+        break;
+    }
+    None
+}
+
+fn fq_namespace_regions(s: &Stream) -> Vec<(Vec<u8>, usize, usize)> {
+    let mut decls: Vec<usize> = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        if kw_is(s, i, b"namespace") {
+            if let Some(n) = sig_next(s, i) {
+                if s.kind(n) == Kind::Punct && s.bytes(n) == b"\\" {
+                    i += 1;
+                    continue;
+                }
+            }
+            decls.push(i);
+        }
+        i += 1;
+    }
+    if decls.is_empty() {
+        return vec![(Vec::new(), 0, s.len())];
+    }
+    let mut regions = Vec::new();
+    for k in 0..decls.len() {
+        let d = decls[k];
+        if let Some((name, body_start, term)) = fq_read_namespace_name(s, d) {
+            if s.bytes(term) == b"{" {
+                let end = match_forward(s, term).unwrap_or(s.len());
+                regions.push((name, body_start, end));
+            } else {
+                let end = if k + 1 < decls.len() { decls[k + 1] } else { s.len() };
+                regions.push((name, body_start, end));
+            }
+        }
+    }
+    regions
+}
+
+fn fq_read_import(s: &Stream, start: usize) -> Option<(Vec<u8>, Vec<u8>, usize)> {
+    let mut b: Vec<u8> = Vec::new();
+    let mut i = start;
+    if is_punct_val(s, i, b"\\") {
+        i += 1;
+    }
+    let mut expect_name = true;
+    while i < s.len() {
+        let k = s.kind(i);
+        if k == Kind::Whitespace || k == Kind::Comment || k == Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        if expect_name {
+            if k != Kind::Ident {
+                return None;
+            }
+            b.extend_from_slice(s.bytes(i));
+            expect_name = false;
+            i += 1;
+            continue;
+        }
+        if k == Kind::Punct && s.bytes(i) == b"\\" {
+            b.push(b'\\');
+            expect_name = true;
+            i += 1;
+            continue;
+        }
+        if k == Kind::Punct && s.bytes(i) == b";" {
+            return Some((b, Vec::new(), i));
+        }
+        if kw_is(s, i, b"as") {
+            let a = sig_next(s, i)?;
+            if s.kind(a) != Kind::Ident {
+                return None;
+            }
+            let semi = sig_next(s, a)?;
+            if !is_punct_val(s, semi, b";") {
+                return None;
+            }
+            return Some((b, s.bytes(a).to_vec(), semi));
+        }
+        return None;
+    }
+    None
+}
+
+fn fq_collect_uses_region(s: &Stream, start: usize, end: usize) -> FqUses {
+    let mut u = FqUses::new();
+    let mut depth = 0i32;
+    let mut i = start;
+    while i < end && i < s.len() {
+        if s.kind(i) == Kind::Punct {
+            match s.bytes(i) {
+                b"{" => depth += 1,
+                b"}" => depth -= 1,
+                _ => {}
+            }
+            i += 1;
+            continue;
+        }
+        if depth != 0 || !kw_is(s, i, b"use") {
+            i += 1;
+            continue;
+        }
+        let n = match sig_next(s, i) {
+            Some(n) => n,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        if s.kind(n) == Kind::Keyword {
+            let lv = s.bytes(n).to_ascii_lowercase();
+            if lv == b"function" || lv == b"const" {
+                i += 1;
+                continue;
+            }
+        }
+        match fq_read_import(s, n) {
+            Some((fqcn, alias, e)) => {
+                let short = if !alias.is_empty() {
+                    alias
+                } else if let Some(idx) = fqcn.iter().rposition(|&c| c == b'\\') {
+                    fqcn[idx + 1..].to_vec()
+                } else {
+                    fqcn.clone()
+                };
+                u.add(fqcn, short);
+                i = e + 1;
+            }
+            None => i += 1,
+        }
+    }
+    u
+}
+
+fn fq_is_name_tok(s: &Stream, i: usize) -> bool {
+    s.kind(i) == Kind::Ident || (s.kind(i) == Kind::Punct && s.bytes(i) == b"\\")
+}
+
+fn fq_read_run_forward(s: &Stream, start: usize) -> Option<(Vec<u8>, usize)> {
+    if start >= s.len() || !fq_is_name_tok(s, start) {
+        return None;
+    }
+    let mut b: Vec<u8> = Vec::new();
+    let mut i = start;
+    let mut last = start;
+    while i < s.len() && fq_is_name_tok(s, i) {
+        b.extend_from_slice(s.bytes(i));
+        last = i;
+        i += 1;
+    }
+    Some((b, last))
+}
+
+fn fq_read_run_backward(s: &Stream, end: usize) -> Option<(Vec<u8>, usize)> {
+    if end >= s.len() {
+        return None;
+    }
+    let mut first = end;
+    let mut i = end as isize;
+    while i >= 0 && fq_is_name_tok(s, i as usize) {
+        first = i as usize;
+        i -= 1;
+    }
+    if !fq_is_name_tok(s, first) {
+        return None;
+    }
+    let mut b: Vec<u8> = Vec::new();
+    for j in first..=end {
+        b.extend_from_slice(s.bytes(j));
+    }
+    if b.is_empty() {
+        return None;
+    }
+    Some((b, first))
+}
+
+fn fq_next_name(s: &Stream, kw: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Option<FqRepl> {
+    let n = sig_next(s, kw)?;
+    let (content, end) = fq_read_run_forward(s, n)?;
+    let repl = fq_determine_short(&content, u, ns, reserved)?;
+    Some(FqRepl { start: n, end, tokens: fq_string_to_tokens(&repl) })
+}
+
+fn fq_prev_name(s: &Stream, idx: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Option<FqRepl> {
+    let p = sig_prev(s, idx)?;
+    if s.kind(p) != Kind::Ident {
+        return None;
+    }
+    let (content, start) = fq_read_run_backward(s, p)?;
+    let repl = fq_determine_short(&content, u, ns, reserved)?;
+    Some(FqRepl { start, end: p, tokens: fq_string_to_tokens(&repl) })
+}
+
+fn fq_extends_implements(s: &Stream, kw: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<FqRepl> {
+    let mut out = Vec::new();
+    let mut cur = sig_next(s, kw);
+    while let Some(i) = cur {
+        if s.kind(i) == Kind::Punct && s.bytes(i) == b"{" {
+            break;
+        }
+        if s.kind(i) == Kind::Keyword {
+            break;
+        }
+        if fq_is_name_tok(s, i) {
+            if let Some((content, end)) = fq_read_run_forward(s, i) {
+                if let Some(repl) = fq_determine_short(&content, u, ns, reserved) {
+                    out.push(FqRepl { start: i, end, tokens: fq_string_to_tokens(&repl) });
+                }
+                cur = sig_next(s, end);
+                continue;
+            }
+        }
+        cur = sig_next(s, i);
+    }
+    out
+}
+
+fn fq_catch(s: &Stream, kw: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<FqRepl> {
+    let open = match sig_next(s, kw) {
+        Some(o) if is_punct_val(s, o, b"(") => o,
+        _ => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    let mut cur = sig_next(s, open);
+    while let Some(i) = cur {
+        if (s.kind(i) == Kind::Punct && s.bytes(i) == b")") || s.kind(i) == Kind::Variable {
+            break;
+        }
+        if fq_is_name_tok(s, i) {
+            if let Some((content, end)) = fq_read_run_forward(s, i) {
+                if let Some(repl) = fq_determine_short(&content, u, ns, reserved) {
+                    out.push(FqRepl { start: i, end, tokens: fq_string_to_tokens(&repl) });
+                }
+                cur = sig_next(s, end);
+                continue;
+            }
+        }
+        cur = sig_next(s, i);
+    }
+    out
+}
+
+fn fq_is_type_boundary_before(s: &Stream, p: usize) -> bool {
+    if s.kind(p) == Kind::Punct {
+        return matches!(s.bytes(p), b"(" | b"," | b"|" | b"&" | b"?" | b":");
+    }
+    if s.kind(p) == Kind::Keyword {
+        return matches!(
+            s.bytes(p).to_ascii_lowercase().as_slice(),
+            b"public" | b"protected" | b"private" | b"readonly" | b"static" | b"var" | b"const" | b"function" | b"fn"
+        );
+    }
+    false
+}
+
+fn fq_is_type_boundary_after(s: &Stream, end: usize) -> bool {
+    let n = match sig_next(s, end) {
+        Some(n) => n,
+        None => return true,
+    };
+    if s.kind(n) == Kind::Variable {
+        return true;
+    }
+    if s.kind(n) == Kind::Punct {
+        return matches!(s.bytes(n), b"|" | b"&" | b")" | b"{" | b";" | b"," | b"...");
+    }
+    false
+}
+
+fn fq_type_runs_in(s: &Stream, from: usize, to: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<FqRepl> {
+    let mut out = Vec::new();
+    let mut cur = Some(from);
+    while let Some(i) = cur {
+        if i > to || i >= s.len() {
+            break;
+        }
+        if fq_is_name_tok(s, i) {
+            if let Some(p) = sig_prev(s, i) {
+                if fq_is_type_boundary_before(s, p) {
+                    if let Some((content, end)) = fq_read_run_forward(s, i) {
+                        if fq_is_type_boundary_after(s, end) {
+                            if let Some(repl) = fq_determine_short(&content, u, ns, reserved) {
+                                out.push(FqRepl { start: i, end, tokens: fq_string_to_tokens(&repl) });
+                            }
+                            cur = sig_next(s, end);
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        cur = sig_next(s, i);
+    }
+    out
+}
+
+fn fq_next_punct(s: &Stream, from: usize, v: &[u8]) -> Option<usize> {
+    let mut i = from + 1;
+    while i < s.len() {
+        if s.kind(i) == Kind::Punct && s.bytes(i) == v {
+            return Some(i);
+        }
+        if s.kind(i) == Kind::Punct && (s.bytes(i) == b";" || s.bytes(i) == b"{") {
+            return None;
+        }
+        i += 1;
+    }
+    None
+}
+
+fn fq_return_type_end(s: &Stream, colon: usize, region_end: usize) -> Option<usize> {
+    let mut i = colon + 1;
+    while i < s.len() && i < region_end {
+        if s.kind(i) == Kind::Punct && (s.bytes(i) == b"{" || s.bytes(i) == b";") {
+            return sig_prev(s, i);
+        }
+        i += 1;
+    }
+    None
+}
+
+fn fq_function(s: &Stream, kw: usize, region_end: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<FqRepl> {
+    let open = match fq_next_punct(s, kw, b"(") {
+        Some(o) => o,
+        None => return Vec::new(),
+    };
+    let close_idx = match match_forward(s, open) {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+    let mut out = fq_type_runs_in(s, open + 1, close_idx.saturating_sub(1), u, ns, reserved);
+    if let Some(c) = sig_next(s, close_idx) {
+        if is_punct_val(s, c, b":") {
+            if let Some(te) = fq_return_type_end(s, c, region_end) {
+                if te > c {
+                    if let Some(rs) = sig_next(s, c) {
+                        out.extend(fq_type_runs_in(s, rs, te, u, ns, reserved));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+const FQ_PHPDOC_TAGS: &[&[u8]] = &[
+    b"param", b"phpstan-param", b"phpstan-property", b"phpstan-property-read",
+    b"phpstan-property-write", b"phpstan-return", b"phpstan-var", b"property",
+    b"property-read", b"property-write", b"psalm-param", b"psalm-property",
+    b"psalm-property-read", b"psalm-property-write", b"psalm-return", b"psalm-var",
+    b"return", b"see", b"throws", b"var",
+];
+
+const FQ_DOC_KEYWORDS: &[&[u8]] = &[
+    b"min", b"max", b"class-string", b"int", b"positive-int", b"negative-int",
+    b"non-empty-string", b"numeric-string", b"array-key", b"scalar",
+    b"non-empty-array", b"non-empty-list", b"key-of", b"value-of", b"literal-string",
+    b"callable-string", b"double", b"boolean", b"integer", b"this", b"$this",
+    b"lowercase-string", b"non-falsy-string", b"truthy-string",
+];
+
+fn fq_hspace(c: u8) -> bool {
+    c == b' ' || c == b'\t'
+}
+fn fq_ws(c: u8) -> bool {
+    matches!(c, b'\t' | b'\n' | 0x0c | b'\r' | b' ')
+}
+fn fq_tag_char(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_' || c == b'-'
+}
+fn fq_name_start(c: u8) -> bool {
+    c.is_ascii_alphabetic() || c == b'_' || c >= 0x80
+}
+fn fq_name_char(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_' || c >= 0x80
+}
+
+// shorten each class-name atom in a type, skipping variables/keys/members.
+fn fq_shorten_doc_type(type_str: &[u8], u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<u8> {
+    let mut out: Vec<u8> = Vec::new();
+    let mut i = 0;
+    let n = type_str.len();
+    let mut in_string: u8 = 0;
+    while i < n {
+        let c = type_str[i];
+        if in_string != 0 {
+            out.push(c);
+            if c == in_string {
+                in_string = 0;
+            }
+            i += 1;
+            continue;
+        }
+        if c == b'\'' || c == b'"' {
+            in_string = c;
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        let mut j = i;
+        if type_str[j] == b'\\' && j + 1 < n && fq_name_start(type_str[j + 1]) {
+            j += 1;
+        }
+        if j < n && fq_name_start(type_str[j]) {
+            let start = i;
+            j += 1;
+            while j < n && fq_name_char(type_str[j]) {
+                j += 1;
+            }
+            loop {
+                if j < n && type_str[j] == b'\\' && j + 1 < n && fq_name_start(type_str[j + 1]) {
+                    j += 1;
+                    while j < n && fq_name_char(type_str[j]) {
+                        j += 1;
+                    }
+                } else {
+                    break;
+                }
+            }
+            let atom = &type_str[start..j];
+            if fq_doc_atom_shortenable(type_str, start, j, n) {
+                out.extend_from_slice(&fq_map_doc_atom(atom, u, ns, reserved));
+            } else {
+                out.extend_from_slice(atom);
+            }
+            i = j;
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+fn fq_doc_atom_shortenable(b: &[u8], start: usize, end: usize, n: usize) -> bool {
+    if start > 0 {
+        let p = b[start - 1];
+        if p == b'$' || p == b':' {
+            return false;
+        }
+    }
+    if end < n && b[end] == b':' && !(end + 1 < n && b[end + 1] == b':') {
+        return false;
+    }
+    true
+}
+
+fn fq_map_doc_atom(atom: &[u8], u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<u8> {
+    if !atom.contains(&b'\\') {
+        let lower = atom.to_ascii_lowercase();
+        if fq_is_reserved_type(&lower) || FQ_DOC_KEYWORDS.iter().any(|k| *k == lower.as_slice()) {
+            return atom.to_vec();
+        }
+    }
+    match fq_determine_short(atom, u, ns, reserved) {
+        Some(r) => r,
+        None => atom.to_vec(),
+    }
+}
+
+// mirrors fqDocTagRe.ReplaceAllStringFunc for the allowed tags.
+fn fq_php_doc_content(content: &[u8], u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Vec<u8> {
+    let mut out: Vec<u8> = Vec::new();
+    let n = content.len();
+    let mut i = 0;
+    while i < n {
+        // try to match at i: [*{] [ \t]* @ tag [ \t]+ type
+        if content[i] == b'*' || content[i] == b'{' {
+            let mut j = i + 1;
+            while j < n && fq_hspace(content[j]) {
+                j += 1;
+            }
+            if j < n && content[j] == b'@' {
+                let g1_end = j + 1;
+                let mut t = g1_end;
+                while t < n && fq_tag_char(content[t]) {
+                    t += 1;
+                }
+                if t > g1_end {
+                    let tag = &content[g1_end..t];
+                    let mut h = t;
+                    while h < n && fq_hspace(content[h]) {
+                        h += 1;
+                    }
+                    if h > t && h < n && !fq_ws(content[h]) && content[h] != b'*' {
+                        // type: [^\s*][^\s]*
+                        let type_start = h;
+                        let mut te = h + 1;
+                        while te < n && !fq_ws(content[te]) {
+                            te += 1;
+                        }
+                        let g1 = &content[i..g1_end];
+                        let g3 = &content[t..h];
+                        let g4 = &content[type_start..te];
+                        out.extend_from_slice(g1);
+                        out.extend_from_slice(tag);
+                        out.extend_from_slice(g3);
+                        if FQ_PHPDOC_TAGS.iter().any(|x| *x == tag.to_ascii_lowercase().as_slice()) {
+                            out.extend_from_slice(&fq_shorten_doc_type(g4, u, ns, reserved));
+                        } else {
+                            out.extend_from_slice(g4);
+                        }
+                        i = te;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(content[i]);
+        i += 1;
+    }
+    out
+}
+
+fn fq_php_doc(s: &Stream, idx: usize, u: &FqUses, ns: &[u8], reserved: &[Vec<u8>]) -> Option<FqRepl> {
+    let content = s.bytes(idx).to_vec();
+    let new_content = fq_php_doc_content(&content, u, ns, reserved);
+    if new_content == content {
+        return None;
+    }
+    Some(FqRepl { start: idx, end: idx, tokens: vec![(Kind::DocComment, new_content)] })
+}
+
+// mirrors fqDocTemplateRe: collect @template/@type declared identifiers.
+fn fq_doc_template_names(content: &[u8]) -> Vec<Vec<u8>> {
+    let mut out = Vec::new();
+    let n = content.len();
+    let mut i = 0;
+    while i < n {
+        if content[i] == b'*' {
+            let mut j = i + 1;
+            while j < n && fq_hspace(content[j]) {
+                j += 1;
+            }
+            if j < n && content[j] == b'@' {
+                let rest = &content[j + 1..];
+                let lower = rest.to_ascii_lowercase();
+                // optional psalm-/phpstan- prefix
+                let mut off = 0;
+                for pfx in [b"psalm-".as_slice(), b"phpstan-".as_slice()] {
+                    if lower.starts_with(pfx) {
+                        off = pfx.len();
+                        break;
+                    }
+                }
+                let after = &lower[off..];
+                let kw = [
+                    b"template-covariant".as_slice(),
+                    b"template-contravariant".as_slice(),
+                    b"template".as_slice(),
+                    b"import-type".as_slice(),
+                    b"type".as_slice(),
+                ]
+                .into_iter()
+                .find(|k| after.starts_with(k));
+                if let Some(k) = kw {
+                    let mut p = j + 1 + off + k.len();
+                    let mut hs = false;
+                    while p < n && fq_hspace(content[p]) {
+                        p += 1;
+                        hs = true;
+                    }
+                    if hs && p < n && fq_name_start(content[p]) {
+                        let st = p;
+                        p += 1;
+                        while p < n && fq_name_char(content[p]) {
+                            p += 1;
+                        }
+                        out.push(content[st..p].to_vec());
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+fn fq_apply(s: &mut Stream, r: &FqRepl) {
+    // set first slot, then remove the rest, then splice extra tokens
+    // Replace [start..=end] with r.tokens
+    // remove end..start+1
+    let mut k = r.end;
+    while k > r.start {
+        s.remove_at(k);
+        k -= 1;
+    }
+    // now index start holds the (old) first token; overwrite it with tokens[0]
+    let (k0, v0) = r.tokens[0].clone();
+    s.set_owned(r.start, v0);
+    s.set_kind(r.start, k0);
+    // insert the remaining tokens after start
+    for (off, (kind, val)) in r.tokens[1..].iter().enumerate() {
+        s.insert_owned(r.start + 1 + off, *kind, val.clone());
+    }
+}
+
+fn fully_qualified_strict_types(s: &mut Stream) -> bool {
+    let regions = fq_namespace_regions(s);
+    let mut repls: Vec<FqRepl> = Vec::new();
+    for (name, start, end) in &regions {
+        let u = fq_collect_uses_region(s, *start, *end);
+        let mut reserved: Vec<Vec<u8>> = Vec::new();
+        let mut seen: Vec<usize> = Vec::new();
+        let mut push = |r: FqRepl, repls: &mut Vec<FqRepl>, seen: &mut Vec<usize>| {
+            if seen.contains(&r.start) {
+                return;
+            }
+            seen.push(r.start);
+            repls.push(r);
+        };
+        let mut depth = 0i32;
+        let mut i = *start;
+        while i < *end && i < s.len() {
+            let k = s.kind(i);
+            if k == Kind::Punct && s.bytes(i) == b"{" {
+                depth += 1;
+            } else if k == Kind::Punct && s.bytes(i) == b"}" {
+                depth -= 1;
+            } else if k == Kind::Variable {
+                if let Some(p) = sig_prev(s, i) {
+                    if s.kind(p) == Kind::Ident {
+                        if let Some(r) = fq_prev_name(s, i, &u, name, &reserved) {
+                            push(r, &mut repls, &mut seen);
+                        }
+                    }
+                }
+            } else if k == Kind::Punct && s.bytes(i) == b"::" {
+                if let Some(r) = fq_prev_name(s, i, &u, name, &reserved) {
+                    push(r, &mut repls, &mut seen);
+                }
+            } else if k == Kind::Keyword {
+                match s.bytes(i).to_ascii_lowercase().as_slice() {
+                    b"function" | b"fn" => {
+                        for r in fq_function(s, i, *end, &u, name, &reserved) {
+                            push(r, &mut repls, &mut seen);
+                        }
+                    }
+                    b"catch" => {
+                        for r in fq_catch(s, i, &u, name, &reserved) {
+                            push(r, &mut repls, &mut seen);
+                        }
+                    }
+                    b"extends" | b"implements" => {
+                        for r in fq_extends_implements(s, i, &u, name, &reserved) {
+                            push(r, &mut repls, &mut seen);
+                        }
+                    }
+                    b"new" | b"instanceof" => {
+                        if let Some(r) = fq_next_name(s, i, &u, name, &reserved) {
+                            push(r, &mut repls, &mut seen);
+                        }
+                    }
+                    b"use" => {
+                        if depth >= 1 {
+                            if let Some(r) = fq_next_name(s, i, &u, name, &reserved) {
+                                push(r, &mut repls, &mut seen);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            } else if k == Kind::DocComment {
+                for id in fq_doc_template_names(s.bytes(i)) {
+                    reserved.push(id);
+                }
+                if let Some(r) = fq_php_doc(s, i, &u, name, &reserved) {
+                    push(r, &mut repls, &mut seen);
+                }
+            }
+            i += 1;
+        }
+    }
+    if repls.is_empty() {
+        return false;
+    }
+    repls.sort_by(|a, b| b.start.cmp(&a.start));
+    for r in &repls {
+        fq_apply(s, r);
+    }
+    true
 }
