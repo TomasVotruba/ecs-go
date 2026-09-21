@@ -14,10 +14,15 @@ import (
 // namespace-relative short name (default config: import_symbols=false,
 // leading_backslash_in_global_namespace=false, the default phpdoc_tags list).
 //
-// Residual: attribute-internal class names (`#[\Foo\Bar]`) are NOT shortened -
-// the flat lexer folds an attribute into a single opaque comment token, so ECS's
-// T_ATTRIBUTE handling has no token equivalent. Leaving them fully qualified is
-// byte-safe (valid PHP, never over-shortened).
+// Residuals (byte-safe: valid PHP, never corrupts, go==rust holds):
+//   - Attribute-internal class names (`#[\Foo\Bar]`) are not shortened - the
+//     flat lexer folds an attribute into one opaque comment token, so ECS's
+//     T_ATTRIBUTE handling has no token equivalent.
+//   - PHPDoc types are shortened by an atom scanner (guarding variables, keys,
+//     `::` members, generic/callable bases and wildcard-generic `<*>` types)
+//     rather than a full recursive TypeExpression parser; it matches ECS on the
+//     verified corpora, but a sufficiently exotic unparseable type construct
+//     could still differ.
 type FullyQualifiedStrictTypes struct{}
 
 func (FullyQualifiedStrictTypes) Name() string {
@@ -35,8 +40,12 @@ var fqReservedTypes = map[string]bool{
 	"static": true, "string": true, "true": true, "void": true,
 }
 
-// fqUses holds the class-import map for one namespace plus the derived caches.
+// fqUses holds the class-import map for one namespace. Like ECS's $uses it is
+// keyed by full name, so importing the same class twice keeps only the last
+// alias; the caches are then derived from that (build).
 type fqUses struct {
+	longs             []string // full names in first-occurrence order
+	longToShort       map[string]string
 	nameByShortLower  map[string]string // lower(short) -> long
 	shortByName       map[string]string // long -> short
 	shortByNormalized map[string]string // normalizeFqcn(long) -> short
@@ -44,6 +53,7 @@ type fqUses struct {
 
 func fqNewUses() *fqUses {
 	return &fqUses{
+		longToShort:       map[string]string{},
 		nameByShortLower:  map[string]string{},
 		shortByName:       map[string]string{},
 		shortByNormalized: map[string]string{},
@@ -51,9 +61,20 @@ func fqNewUses() *fqUses {
 }
 
 func (u *fqUses) add(long, short string) {
-	u.nameByShortLower[strings.ToLower(short)] = long
-	u.shortByName[long] = short
-	u.shortByNormalized[fqNormalize(long)] = short
+	if _, ok := u.longToShort[long]; !ok {
+		u.longs = append(u.longs, long)
+	}
+	u.longToShort[long] = short
+}
+
+// build derives the caches from the (full-name-keyed) import map.
+func (u *fqUses) build() {
+	for _, long := range u.longs {
+		short := u.longToShort[long]
+		u.nameByShortLower[strings.ToLower(short)] = long
+		u.shortByName[long] = short
+		u.shortByNormalized[fqNormalize(long)] = short
+	}
 }
 
 func fqNormalize(input string) string {
