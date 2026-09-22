@@ -63,6 +63,7 @@ func CommonFixers() []fixer.Fixer {
 		NoTrailingCommaInSingleline{},
 		NoSpacesAroundOffset{},
 		ObjectOperatorWithoutWhitespace{},
+		NoUselessNullsafeOperator{},
 		StandardizeNotEquals{},
 		TernaryToNullCoalescing{},
 		NoEmptyStatement{},
@@ -169,6 +170,7 @@ func ConstructFixers() []fixer.Fixer {
 		NotOperatorWithSuccessorSpace{},
 		NoLeadingImportSlash{},
 		Elseif{},
+		NoSuperfluousElseif{},
 		ControlStructureBraces{},
 		ControlStructureContinuationPosition{},
 		NoUnneededControlParentheses{},
@@ -184,9 +186,22 @@ func ConstructFixers() []fixer.Fixer {
 		ReturnTypeDeclaration{},
 		NewWithParentheses{},
 		FunctionDeclaration{},
+		RemoveDeadParam{},
+		RemoveDeadVarThis{},
+		RemoveParamNameReference{},
+		SwitchedTypeAndName{},
+		RemovePHPStormAnnotation{},
+		RemoveEventSubscriberDescription{},
+		RemoveMethodNameDuplicateDescription{},
+		RemovePropertyVariableNameDescription{},
+		OrderedInterfaces{},
+		OrderedTraits{},
+		PhpUnitMethodCasing{},
+		PhpUnitSetUpTearDownVisibility{},
 		OperatorLinebreak{},
 		PhpdocSeparation{},
 		PhpdocToComment{},
+		PhpdocAlign{},
 		ParamReturnAndVarTagMalforms{},
 		GeneralPhpdocTagRename{},
 	}
@@ -215,11 +230,15 @@ func StructuralFixers() []fixer.Fixer {
 		OrderedImports{},
 		BlankLineBetweenImportGroups{},
 		SingleLineAfterImports{},
+		NoBlankLineBetweenImports{},
+		SpaceAfterCommaHereNowDoc{},
+		ArrayOpenerAndCloserNewline{},
 		NoBlankLinesAfterClassOpening{},
 		StatementIndentation{},
 		MethodChainingNewline{},
 		MethodChainingIndentation{},
 		ArrayListItemNewline{},
+		StandaloneLineInMultilineArray{},
 		ArrayIndentation{},
 		NoExtraBlankLines{}, // after import removal, which can leave extra blanks
 	}
@@ -235,6 +254,16 @@ func All() []fixer.Fixer {
 	all = append(all, SpacingFixers()...)
 	all = append(all, ConstructFixers()...)
 	all = append(all, StructuralFixers()...)
+	all = append(all,
+		DoubleAsteriskInlineVar{},
+		FixTagTypo{},
+		TypeToVarTag{},
+		MergeDocBlockStart{},
+		AddMissingVarName{},
+		SingleLineInlineVarDocBlock{},
+		RemoveSuperfluousReturnName{},
+		RemoveSuperfluousVarName{},
+		FixParamNameTypo{})
 	all = append(all, NoClosingTag{})
 	// run in PHP-CS-Fixer priority order (descending); ties keep the curated
 	// order above so parity with ECS's execution order is preserved

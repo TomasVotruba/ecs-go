@@ -22,9 +22,23 @@ const EcsSrcSourceBase = "https://github.com/ecsphp/ecs-src/blob/main/packages/c
 // ecsSrcOnlyFixers are Symplify fixers sourced from ecsphp/ecs-src rather than
 // the split symplify/coding-standard repository.
 var ecsSrcOnlyFixers = map[string]bool{
-	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer`:         true,
-	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePlainConstructorParamFixer`: true,
-	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer`: true,
+	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineRequiredParamFixer`:              true,
+	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePlainConstructorParamFixer`:      true,
+	`Symplify\CodingStandard\Fixer\Spacing\StandaloneLineSymfonyAttributeParamFixer`:      true,
+	`Symplify\CodingStandard\Fixer\Spacing\NoBlankLineBetweenImportsFixer`:                true,
+	`Symplify\CodingStandard\Fixer\Spacing\SpaceAfterCommaHereNowDocFixer`:                true,
+	`Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer`:        true,
+	`Symplify\CodingStandard\Fixer\Commenting\FixTagTypoFixer`:                            true,
+	`Symplify\CodingStandard\Fixer\Commenting\TypeToVarTagFixer`:                          true,
+	`Symplify\CodingStandard\Fixer\Commenting\MergeDocBlockStartFixer`:                    true,
+	`Symplify\CodingStandard\Fixer\Commenting\RemoveDeadParamFixer`:                       true,
+	`Symplify\CodingStandard\Fixer\Commenting\RemoveDeadVarThisFixer`:                     true,
+	`Symplify\CodingStandard\Fixer\Commenting\RemoveParamNameReferenceFixer`:              true,
+	`Symplify\CodingStandard\Fixer\Commenting\SwitchedTypeAndNameFixer`:                   true,
+	`Symplify\CodingStandard\Fixer\Annotation\RemovePHPStormAnnotationFixer`:              true,
+	`Symplify\CodingStandard\Fixer\Annotation\RemovePropertyVariableNameDescriptionFixer`: true,
+	`Symplify\CodingStandard\Fixer\Annotation\RemoveMethodNameDuplicateDescriptionFixer`:  true,
+	`Symplify\CodingStandard\Fixer\Annotation\RemoveEventSubscriberDescriptionFixer`:      true,
 }
 
 type Fixer interface {

@@ -28,6 +28,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Semicolon\NoEmptyStatementFixer",
     r"PhpCsFixer\Fixer\StringNotation\NoBinaryStringFixer",
     r"PhpCsFixer\Fixer\ControlStructure\ElseifFixer",
+    r"PhpCsFixer\Fixer\ControlStructure\NoSuperfluousElseifFixer",
     r"PhpCsFixer\Fixer\ControlStructure\ControlStructureBracesFixer",
     r"PhpCsFixer\Fixer\ControlStructure\NoAlternativeSyntaxFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\StandaloneLinePromotedPropertyFixer",
@@ -43,6 +44,8 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Semicolon\MultilineWhitespaceBeforeSemicolonsFixer",
     r"Symplify\CodingStandard\Fixer\Commenting\AddMissingParamNameFixer",
     r"PhpCsFixer\Fixer\ClassNotation\OrderedTypesFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\OrderedInterfacesFixer",
+    r"PhpCsFixer\Fixer\ClassNotation\OrderedTraitsFixer",
     r"PhpCsFixer\Fixer\DoctrineAnnotation\DoctrineAnnotationSpacesFixer",
     r"Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocSeparationFixer",
@@ -50,10 +53,20 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\DoctrineAnnotation\DoctrineAnnotationArrayAssignmentFixer",
     r"PhpCsFixer\Fixer\DoctrineAnnotation\DoctrineAnnotationIndentationFixer",
     r"Symplify\CodingStandard\Fixer\Commenting\ParamReturnAndVarTagMalformsFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\DoubleAsteriskInlineVarFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\FixTagTypoFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\TypeToVarTagFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\MergeDocBlockStartFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\AddMissingVarNameFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\SingleLineInlineVarDocBlockFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\RemoveSuperfluousReturnNameFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\RemoveSuperfluousVarNameFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\FixParamNameTypoFixer",
     r"PhpCsFixer\Fixer\Phpdoc\GeneralPhpdocTagRenameFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\LambdaNotUsedImportFixer",
     r"PhpCsFixer\Fixer\Import\FullyQualifiedStrictTypesFixer",
     r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer",
+    r"Symplify\CodingStandard\Fixer\ArrayNotation\StandaloneLineInMultilineArrayFixer",
     r"PhpCsFixer\Fixer\ControlStructure\EmptyLoopBodyFixer",
     r"Symplify\CodingStandard\Fixer\Spacing\MethodChainingNewlineFixer",
     r"PhpCsFixer\Fixer\Operator\NewWithParenthesesFixer",
@@ -63,6 +76,16 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\ClassNotation\SingleTraitInsertPerStatementFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\NoMultilineWhitespaceAroundDoubleArrowFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\FunctionDeclarationFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\RemoveDeadParamFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\RemoveDeadVarThisFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\RemoveParamNameReferenceFixer",
+    r"Symplify\CodingStandard\Fixer\Commenting\SwitchedTypeAndNameFixer",
+    r"Symplify\CodingStandard\Fixer\Annotation\RemovePHPStormAnnotationFixer",
+    r"Symplify\CodingStandard\Fixer\Annotation\RemovePropertyVariableNameDescriptionFixer",
+    r"Symplify\CodingStandard\Fixer\Annotation\RemoveMethodNameDuplicateDescriptionFixer",
+    r"Symplify\CodingStandard\Fixer\Annotation\RemoveEventSubscriberDescriptionFixer",
+    r"PhpCsFixer\Fixer\PhpUnit\PhpUnitMethodCasingFixer",
+    r"PhpCsFixer\Fixer\PhpUnit\PhpUnitSetUpTearDownVisibilityFixer",
     r"PhpCsFixer\Fixer\Operator\OperatorLinebreakFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\NoUnreachableDefaultArgumentValueFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\MethodArgumentSpaceFixer",
@@ -102,6 +125,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Basic\NoTrailingCommaInSinglelineFixer",
     r"PhpCsFixer\Fixer\Whitespace\NoSpacesAroundOffsetFixer",
     r"PhpCsFixer\Fixer\Operator\ObjectOperatorWithoutWhitespaceFixer",
+    r"PhpCsFixer\Fixer\Operator\NoUselessNullsafeOperatorFixer",
     r"PhpCsFixer\Fixer\Operator\StandardizeNotEqualsFixer",
     r"PhpCsFixer\Fixer\Operator\TernaryToNullCoalescingFixer",
     r"PhpCsFixer\Fixer\ArrayNotation\TrimArraySpacesFixer",
@@ -168,6 +192,9 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\CastNotation\CastSpacesFixer",
     r"PhpCsFixer\Fixer\Import\NoUnusedImportsFixer",
     r"PhpCsFixer\Fixer\Import\SingleLineAfterImportsFixer",
+    r"Symplify\CodingStandard\Fixer\Spacing\NoBlankLineBetweenImportsFixer",
+    r"Symplify\CodingStandard\Fixer\Spacing\SpaceAfterCommaHereNowDocFixer",
+    r"Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer",
     r"PhpCsFixer\Fixer\FunctionNotation\ReturnTypeDeclarationFixer",
     r"PhpCsFixer\Fixer\Phpdoc\NoBlankLinesAfterPhpdocFixer",
     r"PhpCsFixer\Fixer\Import\NoLeadingImportSlashFixer",
@@ -179,6 +206,7 @@ pub const RULE_NAMES: &[&str] = &[
     r"PhpCsFixer\Fixer\Operator\BinaryOperatorSpacesFixer",
     r"PhpCsFixer\Fixer\Whitespace\BlankLineBetweenImportGroupsFixer",
     r"PhpCsFixer\Fixer\Phpdoc\PhpdocTrimConsecutiveBlankLineSeparationFixer",
+    r"PhpCsFixer\Fixer\Phpdoc\PhpdocAlignFixer",
     r"PhpCsFixer\Fixer\Whitespace\NoWhitespaceInBlankLineFixer",
     r"PhpCsFixer\Fixer\Whitespace\SingleBlankLineAtEofFixer",
     r"PhpCsFixer\Fixer\ControlStructure\ControlStructureContinuationPositionFixer",
@@ -203,45 +231,36 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_class_element_per_statement(s);
     changed |= class_attributes_separation(s);
     changed |= indentation_type(s);
+    changed |= no_alternative_syntax(s);
     changed |= no_empty_statement(s);
     changed |= no_binary_string(s);
-    changed |= no_alternative_syntax(s);
+    changed |= no_unneeded_braces(s);
+    changed |= no_alias_functions(s);
     changed |= remove_useless_default_comment(s);
     changed |= elseif(s);
-    changed |= control_structure_braces(s);
     changed |= standalone_line_promoted_property(s);
-    changed |= standalone_line_plain_constructor_param(s);
-    changed |= standalone_line_required_param(s);
-    changed |= standalone_line_symfony_attribute_param(s);
-    changed |= no_break_comment(s);
-    changed |= phpdoc_separation(s);
-    changed |= phpdoc_summary(s);
-    changed |= phpdoc_tag_type(s);
-    changed |= phpdoc_to_comment(s);
-    changed |= param_return_and_var_tag_malforms(s);
-    changed |= general_phpdoc_tag_rename(s);
-    changed |= lambda_not_used_import(s);
     changed |= array_list_item_newline(s);
     changed |= empty_loop_body(s);
+    changed |= no_superfluous_elseif(s);
     changed |= method_chaining_newline(s);
     changed |= new_with_parentheses(s);
     changed |= array_syntax(s);
     changed |= single_space_around_construct(s);
     changed |= class_definition(s);
     changed |= single_trait_insert_per_statement(s);
+    changed |= array_opener_and_closer_newline(s);
     changed |= no_multiline_whitespace_around_double_arrow(s);
+    changed |= lambda_not_used_import(s);
     changed |= function_declaration(s);
     changed |= no_unneeded_control_parentheses(s);
-    changed |= add_missing_param_name(s);
-    changed |= no_unreachable_default_argument_value(s);
     changed |= method_argument_space(s);
     changed |= array_indentation(s);
     changed |= align_multiline_comment(s);
     changed |= phpdoc_indent(s);
     changed |= long_to_shorthand_operator(s);
     changed |= standardize_increment(s);
-    changed |= increment_style(s);
     changed |= simplified_null_return(s);
+    changed |= increment_style(s);
     changed |= single_quote(s);
     changed |= clean_namespace(s);
     changed |= phpdoc_return_self_reference(s);
@@ -251,6 +270,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= phpdoc_no_useless_inheritdoc(s);
     changed |= no_useless_concat_operator(s);
     changed |= phpdoc_line_span(s);
+    changed |= standalone_line_in_multiline_array(s);
     changed |= phpdoc_no_empty_return(s);
     changed |= nullable_type_declaration_for_default_null_value(s);
     changed |= no_empty_phpdoc(s);
@@ -258,21 +278,20 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= spaces_inside_parentheses(s);
     changed |= list_syntax(s);
     changed |= no_empty_comment(s);
-    changed |= function_to_constant(s);
     changed |= nullable_type_declaration(s);
+    changed |= function_to_constant(s);
     changed |= linebreak_after_opening_tag(s);
     changed |= is_null(s);
     changed |= single_line_comment_spacing(s);
     changed |= no_space_around_double_colon(s);
     changed |= no_unneeded_import_alias(s);
     changed |= empty_loop_condition(s);
+    changed |= doctrine_annotation_array_assignment(s);
     changed |= ternary_operator_spaces(s);
     changed |= blank_line_after_opening_tag(s);
+    changed |= control_structure_braces(s);
     changed |= single_import_per_statement(s);
     changed |= line_ending(s);
-    changed |= doctrine_annotation_array_assignment(s);
-    changed |= doctrine_annotation_spaces(s);
-    changed |= doctrine_annotation_indentation(s);
     changed |= yoda_style(s);
     changed |= no_whitespace_before_comma_in_array(s);
     changed |= whitespace_after_comma_in_array(s);
@@ -280,6 +299,7 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_trailing_comma_in_singleline(s);
     changed |= no_spaces_around_offset(s);
     changed |= object_operator_without_whitespace(s);
+    changed |= no_useless_nullsafe_operator(s);
     changed |= standardize_not_equals(s);
     changed |= ternary_to_null_coalescing(s);
     changed |= trim_array_spaces(s);
@@ -289,8 +309,6 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= no_whitespace_in_empty_array(s);
     changed |= normalize_index_brace(s);
     changed |= switch_continue_to_break(s);
-    changed |= no_unneeded_braces(s);
-    changed |= no_alias_functions(s);
     changed |= multiline_comment_opening_closing(s);
     changed |= declare_parentheses(s);
     changed |= type_declaration_spaces(s);
@@ -299,7 +317,11 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= explicit_indirect_variable(s);
     changed |= no_null_property_initialization(s);
     changed |= include(s);
+    changed |= add_missing_param_name(s);
     changed |= no_alias_language_construct_call(s);
+    changed |= no_unreachable_default_argument_value(s);
+    changed |= doctrine_annotation_spaces(s);
+    changed |= doctrine_annotation_indentation(s);
     changed |= phpdoc_scalar(s);
     changed |= general_phpdoc_annotation_remove(s);
     changed |= phpdoc_types(s);
@@ -312,6 +334,8 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= phpdoc_var_without_name(s);
     changed |= phpdoc_types_order(s);
     changed |= phpdoc_var_annotation_correct_order(s);
+    changed |= phpdoc_summary(s);
+    changed |= phpdoc_tag_type(s);
     changed |= lowercase_keywords(s);
     changed |= constant_case(s);
     changed |= lowercase_static_reference(s);
@@ -329,7 +353,6 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= multiline_whitespace_before_semicolons(s);
     changed |= concat_space(s);
     changed |= blank_line_after_strict_types(s);
-    changed |= operator_linebreak(s);
     changed |= no_trailing_whitespace(s);
     changed |= no_trailing_whitespace_in_comment(s);
     changed |= declare_equal_normalize(s);
@@ -337,9 +360,27 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= control_structure_continuation_position(s);
     changed |= switch_case_semicolon_to_colon(s);
     changed |= switch_case_space(s);
+    changed |= standalone_line_plain_constructor_param(s);
+    changed |= standalone_line_required_param(s);
+    changed |= standalone_line_symfony_attribute_param(s);
+    changed |= no_break_comment(s);
+    changed |= remove_phpstorm_annotation(s);
+    changed |= remove_event_subscriber_description(s);
+    changed |= remove_method_name_duplicate_description(s);
+    changed |= remove_property_variable_name_description(s);
+    changed |= ordered_interfaces(s);
+    changed |= ordered_traits(s);
+    changed |= phpunit_method_casing(s);
+    changed |= phpunit_setup_teardown_visibility(s);
+    changed |= operator_linebreak(s);
+    changed |= phpdoc_separation(s);
+    changed |= phpdoc_to_comment(s);
+    changed |= param_return_and_var_tag_malforms(s);
+    changed |= general_phpdoc_tag_rename(s);
     changed |= visibility_required(s);
     changed |= modifier_keywords(s);
     changed |= single_blank_line_before_namespace(s);
+    changed |= space_after_comma_here_now_doc(s);
     changed |= no_blank_lines_after_class_opening(s);
     changed |= method_chaining_indentation(s);
     changed |= no_closing_tag(s);
@@ -373,8 +414,23 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= single_line_comment_style(s);
     changed |= blank_lines_before_namespace(s);
     changed |= binary_operator_spaces(s);
+    changed |= remove_dead_param(s);
+    changed |= remove_dead_var_this(s);
+    changed |= remove_param_name_reference(s);
+    changed |= switched_type_and_name(s);
+    changed |= double_asterisk_inline_var(s);
+    changed |= fix_tag_typo(s);
+    changed |= type_to_var_tag(s);
+    changed |= merge_doc_block_start(s);
+    changed |= add_missing_var_name(s);
+    changed |= single_line_inline_var_doc_block(s);
+    changed |= remove_superfluous_return_name(s);
+    changed |= remove_superfluous_var_name(s);
+    changed |= fix_param_name_typo(s);
     changed |= blank_line_between_import_groups(s);
     changed |= phpdoc_trim_consecutive_blank_line_separation(s);
+    changed |= phpdoc_align(s);
+    changed |= no_blank_line_between_imports(s);
     changed |= no_whitespace_in_blank_line(s);
     changed |= single_blank_line_at_eof(s);
     changed
@@ -10091,6 +10147,514 @@ fn phpdoc_single_line_var_spacing(s: &mut Stream) -> bool {
     })
 }
 
+// PhpdocAlign (left align, spacing {param:2,_default:1}) - mirror of go phpdoc_align.
+struct PaMatch {
+    indent: Vec<u8>,
+    tag: Vec<u8>,
+    hint: Vec<u8>,
+    var_name: Vec<u8>,
+    static_kw: Vec<u8>,
+    desc: Vec<u8>,
+    is_tag: bool,
+}
+
+const PA_NAME_TAGS: &[&[u8]] = &[
+    b"param", b"property", b"property-read", b"property-write", b"phpstan-param",
+    b"phpstan-property", b"phpstan-property-read", b"phpstan-property-write",
+    b"phpstan-assert", b"phpstan-assert-if-true", b"phpstan-assert-if-false",
+    b"psalm-param", b"psalm-param-out", b"psalm-property", b"psalm-property-read",
+    b"psalm-property-write", b"psalm-assert", b"psalm-assert-if-true", b"psalm-assert-if-false",
+];
+const PA_METHOD_TAGS: &[&[u8]] = &[b"method", b"phpstan-method", b"psalm-method"];
+const PA_NONAME_TAGS: &[&[u8]] = &[b"return", b"throws", b"type", b"var"];
+
+fn pa_spacing_for(tag: &[u8]) -> usize {
+    if tag == b"param" { 2 } else { 1 }
+}
+
+fn pa_is_hspace(c: u8) -> bool { c == b' ' || c == b'\t' }
+fn pa_is_ws(c: u8) -> bool {
+    c == b' ' || c == b'\t' || c == b'\n' || c == b'\r' || c == 0x0b || c == 0x0c
+}
+fn pa_tag_name_char(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_' || c == b'-'
+}
+fn pa_in_list(tag: &[u8], list: &[&[u8]]) -> bool {
+    list.iter().any(|t| *t == tag)
+}
+fn pa_trim_space(b: &[u8]) -> Vec<u8> {
+    let mut start = 0;
+    let mut end = b.len();
+    while start < end && pa_is_ws(b[start]) { start += 1; }
+    while end > start && pa_is_ws(b[end - 1]) { end -= 1; }
+    b[start..end].to_vec()
+}
+fn pa_spaces(n: usize) -> Vec<u8> { vec![b' '; n] }
+
+fn phpdoc_align(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for i in 0..s.len() {
+        if s.kind(i) != Kind::DocComment {
+            continue;
+        }
+        let v = s.bytes(i).to_vec();
+        let rebuilt = pa_doc_block(&v);
+        if rebuilt != v {
+            s.set_owned(i, rebuilt);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn pa_doc_block(content: &[u8]) -> Vec<u8> {
+    let mut lines = split_doc_lines(content);
+    let l = lines.len();
+    let mut i = 0usize;
+    while i < l {
+        let m = pa_get_matches(&lines[i], false);
+        if m.is_none() {
+            i += 1;
+            continue;
+        }
+        let current = i;
+        let mut items = vec![m.unwrap()];
+        loop {
+            i += 1;
+            if i >= l {
+                pa_rewrite(&mut lines, current, &items);
+                return lines.concat();
+            }
+            match pa_get_matches(&lines[i], true) {
+                Some(m2) => items.push(m2),
+                None => break,
+            }
+        }
+        pa_rewrite(&mut lines, current, &items);
+        // leave i on the breaking line so it is reconsidered (go: i-- then for-i++)
+    }
+    lines.concat()
+}
+
+fn pa_get_matches(raw: &[u8], comment_only: bool) -> Option<PaMatch> {
+    // strings.TrimRight(rawLine, "\r\n")
+    let mut end = raw.len();
+    while end > 0 && (raw[end - 1] == b'\r' || raw[end - 1] == b'\n') {
+        end -= 1;
+    }
+    let line = &raw[..end];
+    // ^(?P<indent>(?:\ {2}|\t)*)\ ?\*
+    let mut i = 0usize;
+    let mut indent_end = 0usize;
+    while i < line.len() {
+        if i + 1 < line.len() && line[i] == b' ' && line[i + 1] == b' ' {
+            i += 2;
+            indent_end = i;
+        } else if line[i] == b'\t' {
+            i += 1;
+            indent_end = i;
+        } else {
+            break;
+        }
+    }
+    let indent = line[..indent_end].to_vec();
+    if i < line.len() && line[i] == b' ' {
+        i += 1;
+    }
+    if i >= line.len() || line[i] != b'*' {
+        return None;
+    }
+    i += 1; // past '*'
+    let star_pos = i;
+
+    // tag regex: \h*@tag...
+    let mut j = i;
+    while j < line.len() && pa_is_hspace(line[j]) {
+        j += 1;
+    }
+    if j < line.len() && line[j] == b'@' {
+        if let Some(m) = pa_parse_tag(&indent, line, j + 1) {
+            return Some(m);
+        }
+    }
+
+    if !comment_only {
+        return None;
+    }
+    // regexCommentLine: \*(?!\h?+@)(?:\s+(?P<desc>\V+))(?<!\*\/)\r?$
+    let mut nb = star_pos;
+    if nb < line.len() && pa_is_hspace(line[nb]) {
+        nb += 1;
+    }
+    if nb < line.len() && line[nb] == b'@' {
+        return None;
+    }
+    let mut d = star_pos;
+    let mut saw_ws = false;
+    while d < line.len() && pa_is_hspace(line[d]) {
+        d += 1;
+        saw_ws = true;
+    }
+    if !saw_ws || d >= line.len() {
+        return None;
+    }
+    let desc = &line[d..];
+    if desc.is_empty() {
+        return None;
+    }
+    if line.ends_with(b"*/") {
+        return None;
+    }
+    Some(PaMatch {
+        indent,
+        tag: Vec::new(),
+        hint: Vec::new(),
+        var_name: Vec::new(),
+        static_kw: Vec::new(),
+        desc: desc.to_vec(),
+        is_tag: false,
+    })
+}
+
+fn pa_parse_tag(indent: &[u8], line: &[u8], off: usize) -> Option<PaMatch> {
+    let mut e = off;
+    while e < line.len() && pa_tag_name_char(line[e]) {
+        e += 1;
+    }
+    let tag = &line[off..e];
+    if tag.is_empty() {
+        return None;
+    }
+    if pa_in_list(tag, PA_NAME_TAGS) {
+        return pa_parse_name_tag(indent, tag, line, e);
+    }
+    if pa_in_list(tag, PA_NONAME_TAGS) {
+        return pa_parse_no_name_tag(indent, tag, line, e);
+    }
+    if pa_in_list(tag, PA_METHOD_TAGS) {
+        return pa_parse_method_tag(indent, tag, line, e);
+    }
+    None
+}
+
+fn pa_parse_name_tag(indent: &[u8], tag: &[u8], line: &[u8], pos: usize) -> Option<PaMatch> {
+    let mut p = pos;
+    while p < line.len() && pa_is_ws(line[p]) {
+        p += 1;
+    }
+    if p == pos {
+        return None;
+    }
+    // var: a '$' at depth 0 separated from the hint by whitespace (union members
+    // like `Foo|$this` and callable params stay in the hint)
+    let mut dollar: isize = -1;
+    let mut depth = 0i32;
+    let mut k = p;
+    while k < line.len() {
+        match line[k] {
+            b'<' | b'[' | b'(' | b'{' => depth += 1,
+            b'>' | b']' | b')' | b'}' => {
+                if depth > 0 {
+                    depth -= 1;
+                }
+            }
+            b'$' => {
+                if depth == 0 {
+                    let mut ps = k;
+                    if k >= 1 && k - 1 >= p && line[k - 1] == b'&' {
+                        ps = k - 1;
+                    } else if k >= 3 && k - 3 >= p && &line[k - 3..k] == b"..." {
+                        ps = k - 3;
+                    }
+                    if ps == p || pa_is_ws(line[ps - 1]) {
+                        dollar = k as isize;
+                    }
+                }
+            }
+            _ => {}
+        }
+        if dollar >= 0 {
+            break;
+        }
+        k += 1;
+    }
+    if dollar < 0 {
+        return None;
+    }
+    let mut var_start = dollar as usize;
+    if var_start >= 1 && var_start - 1 >= p && line[var_start - 1] == b'&' {
+        var_start -= 1;
+    } else if var_start >= 3 && var_start - 3 >= p && &line[var_start - 3..var_start] == b"..." {
+        var_start -= 3;
+    }
+    let hint = pa_trim_space(&line[p..var_start]);
+    let mut ve = var_start;
+    while ve < line.len() && !pa_is_ws(line[ve]) {
+        ve += 1;
+    }
+    let var_name = line[var_start..ve].to_vec();
+    let mut desc: Vec<u8> = Vec::new();
+    let mut q = ve;
+    while q < line.len() && pa_is_ws(line[q]) {
+        q += 1;
+    }
+    if q > ve && q < line.len() {
+        desc = line[q..].to_vec();
+    }
+    Some(PaMatch {
+        indent: indent.to_vec(),
+        tag: tag.to_vec(),
+        hint,
+        var_name,
+        static_kw: Vec::new(),
+        desc,
+        is_tag: true,
+    })
+}
+
+fn pa_parse_no_name_tag(indent: &[u8], tag: &[u8], line: &[u8], pos: usize) -> Option<PaMatch> {
+    let mut p = pos;
+    while p < line.len() && pa_is_ws(line[p]) {
+        p += 1;
+    }
+    if p == pos {
+        return None;
+    }
+    let (hint_end, balanced) = pa_scan_type(line, p);
+    if !balanced {
+        // unbalanced type: REGEX_TYPES matches nothing, hint empty; desc needs its
+        // own \s+, which requires 2+ leading spaces to split. Single space -> None.
+        if p - pos < 2 {
+            return None;
+        }
+        return Some(PaMatch {
+            indent: indent.to_vec(),
+            tag: tag.to_vec(),
+            hint: Vec::new(),
+            var_name: Vec::new(),
+            static_kw: Vec::new(),
+            desc: line[p..].to_vec(),
+            is_tag: true,
+        });
+    }
+    let hint = pa_trim_space(&line[p..hint_end]);
+    let mut desc: Vec<u8> = Vec::new();
+    let mut q = hint_end;
+    while q < line.len() && pa_is_ws(line[q]) {
+        q += 1;
+    }
+    if q < line.len() {
+        desc = line[q..].to_vec();
+    }
+    Some(PaMatch {
+        indent: indent.to_vec(),
+        tag: tag.to_vec(),
+        hint,
+        var_name: Vec::new(),
+        static_kw: Vec::new(),
+        desc,
+        is_tag: true,
+    })
+}
+
+fn pa_parse_method_tag(indent: &[u8], tag: &[u8], line: &[u8], pos: usize) -> Option<PaMatch> {
+    if !line[pos..].contains(&b'(') {
+        return pa_parse_no_name_tag(indent, tag, line, pos);
+    }
+    let mut p = pos;
+    while p < line.len() && pa_is_ws(line[p]) {
+        p += 1;
+    }
+    if p == pos {
+        return None;
+    }
+    let mut static_kw: Vec<u8> = Vec::new();
+    if line[p..].starts_with(b"static") && (p + 6 >= line.len() || pa_is_ws(line[p + 6])) {
+        static_kw = b"static".to_vec();
+        p += 6;
+        while p < line.len() && pa_is_ws(line[p]) {
+            p += 1;
+        }
+    }
+    let sig_paren = match line.iter().rposition(|&c| c == b')') {
+        Some(x) => x,
+        None => return None,
+    };
+    if p > sig_paren {
+        return None;
+    }
+    let (hint_end, _balanced) = pa_scan_type(line, p);
+    let mut hint: Vec<u8>;
+    let start;
+    if hint_end > sig_paren {
+        // no return type: the scanned run is the name+signature itself
+        hint = Vec::new();
+        start = p;
+    } else {
+        hint = pa_trim_space(&line[p..hint_end]);
+        let mut q = hint_end;
+        while q < line.len() && pa_is_ws(line[q]) {
+            q += 1;
+        }
+        if q > sig_paren {
+            return None;
+        }
+        start = q;
+    }
+    // strings.TrimRight(line[start:sigParen+1], " \t")
+    let mut se = sig_paren + 1;
+    while se > start && (line[se - 1] == b' ' || line[se - 1] == b'\t') {
+        se -= 1;
+    }
+    let signature = line[start..se].to_vec();
+    if !signature.ends_with(b")") {
+        return None;
+    }
+    // desc: (?:\s+ \V*) after the signature's closing paren
+    let mut desc: Vec<u8> = Vec::new();
+    let mut r = sig_paren + 1;
+    while r < line.len() && pa_is_ws(line[r]) {
+        r += 1;
+    }
+    if r < line.len() {
+        desc = line[r..].to_vec();
+    }
+    if hint.is_empty() && !static_kw.is_empty() {
+        hint = static_kw.clone();
+        static_kw = Vec::new();
+    }
+    Some(PaMatch {
+        indent: indent.to_vec(),
+        tag: tag.to_vec(),
+        hint,
+        var_name: signature,
+        static_kw,
+        desc,
+        is_tag: true,
+    })
+}
+
+fn pa_scan_type(line: &[u8], pos: usize) -> (usize, bool) {
+    let mut depth = 0i32;
+    let mut i = pos;
+    let mut last = pos;
+    while i < line.len() {
+        let c = line[i];
+        if c == b'<' || c == b'[' || c == b'(' || c == b'{' {
+            depth += 1;
+            i += 1;
+            last = i;
+        } else if c == b'>' || c == b']' || c == b')' || c == b'}' {
+            if depth > 0 {
+                depth -= 1;
+            }
+            i += 1;
+            last = i;
+        } else if c == b' ' || c == b'\t' {
+            if depth > 0 {
+                i += 1;
+                continue;
+            }
+            let mut k = i;
+            while k < line.len() && (line[k] == b' ' || line[k] == b'\t') {
+                k += 1;
+            }
+            if k < line.len() && (line[k] == b'|' || line[k] == b'&') {
+                i = k;
+                continue;
+            }
+            return (last, depth == 0);
+        } else if c == b'\n' || c == b'\r' {
+            return (last, depth == 0);
+        } else {
+            i += 1;
+            last = i;
+        }
+    }
+    (last, depth == 0)
+}
+
+fn pa_rewrite(lines: &mut [Vec<u8>], current: usize, items: &[PaMatch]) {
+    let has_static = items.iter().any(|it| it.is_tag && !it.static_kw.is_empty());
+    let mut opening_hint: Vec<u8> = Vec::new();
+    let mut opening_set = false;
+    for (j, item) in items.iter().enumerate() {
+        let mut line: Vec<u8> = Vec::new();
+        if !item.is_tag {
+            if !item.desc.is_empty() && item.desc[0] == b'@' {
+                line.extend_from_slice(&item.indent);
+                line.extend_from_slice(b" * ");
+                line.extend_from_slice(&item.desc);
+                line.push(b'\n');
+                lines[current + j] = line;
+                continue;
+            }
+            let left_indent = pa_left_desc_indent(items, j);
+            line.extend_from_slice(&item.indent);
+            line.extend_from_slice(b" * ");
+            if opening_set && !opening_hint.is_empty() {
+                line.push(b' ');
+            }
+            line.extend_from_slice(&pa_spaces(left_indent));
+            line.extend_from_slice(&item.desc);
+            line.push(b'\n');
+            lines[current + j] = line;
+            continue;
+        }
+        opening_hint = item.hint.clone();
+        opening_set = true;
+        let spacing = pa_spacing_for(&item.tag);
+        line.extend_from_slice(&item.indent);
+        line.extend_from_slice(b" * @");
+        line.extend_from_slice(&item.tag);
+        if has_static {
+            if !item.static_kw.is_empty() {
+                line.extend_from_slice(&pa_spaces(spacing));
+                line.extend_from_slice(&item.static_kw);
+            }
+        }
+        if !item.hint.is_empty() {
+            line.extend_from_slice(&pa_spaces(spacing));
+            line.extend_from_slice(&item.hint);
+        }
+        if !item.var_name.is_empty() {
+            line.extend_from_slice(&pa_spaces(spacing));
+            line.extend_from_slice(&item.var_name);
+            if !item.desc.is_empty() {
+                line.extend_from_slice(&pa_spaces(spacing));
+                line.extend_from_slice(&item.desc);
+            }
+        } else if !item.desc.is_empty() {
+            line.extend_from_slice(&pa_spaces(spacing));
+            line.extend_from_slice(&item.desc);
+        }
+        line.push(b'\n');
+        lines[current + j] = line;
+    }
+}
+
+fn pa_left_desc_indent(items: &[PaMatch], index: usize) -> usize {
+    let mut idx = index as isize;
+    let mut found: Option<&PaMatch> = None;
+    while idx >= 0 {
+        let it = &items[idx as usize];
+        if it.is_tag {
+            found = Some(it);
+            break;
+        }
+        idx -= 1;
+    }
+    let item = match found {
+        Some(it) => it,
+        None => return 0,
+    };
+    let spacing = pa_spacing_for(&item.tag);
+    let sent = |frag: &[u8]| -> usize {
+        if frag.is_empty() { 0 } else { frag.len() + spacing }
+    };
+    sent(&item.static_kw) + sent(&item.tag) + sent(&item.hint) + sent(&item.var_name)
+}
+
 fn phpdoc_trim_consecutive_blank_line_separation(s: &mut Stream) -> bool {
     apply_to_docblocks(s, |d| {
         let mut kept: Vec<DocLine> = Vec::new();
@@ -16971,4 +17535,3024 @@ fn fully_qualified_strict_types(s: &mut Stream) -> bool {
         fq_apply(s, r);
     }
     true
+}
+
+
+
+fn no_useless_nullsafe_operator(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if s.kind(i) != Kind::Punct || s.bytes(i) != b"?->" {
+            continue;
+        }
+        match prev_significant_index(s, i) {
+            Some(p) if s.kind(p) == Kind::Variable && s.bytes(p).eq_ignore_ascii_case(b"$this") => {
+                s.set_owned(i, b"->".to_vec());
+                changed = true;
+            }
+            _ => {}
+        }
+    }
+    changed
+}
+
+
+// ---- W2: SpaceAfterCommaHereNowDoc + NoBlankLineBetweenImports ----
+
+fn space_after_comma_here_now_doc(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if s.kind(i) != Kind::String || !s.bytes(i).starts_with(b"<<<") {
+            continue;
+        }
+        let n = i + 1;
+        if n < s.len() && s.kind(n) == Kind::Punct && (s.bytes(n) == b"," || s.bytes(n) == b"]") {
+            s.insert_owned(n, Kind::Whitespace, b"\n".to_vec());
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn no_blank_line_between_imports(s: &mut Stream) -> bool {
+    let mut uses: Vec<usize> = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"use") && !in_class_like_body(s, i) {
+            let j = skip_ws(s, i + 1);
+            if !(j < s.len() && s.kind(j) == Kind::Punct && s.bytes(j) == b"(") {
+                uses.push(i);
+            }
+        }
+        i += 1;
+    }
+    let mut changed = false;
+    let mut k = 1;
+    while k < uses.len() {
+        let use_index = uses[k];
+        if let Some(prev) = sig_prev(s, use_index) {
+            if s.kind(prev) == Kind::Punct && s.bytes(prev) == b";" && use_index >= 1 && s.kind(use_index - 1) == Kind::Whitespace {
+                let ws = use_index - 1;
+                if s.bytes(ws).iter().filter(|&&c| c == b'\n').count() >= 2 {
+                    s.set_owned(ws, b"\n".to_vec());
+                    changed = true;
+                }
+            }
+        }
+        k += 1;
+    }
+    changed
+}
+
+fn array_opener_and_closer_newline(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut open = s.len();
+    while open > 0 {
+        open -= 1;
+        if s.kind(open) != Kind::Punct || s.bytes(open) != b"[" {
+            continue;
+        }
+        if !is_array_literal_open(s, open) {
+            continue;
+        }
+        let close_idx = match match_forward(s, open) {
+            Some(c) => c,
+            None => continue,
+        };
+        let first = match sig_next(s, open) {
+            Some(f) if f != close_idx => f,
+            _ => continue,
+        };
+        if s.kind(first) == Kind::Punct && s.bytes(first) == b"[" && is_array_literal_open(s, first) {
+            continue;
+        }
+        if !array_has_top_level_arrow(s, open, close_idx) {
+            continue;
+        }
+        if !(close_idx > 0 && s.kind(close_idx - 1) == Kind::Whitespace && has_newline(s.bytes(close_idx - 1))) {
+            if edit_slot_before(s, close_idx, b"\n") {
+                changed = true;
+            }
+        }
+        if !(open + 1 < s.len() && s.kind(open + 1) == Kind::Whitespace && has_newline(s.bytes(open + 1))) {
+            if edit_slot_after(s, open, b"\n") {
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+
+
+// ===== Symplify docblock fixers (byte-identical to the go implementations) =====
+
+fn sdb_is_ws(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0c)
+}
+
+// @(psalm-|phpstan-)?(param|return|var) anywhere
+fn sdb_has_type_annotation(v: &[u8]) -> bool {
+    let mut i = 0;
+    while i < v.len() {
+        if v[i] == b'@' {
+            let mut j = i + 1;
+            if v[j..].starts_with(b"psalm-") {
+                j += 6;
+            } else if v[j..].starts_with(b"phpstan-") {
+                j += 8;
+            }
+            if v[j..].starts_with(b"param") || v[j..].starts_with(b"return") || v[j..].starts_with(b"var") {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn sdb_candidate(s: &Stream) -> bool {
+    let mut has_comment = false;
+    for i in 0..s.len() {
+        if matches!(s.kind(i), Kind::Comment | Kind::DocComment) {
+            has_comment = true;
+            break;
+        }
+    }
+    if !has_comment {
+        return false;
+    }
+    for i in 0..s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"callable") {
+            if i + 3 < s.len() && s.kind(i + 3) == Kind::Punct && s.bytes(i + 3) == b")" {
+                return false;
+            }
+        }
+    }
+    for i in 0..s.len() {
+        if s.kind(i) == Kind::Variable
+            || (s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"function"))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn sdb_is_empty(content: &[u8]) -> bool {
+    // strip "/**", "*/", "*", and whitespace -> empty?
+    let mut i = 0;
+    while i < content.len() {
+        if content[i..].starts_with(b"/**") {
+            i += 3;
+            continue;
+        }
+        if content[i..].starts_with(b"*/") {
+            i += 2;
+            continue;
+        }
+        if content[i] == b'*' || sdb_is_ws(content[i]) {
+            i += 1;
+            continue;
+        }
+        return false;
+    }
+    true
+}
+
+fn sdb_apply(s: &mut Stream, transform: fn(&[u8], &Stream, usize) -> Vec<u8>) -> bool {
+    if !sdb_candidate(s) {
+        return false;
+    }
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        let k = s.kind(i);
+        if k != Kind::Comment && k != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        if !sdb_has_type_annotation(s.bytes(i)) {
+            i += 1;
+            continue;
+        }
+        let new_content = transform(s.bytes(i), s, i);
+        if new_content == s.bytes(i) {
+            i += 1;
+            continue;
+        }
+        if sdb_is_empty(&new_content) {
+            let follow_ws = i + 1 < s.len() && s.kind(i + 1) == Kind::Whitespace;
+            s.remove_at(i);
+            if follow_ws {
+                s.remove_at(i);
+            }
+            changed = true;
+            continue;
+        }
+        s.set_owned(i, new_content);
+        s.set_kind(i, Kind::DocComment);
+        changed = true;
+        i += 1;
+    }
+    changed
+}
+
+// find first occurrence of needle in hay from `from`
+fn sdb_find(hay: &[u8], needle: &[u8], from: usize) -> Option<usize> {
+    if needle.is_empty() || from > hay.len() {
+        return None;
+    }
+    let mut i = from;
+    while i + needle.len() <= hay.len() {
+        if &hay[i..i + needle.len()] == needle {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+// --- DoubleAsteriskInlineVar ---
+fn double_asterisk_inline_var_t(content: &[u8], s: &Stream, i: usize) -> Vec<u8> {
+    if s.kind(i) != Kind::Comment {
+        return content.to_vec();
+    }
+    // ^/\*(\n?\s+@(?:psalm-|phpstan-)?var)  -> /**$1
+    if !content.starts_with(b"/*") {
+        return content.to_vec();
+    }
+    let mut j = 2;
+    let after_slash_star = j;
+    if j < content.len() && content[j] == b'\n' {
+        j += 1;
+    }
+    let ws_start = j;
+    while j < content.len() && sdb_is_ws(content[j]) {
+        j += 1;
+    }
+    if j == ws_start {
+        return content.to_vec();
+    }
+    let mut t = j;
+    if content[t..].starts_with(b"psalm-") {
+        t += 6;
+    } else if content[t..].starts_with(b"phpstan-") {
+        t += 8;
+    }
+    if !content[t..].starts_with(b"var") {
+        return content.to_vec();
+    }
+    // rebuild: "/**" + content[after_slash_star..]
+    let mut out = b"/**".to_vec();
+    out.extend_from_slice(&content[after_slash_star..]);
+    out
+}
+fn double_asterisk_inline_var(s: &mut Stream) -> bool {
+    sdb_apply(s, double_asterisk_inline_var_t)
+}
+
+// --- FixTagTypo: @(...param|return|var)s\b -> @$1 ---
+fn fix_tag_typo_t(content: &[u8], _s: &Stream, _i: usize) -> Vec<u8> {
+    let mut out = Vec::with_capacity(content.len());
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b'@' {
+            let mut j = i + 1;
+            let mut k = j;
+            if content[k..].starts_with(b"psalm-") {
+                k += 6;
+            } else if content[k..].starts_with(b"phpstan-") {
+                k += 8;
+            }
+            let tag = if content[k..].starts_with(b"param") {
+                Some(5)
+            } else if content[k..].starts_with(b"return") {
+                Some(6)
+            } else if content[k..].starts_with(b"var") {
+                Some(3)
+            } else {
+                None
+            };
+            if let Some(taglen) = tag {
+                let s_pos = k + taglen;
+                if s_pos < content.len() && content[s_pos] == b's' {
+                    let after = s_pos + 1;
+                    let boundary = after >= content.len()
+                        || !(content[after].is_ascii_alphanumeric() || content[after] == b'_');
+                    if boundary {
+                        // keep @ + [prefix]+tag, drop the trailing s
+                        out.extend_from_slice(&content[i..s_pos]);
+                        i = s_pos + 1;
+                        j = i;
+                        let _ = j;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(content[i]);
+        i += 1;
+    }
+    out
+}
+fn fix_tag_typo(s: &mut Stream) -> bool {
+    sdb_apply(s, fix_tag_typo_t)
+}
+
+// --- TypeToVarTag: @type\b -> @var (+ single asterisk to double) ---
+fn type_to_var_tag(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        let k = s.kind(i);
+        if k != Kind::Comment && k != Kind::DocComment {
+            i += 1;
+            continue;
+        }
+        // has @type\b ?
+        let content = s.bytes(i);
+        let mut has = false;
+        let mut p = 0;
+        while let Some(at) = sdb_find(content, b"@type", p) {
+            let after = at + 5;
+            if after >= content.len() || !(content[after].is_ascii_alphanumeric() || content[after] == b'_') {
+                has = true;
+                break;
+            }
+            p = at + 1;
+        }
+        if !has {
+            i += 1;
+            continue;
+        }
+        // replace @type\b -> @var
+        let mut nc: Vec<u8> = Vec::new();
+        let mut q = 0;
+        while q < content.len() {
+            if content[q..].starts_with(b"@type") {
+                let after = q + 5;
+                if after >= content.len() || !(content[after].is_ascii_alphanumeric() || content[after] == b'_') {
+                    nc.extend_from_slice(b"@var");
+                    q += 5;
+                    continue;
+                }
+            }
+            nc.push(content[q]);
+            q += 1;
+        }
+        // ^/\*(\n?\s+@var) -> /**$1
+        if nc.starts_with(b"/*") && !nc.starts_with(b"/**") {
+            let mut j = 2;
+            if j < nc.len() && nc[j] == b'\n' {
+                j += 1;
+            }
+            let wss = j;
+            while j < nc.len() && sdb_is_ws(nc[j]) {
+                j += 1;
+            }
+            if j > wss && nc[j..].starts_with(b"@var") {
+                let mut out = b"/**".to_vec();
+                out.extend_from_slice(&nc[2..]);
+                nc = out;
+            }
+        }
+        s.set_owned(i, nc);
+        s.set_kind(i, Kind::DocComment);
+        changed = true;
+        i += 1;
+    }
+    changed
+}
+
+// --- MergeDocBlockStart ---
+fn merge_doc_block_start(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) != Kind::Comment {
+            i += 1;
+            continue;
+        }
+        let content = s.bytes(i);
+        if !content.starts_with(b"/*") || content.starts_with(b"/**") {
+            i += 1;
+            continue;
+        }
+        // must carry a phpdoc tag on a "* @" line: \n\s*\*\s*@
+        if !merge_has_tag_line(content) {
+            i += 1;
+            continue;
+        }
+        let lines: Vec<&[u8]> = split_on_newline(content);
+        let mut kept: Vec<Vec<u8>> = Vec::new();
+        let mut removed = false;
+        for (k, line) in lines.iter().enumerate() {
+            if k != 0 && merge_is_empty_asterisk_line(line) {
+                removed = true;
+                continue;
+            }
+            kept.push(line.to_vec());
+        }
+        if !removed {
+            i += 1;
+            continue;
+        }
+        // opener /* -> /**
+        if kept[0].starts_with(b"/*") && !kept[0].starts_with(b"/**") {
+            let mut o = b"/**".to_vec();
+            o.extend_from_slice(&kept[0][2..]);
+            kept[0] = o;
+        }
+        let joined = join_newline(&kept);
+        s.set_owned(i, joined);
+        s.set_kind(i, Kind::DocComment);
+        changed = true;
+        i += 1;
+    }
+    changed
+}
+fn split_on_newline(v: &[u8]) -> Vec<&[u8]> {
+    let mut out = Vec::new();
+    let mut start = 0;
+    for i in 0..v.len() {
+        if v[i] == b'\n' {
+            out.push(&v[start..i]);
+            start = i + 1;
+        }
+    }
+    out.push(&v[start..]);
+    out
+}
+fn join_newline(lines: &[Vec<u8>]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for (i, l) in lines.iter().enumerate() {
+        if i > 0 {
+            out.push(b'\n');
+        }
+        out.extend_from_slice(l);
+    }
+    out
+}
+// ^\s*\*\s*$
+fn merge_is_empty_asterisk_line(line: &[u8]) -> bool {
+    let mut i = 0;
+    while i < line.len() && sdb_is_ws(line[i]) {
+        i += 1;
+    }
+    if i >= line.len() || line[i] != b'*' {
+        return false;
+    }
+    i += 1;
+    while i < line.len() && sdb_is_ws(line[i]) {
+        i += 1;
+    }
+    i == line.len()
+}
+// \n\s*\*\s*@
+fn merge_has_tag_line(content: &[u8]) -> bool {
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b'\n' {
+            let mut j = i + 1;
+            while j < content.len() && sdb_is_ws(content[j]) {
+                j += 1;
+            }
+            if j < content.len() && content[j] == b'*' {
+                j += 1;
+                while j < content.len() && sdb_is_ws(content[j]) {
+                    j += 1;
+                }
+                if j < content.len() && content[j] == b'@' {
+                    return true;
+                }
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn is_name_char(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_'
+}
+
+// match a type run: [|\\\w]+  (returns end index) starting at i, or None
+fn match_type_run(v: &[u8], i: usize) -> Option<usize> {
+    let mut j = i;
+    while j < v.len() && (v[j] == b'|' || v[j] == b'\\' || is_name_char(v[j])) {
+        j += 1;
+    }
+    if j > i {
+        Some(j)
+    } else {
+        None
+    }
+}
+
+// match "$" + \w+ at i, return end or None
+fn match_dollar_name(v: &[u8], i: usize) -> Option<usize> {
+    if i >= v.len() || v[i] != b'$' {
+        return None;
+    }
+    let mut j = i + 1;
+    while j < v.len() && is_name_char(v[j]) {
+        j += 1;
+    }
+    if j > i + 1 {
+        Some(j)
+    } else {
+        None
+    }
+}
+
+fn ws_run(v: &[u8], i: usize) -> usize {
+    let mut j = i;
+    while j < v.len() && sdb_is_ws(v[j]) {
+        j += 1;
+    }
+    j
+}
+
+// --- AddMissingVarName ---
+fn add_missing_next_variable(s: &Stream, i: usize) -> Option<Vec<u8>> {
+    let n = sig_next(s, i)?;
+    if s.kind(n) != Kind::Variable {
+        return None;
+    }
+    if let Some(a) = sig_next(s, n) {
+        if s.kind(a) == Kind::Punct && (s.bytes(a) == b"->" || s.bytes(a) == b"?->") {
+            return None;
+        }
+    }
+    Some(s.bytes(n).to_vec())
+}
+fn add_missing_var_name_t(content: &[u8], s: &Stream, i: usize) -> Vec<u8> {
+    // ^(/\*\* @(?:psalm-|phpstan-)?var )(type)(\s+\*/)$
+    let open = b"/** @";
+    if !content.starts_with(open) {
+        return content.to_vec();
+    }
+    let mut p = open.len();
+    if content[p..].starts_with(b"psalm-") {
+        p += 6;
+    } else if content[p..].starts_with(b"phpstan-") {
+        p += 8;
+    }
+    if !content[p..].starts_with(b"var ") {
+        return content.to_vec();
+    }
+    p += 4;
+    let open_end = p;
+    // type = [\\\w|\[\]&-]+
+    let type_start = p;
+    while p < content.len()
+        && (content[p] == b'\\'
+            || content[p] == b'|'
+            || content[p] == b'['
+            || content[p] == b']'
+            || content[p] == b'&'
+            || content[p] == b'-'
+            || is_name_char(content[p]))
+    {
+        p += 1;
+    }
+    if p == type_start {
+        return content.to_vec();
+    }
+    let type_end = p;
+    // (\s+\*/)$
+    let close_start = p;
+    let wend = ws_run(content, p);
+    if wend == p {
+        return content.to_vec();
+    }
+    if !(content[wend..] == *b"*/") {
+        return content.to_vec();
+    }
+    let var = match add_missing_next_variable(s, i) {
+        Some(v) => v,
+        None => return content.to_vec(),
+    };
+    let mut out = content[..open_end].to_vec();
+    out.extend_from_slice(&content[type_start..type_end]);
+    out.push(b' ');
+    out.extend_from_slice(&var);
+    out.extend_from_slice(&content[close_start..]);
+    out
+}
+fn add_missing_var_name(s: &mut Stream) -> bool {
+    sdb_apply(s, add_missing_var_name_t)
+}
+
+// --- SingleLineInlineVarDocBlock ---
+fn single_line_is_variable_comment(s: &Stream, i: usize) -> bool {
+    let n = match sig_next(s, i) {
+        Some(n) => n,
+        None => return false,
+    };
+    let nn = match sig_next(s, n + 2) {
+        Some(nn) => nn,
+        None => return false,
+    };
+    if s.kind(nn) == Kind::Keyword {
+        let lo = s.bytes(nn).to_ascii_lowercase();
+        if lo == b"static" || lo == b"function" {
+            return false;
+        }
+    }
+    s.kind(n) == Kind::Variable
+}
+fn single_line_inline_var_doc_block_t(content: &[u8], s: &Stream, i: usize) -> Vec<u8> {
+    if !single_line_is_variable_comment(s, i) {
+        return content.to_vec();
+    }
+    if content.iter().filter(|&&c| c == b'\n').count() > 2 {
+        return content.to_vec();
+    }
+    // ^/\*\s+\*(\s+@(?:psalm-|phpstan-)?var) -> /**$1
+    let mut v = content.to_vec();
+    if v.starts_with(b"/*") {
+        let mut j = 2;
+        let ws1 = ws_run(&v, j);
+        if ws1 > j && ws1 < v.len() && v[ws1] == b'*' {
+            j = ws1 + 1;
+            let ws2s = j;
+            let ws2 = ws_run(&v, j);
+            if ws2 > ws2s {
+                let mut t = ws2;
+                if v[t..].starts_with(b"psalm-") {
+                    t += 6;
+                } else if v[t..].starts_with(b"phpstan-") {
+                    t += 8;
+                }
+                if v[t..].starts_with(b"var") {
+                    // replace "/* ... *" (up to and incl that asterisk) leaving group1 = v[ws2s-?..]
+                    // group1 = "\s+@...var..." starts at ws2s (the \s+ before @). Reconstruct: /** + v[ws2s..]
+                    let mut out = b"/**".to_vec();
+                    out.extend_from_slice(&v[ws2s..]);
+                    v = out;
+                }
+            }
+        }
+    }
+    // \s+ -> ' '
+    let mut collapsed: Vec<u8> = Vec::with_capacity(v.len());
+    let mut k = 0;
+    while k < v.len() {
+        if sdb_is_ws(v[k]) {
+            collapsed.push(b' ');
+            k = ws_run(&v, k);
+        } else {
+            collapsed.push(v[k]);
+            k += 1;
+        }
+    }
+    // (\*\*)(\s+\*) -> $1   i.e. "** *" (double asterisk, ws, single) -> "**"
+    let mut out: Vec<u8> = Vec::with_capacity(collapsed.len());
+    let mut m = 0;
+    while m < collapsed.len() {
+        if collapsed[m..].starts_with(b"**") {
+            let wsn = ws_run(&collapsed, m + 2);
+            if wsn > m + 2 && wsn < collapsed.len() && collapsed[wsn] == b'*' {
+                out.extend_from_slice(b"**");
+                m = wsn + 1;
+                continue;
+            }
+        }
+        out.push(collapsed[m]);
+        m += 1;
+    }
+    out
+}
+fn single_line_inline_var_doc_block(s: &mut Stream) -> bool {
+    sdb_apply(s, single_line_inline_var_doc_block_t)
+}
+
+// --- RemoveSuperfluousReturnName / VarName (shared per-line tag+type+$name stripper) ---
+// matches (tag)(\s+[|\\\w]+)?(\s+)(\$\w+) inside a line starting at the tag; returns
+// (match_start, tag_end, type_end_or_tag_end, name) where type is optional.
+struct TagVarMatch {
+    start: usize,
+    end: usize,   // end of whole match
+    type_end: usize, // end of tag(+type) portion to keep
+    name_start: usize,
+    name_end: usize,
+}
+fn find_tag_var(line: &[u8], tag_variants: &[&[u8]]) -> Option<TagVarMatch> {
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'@' {
+            for tag in tag_variants {
+                if line[i..].starts_with(tag) {
+                    let tag_end = i + tag.len();
+                    // optional (\s+[|\\\w]+)
+                    let mut cur = tag_end;
+                    let mut type_end = tag_end;
+                    let ws1 = ws_run(line, cur);
+                    if ws1 > cur {
+                        if let Some(te) = match_type_run(line, ws1) {
+                            cur = te;
+                            type_end = te;
+                        } else {
+                            cur = tag_end;
+                        }
+                    }
+                    // (\s+)
+                    let ws2 = ws_run(line, cur);
+                    if ws2 == cur {
+                        continue;
+                    }
+                    // (\$\w+)
+                    if let Some(ne) = match_dollar_name(line, ws2) {
+                        return Some(TagVarMatch {
+                            start: i,
+                            end: ne,
+                            type_end,
+                            name_start: ws2,
+                            name_end: ne,
+                        });
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+const RETURN_TAGS: &[&[u8]] = &[b"@return", b"@psalm-return", b"@phpstan-return"];
+const VAR_TAGS: &[&[u8]] = &[b"@var", b"@psalm-var", b"@phpstan-var"];
+
+fn count_dollar_names(line: &[u8]) -> usize {
+    let mut n = 0;
+    let mut i = 0;
+    while i < line.len() {
+        if let Some(e) = match_dollar_name(line, i) {
+            n += 1;
+            i = e;
+        } else {
+            i += 1;
+        }
+    }
+    n
+}
+
+fn remove_superfluous_return_name_t(content: &[u8], _s: &Stream, _i: usize) -> Vec<u8> {
+    let lines = split_doc_lines(content);
+    let mut out: Vec<u8> = Vec::new();
+    for line in &lines {
+        if let Some(m) = find_tag_var(line, RETURN_TAGS) {
+            let name = &line[m.name_start..m.name_end];
+            if name != b"$this" && count_dollar_names(line) < 2 {
+                // replace [m.start..m.end] with tag(+type) = line[m.start..m.type_end]
+                out.extend_from_slice(&line[..m.start]);
+                out.extend_from_slice(&line[m.start..m.type_end]);
+                out.extend_from_slice(&line[m.end..]);
+                continue;
+            }
+        }
+        out.extend_from_slice(line);
+    }
+    out
+}
+fn remove_superfluous_return_name(s: &mut Stream) -> bool {
+    sdb_apply(s, remove_superfluous_return_name_t)
+}
+
+fn remove_superfluous_var_name_t(content: &[u8], s: &Stream, i: usize) -> Vec<u8> {
+    let n = match sig_next(s, i) {
+        Some(n) => n,
+        None => return content.to_vec(),
+    };
+    if s.kind(n) != Kind::Keyword {
+        return content.to_vec();
+    }
+    match s.bytes(n).to_ascii_lowercase().as_slice() {
+        b"public" | b"protected" | b"private" | b"static" => {}
+        _ => return content.to_vec(),
+    }
+    let lines = split_doc_lines(content);
+    let mut out: Vec<u8> = Vec::new();
+    for line in &lines {
+        if let Some(m) = find_tag_var(line, VAR_TAGS) {
+            let name = &line[m.name_start..m.name_end];
+            out.extend_from_slice(&line[..m.start]);
+            if name == b"$this" {
+                let taglen = var_tag_len(&line[m.start..]);
+                out.extend_from_slice(&line[m.start..m.start + taglen]);
+                out.extend_from_slice(b" self");
+            } else {
+                out.extend_from_slice(&line[m.start..m.type_end]);
+            }
+            out.extend_from_slice(&line[m.end..]);
+            continue;
+        }
+        out.extend_from_slice(line);
+    }
+    out
+}
+fn var_tag_len(v: &[u8]) -> usize {
+    for tag in VAR_TAGS {
+        if v.starts_with(tag) {
+            return tag.len();
+        }
+    }
+    0
+}
+fn remove_superfluous_var_name(s: &mut Stream) -> bool {
+    sdb_apply(s, remove_superfluous_var_name_t)
+}
+
+// --- FixParamNameTypo ---
+fn fpnt_resolve_arg_names(s: &Stream, doc_pos: usize) -> Vec<Vec<u8>> {
+    let mut fnpos = None;
+    let mut j = doc_pos + 1;
+    while j < s.len() {
+        if s.kind(j) == Kind::Keyword {
+            let lo = s.bytes(j).to_ascii_lowercase();
+            if lo == b"function" || lo == b"fn" {
+                fnpos = Some(j);
+                break;
+            }
+        }
+        j += 1;
+    }
+    let fnpos = match fnpos {
+        Some(f) => f,
+        None => return vec![],
+    };
+    let open = match next_punct_of_kind(s, fnpos, &[b"("]) {
+        Some(o) => o,
+        None => return vec![],
+    };
+    let close_idx = match match_forward(s, open) {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let mut names = vec![];
+    let mut depth = 0i32;
+    let mut i = open + 1;
+    while i < close_idx {
+        if s.kind(i) == Kind::Punct {
+            match s.bytes(i) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                _ => {}
+            }
+            i += 1;
+            continue;
+        }
+        if depth == 0 && s.kind(i) == Kind::Variable {
+            names.push(s.bytes(i).to_vec());
+        }
+        i += 1;
+    }
+    names
+}
+
+// per @param line, first $name (skip callable), preserving order
+// go-regexp `\s` = [\t\n\f\r ] (no vertical tab); lines are already newline-split
+fn fpnt_is_ws(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | 0x0C | b'\r')
+}
+
+// mirror `\*\s*@param`: a real doc-block tag line has `*` then ws then @param
+fn fpnt_line_has_param_ann(line: &[u8]) -> bool {
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'*' {
+            let mut j = i + 1;
+            while j < line.len() && fpnt_is_ws(line[j]) {
+                j += 1;
+            }
+            if line[j..].starts_with(b"@param") {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn fpnt_param_names(content: &[u8]) -> Vec<Vec<u8>> {
+    let mut out = vec![];
+    for line in split_on_newline(content) {
+        if !fpnt_line_has_param_ann(line) {
+            continue;
+        }
+        if let Some(at) = sdb_find(line, b"@param", 0) {
+            let after = at + 6;
+            let ws = ws_run(line, after);
+            if ws == after {
+                continue; // need \s+
+            }
+            // optional callable right after ws
+            if line[ws..].starts_with(b"callable") {
+                let cb = ws + 8;
+                let boundary = cb >= line.len() || !is_name_char(line[cb]);
+                if boundary {
+                    continue;
+                }
+            }
+            // first $\w+ from ws
+            let mut k = ws;
+            let mut found = None;
+            while k < line.len() {
+                if let Some(e) = match_dollar_name(line, k) {
+                    found = Some(line[k..e].to_vec());
+                    break;
+                }
+                k += 1;
+            }
+            if let Some(name) = found {
+                out.push(name);
+            }
+        }
+    }
+    out
+}
+
+fn fix_param_name_typo_t(content: &[u8], s: &Stream, i: usize) -> Vec<u8> {
+    let argument_names = fpnt_resolve_arg_names(s, i);
+    if argument_names.is_empty() {
+        return content.to_vec();
+    }
+    let param_names_vec = fpnt_param_names(content);
+    // map index -> name
+    let mut param_names: std::collections::BTreeMap<usize, Vec<u8>> = std::collections::BTreeMap::new();
+    for (idx, n) in param_names_vec.iter().enumerate() {
+        param_names.insert(idx, n.clone());
+    }
+    let mut miss: std::collections::BTreeMap<usize, Vec<u8>> = std::collections::BTreeMap::new();
+    for (k, arg) in argument_names.iter().enumerate() {
+        let mut found = None;
+        for (pk, pn) in param_names.iter() {
+            if pn == arg {
+                found = Some(*pk);
+                break;
+            }
+        }
+        if let Some(pk) = found {
+            param_names.remove(&pk);
+        } else {
+            miss.insert(k, arg.clone());
+        }
+    }
+    if miss.is_empty() || param_names.is_empty() {
+        return content.to_vec();
+    }
+    // replaced table keyed by argument name
+    let mut replaced: std::collections::HashMap<Vec<u8>, bool> = std::collections::HashMap::new();
+    for a in &argument_names {
+        replaced.insert(a.clone(), false);
+    }
+    let mut doc = content.to_vec();
+    for (k, arg_name) in miss.iter() {
+        let typo_name = match param_names.get(k) {
+            Some(t) => t.clone(),
+            None => continue,
+        };
+        doc = fpnt_replace(&doc, &typo_name, arg_name, &mut replaced);
+    }
+    doc
+}
+
+// replace every @param(.*?)(typo_name\b) applying the defer/replace callback
+fn fpnt_replace(
+    content: &[u8],
+    typo_name: &[u8],
+    arg_name: &[u8],
+    replaced: &mut std::collections::HashMap<Vec<u8>, bool>,
+) -> Vec<u8> {
+    let mut out: Vec<u8> = Vec::new();
+    let mut pos = 0;
+    while pos < content.len() {
+        // find next @param
+        let at = match sdb_find(content, b"@param", pos) {
+            Some(a) => a,
+            None => break,
+        };
+        // lazily find first typo_name after @param with trailing word-boundary.
+        // Go regexp `@param(.*?)(typo\b)` uses `.` which never crosses `\n`, so
+        // the match must stay on @param's own line: bound the search to line end.
+        let g1_start = at + 6;
+        let mut line_end = g1_start;
+        while line_end < content.len() && content[line_end] != b'\n' {
+            line_end += 1;
+        }
+        let mut j = g1_start;
+        let mut matched_name_start = None;
+        while j + typo_name.len() <= line_end {
+            if &content[j..j + typo_name.len()] == typo_name {
+                let after = j + typo_name.len();
+                let boundary = after >= content.len() || !is_name_char(content[after]);
+                if boundary {
+                    matched_name_start = Some(j);
+                    break;
+                }
+            }
+            j += 1;
+        }
+        let name_start = match matched_name_start {
+            Some(n) => n,
+            None => {
+                // no match for this @param; emit up to end of @param and continue
+                out.extend_from_slice(&content[pos..g1_start]);
+                pos = g1_start;
+                continue;
+            }
+        };
+        let name_end = name_start + typo_name.len();
+        // group1 = content[g1_start..name_start]
+        out.extend_from_slice(&content[pos..at]);
+        // decide
+        let param_name = &content[name_start..name_end];
+        let deferred = match replaced.get(param_name) {
+            Some(false) => true,
+            _ => false,
+        };
+        if deferred {
+            replaced.insert(param_name.to_vec(), true);
+            // keep original match (matched[0] = content[at..name_end])
+            out.extend_from_slice(&content[at..name_end]);
+        } else {
+            out.extend_from_slice(b"@param");
+            out.extend_from_slice(&content[g1_start..name_start]);
+            out.extend_from_slice(arg_name);
+        }
+        pos = name_end;
+    }
+    out.extend_from_slice(&content[pos..]);
+    out
+}
+fn fix_param_name_typo(s: &mut Stream) -> bool {
+    sdb_apply(s, fix_param_name_typo_t)
+}
+
+
+// ===== Symplify docblock/annotation fixers (mirror of go implementations) =====
+
+fn sdb_word_byte(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_'
+}
+
+fn sdb_is_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
+}
+
+// matches @(psalm-|phpstan-)?(param|return|var) starting at i; returns true if found anywhere
+fn sdb4_has_type_annotation(b: &[u8]) -> bool {
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'@' {
+            let mut j = i + 1;
+            if b[j..].starts_with(b"psalm-") {
+                j += 6;
+            } else if b[j..].starts_with(b"phpstan-") {
+                j += 8;
+            }
+            if b[j..].starts_with(b"param") || b[j..].starts_with(b"return") || b[j..].starts_with(b"var") {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn sdb_is_empty_docblock(content: &[u8]) -> bool {
+    // strip "/**", "*/", "*" then trim whitespace -> empty?
+    let mut out: Vec<u8> = Vec::with_capacity(content.len());
+    let mut i = 0;
+    while i < content.len() {
+        if content[i..].starts_with(b"/**") {
+            i += 3;
+        } else if content[i..].starts_with(b"*/") {
+            i += 2;
+        } else if content[i] == b'*' {
+            i += 1;
+        } else {
+            out.push(content[i]);
+            i += 1;
+        }
+    }
+    out.iter().all(|&c| sdb_is_space(c))
+}
+
+fn sdb4_candidate(s: &Stream) -> bool {
+    let mut has_comment = false;
+    let mut has_func_or_var = false;
+    let mut i = 0;
+    while i < s.len() {
+        match s.kind(i) {
+            Kind::DocComment | Kind::Comment => has_comment = true,
+            Kind::Variable => has_func_or_var = true,
+            Kind::Keyword => {
+                let lo = s.bytes(i).to_ascii_lowercase();
+                if lo == b"function" {
+                    has_func_or_var = true;
+                }
+                if lo == b"callable" && i + 3 < s.len() && s.bytes(i + 3) == b")" {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    has_comment && has_func_or_var
+}
+
+fn sdb4_apply<F: Fn(&[u8]) -> Vec<u8>>(s: &mut Stream, process: F) -> bool {
+    if !sdb4_candidate(s) {
+        return false;
+    }
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if s.kind(i) != Kind::DocComment && s.kind(i) != Kind::Comment {
+            continue;
+        }
+        if !sdb4_has_type_annotation(s.bytes(i)) {
+            continue;
+        }
+        let nc = process(s.bytes(i));
+        if nc == s.bytes(i) {
+            continue;
+        }
+        if sdb_is_empty_docblock(&nc) {
+            s.remove_at(i);
+            if i < s.len() && s.kind(i) == Kind::Whitespace {
+                s.remove_at(i);
+            }
+        } else {
+            s.set_owned(i, nc);
+            s.set_kind(i, Kind::DocComment);
+        }
+        changed = true;
+    }
+    changed
+}
+
+// split into lines each keeping trailing "\n" (matches go strings via join(""))
+fn sdb_lines_keepnl(content: &[u8]) -> Vec<Vec<u8>> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b'\n' {
+            lines.push(content[start..=i].to_vec());
+            start = i + 1;
+        }
+        i += 1;
+    }
+    if start < content.len() {
+        lines.push(content[start..].to_vec());
+    }
+    lines
+}
+
+// split by '\n' dropping the separators (matches go strings.Split(x,"\n"))
+fn sdb_split_nl(content: &[u8]) -> Vec<Vec<u8>> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b'\n' {
+            lines.push(content[start..i].to_vec());
+            start = i + 1;
+        }
+        i += 1;
+    }
+    lines.push(content[start..].to_vec());
+    lines
+}
+
+fn sdb_join_nl(lines: &[Vec<u8>]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for (k, l) in lines.iter().enumerate() {
+        if k > 0 {
+            out.push(b'\n');
+        }
+        out.extend_from_slice(l);
+    }
+    out
+}
+
+// --- RemoveDeadParam: line matches @(psalm-|phpstan-)?param\s+$\w+\s*$ ---
+fn sdb_dead_param_line(line: &[u8]) -> bool {
+    // find @ + opt prefix + param + ws+ + $ + word+ + ws* then end (ignore trailing \n)
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'@' {
+            let mut j = i + 1;
+            if line[j..].starts_with(b"psalm-") {
+                j += 6;
+            } else if line[j..].starts_with(b"phpstan-") {
+                j += 8;
+            }
+            if line[j..].starts_with(b"param") {
+                j += 5;
+                let ws_start = j;
+                while j < line.len() && sdb_is_space(line[j]) {
+                    j += 1;
+                }
+                if j > ws_start && j < line.len() && line[j] == b'$' {
+                    j += 1;
+                    let name_start = j;
+                    while j < line.len() && sdb_word_byte(line[j]) {
+                        j += 1;
+                    }
+                    if j > name_start {
+                        // \s* then end-of-line ($ matches before trailing \n)
+                        while j < line.len() && sdb_is_space(line[j]) && line[j] != b'\n' {
+                            j += 1;
+                        }
+                        if j == line.len() || line[j] == b'\n' {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn remove_dead_param(s: &mut Stream) -> bool {
+    sdb4_apply(s, |content| {
+        let mut lines = sdb_lines_keepnl(content);
+        let mut ch = false;
+        for l in lines.iter_mut() {
+            if sdb_dead_param_line(l) {
+                l.clear();
+                ch = true;
+            }
+        }
+        if !ch {
+            content.to_vec()
+        } else {
+            lines.concat()
+        }
+    })
+}
+
+// --- RemoveDeadVarThis: line has @(psalm-|phpstan-)?var\b ... $this\b ---
+fn sdb_dead_var_this_line(line: &[u8]) -> bool {
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'@' {
+            let mut j = i + 1;
+            if line[j..].starts_with(b"psalm-") {
+                j += 6;
+            } else if line[j..].starts_with(b"phpstan-") {
+                j += 8;
+            }
+            if line[j..].starts_with(b"var") {
+                let after = j + 3;
+                // \b: next char is not a word byte
+                if after >= line.len() || !sdb_word_byte(line[after]) {
+                    // find $this with word boundary after, in the rest of the line (no \n)
+                    let mut k = after;
+                    while k < line.len() && line[k] != b'\n' {
+                        if line[k..].starts_with(b"$this") {
+                            let end = k + 5;
+                            if end >= line.len() || !sdb_word_byte(line[end]) {
+                                return true;
+                            }
+                        }
+                        k += 1;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn remove_dead_var_this(s: &mut Stream) -> bool {
+    sdb4_apply(s, |content| {
+        let mut lines = sdb_lines_keepnl(content);
+        let mut ch = false;
+        for l in lines.iter_mut() {
+            if sdb_dead_var_this_line(l) {
+                l.clear();
+                ch = true;
+            }
+        }
+        if !ch {
+            content.to_vec()
+        } else {
+            lines.concat()
+        }
+    })
+}
+
+// --- RemoveParamNameReference: (@param.*?)&($\w+) -> drop the & ---
+fn remove_param_name_reference(s: &mut Stream) -> bool {
+    sdb4_apply(s, |content| {
+        let mut out: Vec<u8> = Vec::with_capacity(content.len());
+        let mut i = 0;
+        while i < content.len() {
+            if content[i..].starts_with(b"@param") {
+                // scan for first '&' followed by $\w+ before end of content (.*? no newline)
+                let mut j = i + 6;
+                let mut found = None;
+                while j < content.len() && content[j] != b'\n' {
+                    if content[j] == b'&'
+                        && j + 1 < content.len()
+                        && content[j + 1] == b'$'
+                        && j + 2 < content.len()
+                        && sdb_word_byte(content[j + 2])
+                    {
+                        found = Some(j);
+                        break;
+                    }
+                    j += 1;
+                }
+                if let Some(amp) = found {
+                    out.extend_from_slice(&content[i..amp]); // @param ...
+                    // skip the '&', keep $\w+
+                    i = amp + 1;
+                    continue;
+                }
+            }
+            out.push(content[i]);
+            i += 1;
+        }
+        out
+    })
+}
+
+// --- RemovePHPStormAnnotation ---
+fn sdb_created_by_phpstorm_only(content: &[u8]) -> bool {
+    // (?is) /\*\* \s+ \* \s+ Created by PHPStorm (.*?) \*/   ; if removing it empties content
+    // content must start with /** then ws+ then * then ws+ then "Created by PHPStorm" (case-insens),
+    // and end with */. Then the whole block is the annotation.
+    let lo = content.to_ascii_lowercase();
+    if !lo.starts_with(b"/**") || !lo.ends_with(b"*/") {
+        return false;
+    }
+    let mut i = 3;
+    let ws1 = i;
+    while i < lo.len() && sdb_is_space(lo[i]) {
+        i += 1;
+    }
+    if i == ws1 || i >= lo.len() || lo[i] != b'*' {
+        return false;
+    }
+    i += 1;
+    let ws2 = i;
+    while i < lo.len() && sdb_is_space(lo[i]) {
+        i += 1;
+    }
+    if i == ws2 {
+        return false;
+    }
+    lo[i..].starts_with(b"created by phpstorm")
+}
+
+fn remove_phpstorm_annotation(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if s.kind(i) != Kind::DocComment && s.kind(i) != Kind::Comment {
+            continue;
+        }
+        if sdb_created_by_phpstorm_only(s.bytes(i)) {
+            s.remove_at(i);
+            changed = true;
+        }
+    }
+    changed
+}
+
+// --- SwitchedTypeAndName ---
+const SDB_PRIMITIVES: &[&[u8]] = &[
+    b"string", b"int", b"integer", b"float", b"bool", b"boolean", b"array", b"object",
+    b"callable", b"iterable", b"mixed", b"void", b"null", b"false", b"true", b"self",
+    b"static", b"parent", b"resource", b"scalar", b"never", b"number", b"double",
+];
+
+fn sdb_type_char(c: u8) -> bool {
+    // [|\\\w\[\]] from the type group (excluding the <...> generic handled separately)
+    c == b'|' || c == b'\\' || sdb_word_byte(c) || c == b'[' || c == b']'
+}
+
+fn sdb_known_type(t: &[u8]) -> bool {
+    if t.iter().any(|&c| matches!(c, b'\\' | b'[' | b']' | b'<' | b'>' | b'|')) {
+        return true;
+    }
+    let lo = t.to_ascii_lowercase();
+    SDB_PRIMITIVES.iter().any(|p| *p == lo.as_slice())
+}
+
+// try to rewrite one line "@tag $name type rest" -> "@tag type $name rest"; returns Some(newline) or None
+fn sdb_switch_line(line: &[u8]) -> Option<Vec<u8>> {
+    // @((?:psalm-|phpstan-)?(?:param|var))(\s+)($\w+)(\s+)(type)(\s+\S.*)?$
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'@' {
+            let tag_start = i + 1;
+            let mut j = tag_start;
+            if line[j..].starts_with(b"psalm-") {
+                j += 6;
+            } else if line[j..].starts_with(b"phpstan-") {
+                j += 8;
+            }
+            let kw = if line[j..].starts_with(b"param") {
+                Some(5)
+            } else if line[j..].starts_with(b"var") {
+                Some(3)
+            } else {
+                None
+            };
+            if let Some(kwlen) = kw {
+                j += kwlen;
+                let tag_end = j;
+                // (\s+)
+                let ws1s = j;
+                while j < line.len() && sdb_is_space(line[j]) && line[j] != b'\n' {
+                    j += 1;
+                }
+                if j == ws1s {
+                    i += 1;
+                    continue;
+                }
+                let ws1e = j;
+                // ($\w+)
+                if j >= line.len() || line[j] != b'$' {
+                    i += 1;
+                    continue;
+                }
+                let name_s = j;
+                j += 1;
+                while j < line.len() && sdb_word_byte(line[j]) {
+                    j += 1;
+                }
+                if j == name_s + 1 {
+                    i += 1;
+                    continue;
+                }
+                let name_e = j;
+                // (\s+)
+                let ws2s = j;
+                while j < line.len() && sdb_is_space(line[j]) && line[j] != b'\n' {
+                    j += 1;
+                }
+                if j == ws2s {
+                    i += 1;
+                    continue;
+                }
+                let ws2e = j;
+                // (type): ((?:[|\\\w\[\]]|<[^<>]*>)+)
+                let type_s = j;
+                loop {
+                    if j < line.len() && sdb_type_char(line[j]) {
+                        j += 1;
+                    } else if j < line.len() && line[j] == b'<' {
+                        // <[^<>]*>
+                        let mut k = j + 1;
+                        while k < line.len() && line[k] != b'<' && line[k] != b'>' {
+                            k += 1;
+                        }
+                        if k < line.len() && line[k] == b'>' {
+                            j = k + 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                if j == type_s {
+                    i += 1;
+                    continue;
+                }
+                let type_e = j;
+                // (\s+\S.*)? then end-of-line
+                let rest_s = j;
+                let mut rest_e = j;
+                {
+                    let mut k = j;
+                    let wss = k;
+                    while k < line.len() && sdb_is_space(line[k]) && line[k] != b'\n' {
+                        k += 1;
+                    }
+                    if k > wss && k < line.len() && line[k] != b'\n' {
+                        // \S then .*
+                        while k < line.len() && line[k] != b'\n' {
+                            k += 1;
+                        }
+                        rest_e = k;
+                    }
+                }
+                // must reach end-of-line
+                let end = rest_e;
+                if !(end == line.len() || line[end] == b'\n') {
+                    i += 1;
+                    continue;
+                }
+                let typ = &line[type_s..type_e];
+                if !sdb_known_type(typ) {
+                    i += 1;
+                    continue;
+                }
+                // rebuild: prefix + @ + tag + ws1 + type + ws2 + name + rest + suffix(\n)
+                let mut out: Vec<u8> = Vec::new();
+                out.extend_from_slice(&line[..i]);
+                out.push(b'@');
+                out.extend_from_slice(&line[tag_start..tag_end]);
+                out.extend_from_slice(&line[ws1s..ws1e]);
+                out.extend_from_slice(typ);
+                out.extend_from_slice(&line[ws2s..ws2e]);
+                out.extend_from_slice(&line[name_s..name_e]);
+                out.extend_from_slice(&line[rest_s..rest_e]);
+                out.extend_from_slice(&line[end..]);
+                return Some(out);
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+fn switched_type_and_name(s: &mut Stream) -> bool {
+    sdb4_apply(s, |content| {
+        let mut lines = sdb_lines_keepnl(content);
+        let mut ch = false;
+        for l in lines.iter_mut() {
+            if let Some(nl) = sdb_switch_line(l) {
+                *l = nl;
+                ch = true;
+            }
+        }
+        if !ch {
+            content.to_vec()
+        } else {
+            lines.concat()
+        }
+    })
+}
+
+// --- name resolvers ---
+fn sdb_method_name_after(s: &Stream, comment_idx: usize) -> Option<Vec<u8>> {
+    let mut i = comment_idx + 1;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"function") {
+            if let Some(n) = sig_next(s, i) {
+                if s.kind(n) == Kind::Ident {
+                    return Some(s.bytes(n).to_vec());
+                }
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+fn sdb_property_name_after(s: &Stream, comment_idx: usize) -> Option<Vec<u8>> {
+    let mut i = comment_idx + 1;
+    while i < s.len() {
+        if s.kind(i) == Kind::Variable {
+            return Some(s.bytes(i).to_vec());
+        }
+        i += 1;
+    }
+    None
+}
+
+fn sdb_resolve_words(value: &[u8]) -> Vec<Vec<u8>> {
+    // split camelCase (lower followed by upper), lowercase, extract [a-zA-Z]+
+    let mut spaced: Vec<u8> = Vec::with_capacity(value.len());
+    for (i, &c) in value.iter().enumerate() {
+        if i > 0 && value[i - 1].is_ascii_lowercase() && c.is_ascii_uppercase() {
+            spaced.push(b' ');
+        }
+        spaced.push(c.to_ascii_lowercase());
+    }
+    let mut words = Vec::new();
+    let mut k = 0;
+    while k < spaced.len() {
+        if spaced[k].is_ascii_alphabetic() {
+            let s0 = k;
+            while k < spaced.len() && spaced[k].is_ascii_alphabetic() {
+                k += 1;
+            }
+            words.push(spaced[s0..k].to_vec());
+        } else {
+            k += 1;
+        }
+    }
+    words
+}
+
+fn sdb_stream_has_kw(s: &Stream, kw: &[u8]) -> bool {
+    let mut i = 0;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(kw) {
+            return true;
+        }
+        i += 1;
+    }
+    false
+}
+fn sdb_stream_has_variable(s: &Stream) -> bool {
+    (0..s.len()).any(|i| s.kind(i) == Kind::Variable)
+}
+fn sdb_stream_has_comment(s: &Stream) -> bool {
+    (0..s.len()).any(|i| matches!(s.kind(i), Kind::DocComment | Kind::Comment))
+}
+
+// --- RemovePropertyVariableNameDescription ---
+fn sdb_count_var_tag(content: &[u8]) -> usize {
+    let mut n = 0;
+    let mut i = 0;
+    while i < content.len() {
+        if content[i] == b'@' {
+            let mut j = i + 1;
+            if content[j..].starts_with(b"psalm-") {
+                j += 6;
+            } else if content[j..].starts_with(b"phpstan-") {
+                j += 8;
+            }
+            if content[j..].starts_with(b"var") {
+                n += 1;
+            }
+        }
+        i += 1;
+    }
+    n
+}
+fn sdb_line_has_var_tag(line: &[u8]) -> bool {
+    let mut i = 0;
+    while i < line.len() {
+        if line[i] == b'@' {
+            let mut j = i + 1;
+            if line[j..].starts_with(b"psalm-") {
+                j += 6;
+            } else if line[j..].starts_with(b"phpstan-") {
+                j += 8;
+            }
+            if line[j..].starts_with(b"var") {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+fn remove_property_variable_name_description(s: &mut Stream) -> bool {
+    if !sdb_stream_has_variable(s) || !sdb_stream_has_comment(s) {
+        return false;
+    }
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if !matches!(s.kind(i), Kind::DocComment | Kind::Comment) {
+            continue;
+        }
+        let prop = match sdb_property_name_after(s, i) {
+            Some(p) => p,
+            None => continue,
+        };
+        if sdb_count_var_tag(s.bytes(i)) != 1 {
+            continue;
+        }
+        let content = s.bytes(i).to_vec();
+        let mut lines = sdb_split_nl(&content);
+        let mut suffix = vec![b' '];
+        suffix.extend_from_slice(&prop);
+        let mut ch = false;
+        for l in lines.iter_mut() {
+            if l.ends_with(&suffix) && sdb_line_has_var_tag(l) {
+                let cut = l.len() - suffix.len();
+                let mut trimmed = l[..cut].to_vec();
+                while trimmed.last().map(|&c| sdb_is_space(c)).unwrap_or(false) {
+                    trimmed.pop();
+                }
+                *l = trimmed;
+                ch = true;
+            }
+        }
+        if ch {
+            s.set_owned(i, sdb_join_nl(&lines));
+            s.set_kind(i, Kind::DocComment);
+            changed = true;
+        }
+    }
+    changed
+}
+
+// --- RemoveMethodNameDuplicateDescription ---
+fn sdb_getter_setter_noun(v: &[u8]) -> Option<Vec<u8>> {
+    for p in [b"get".as_slice(), b"set".as_slice()] {
+        if v.starts_with(p) && v.len() > p.len() {
+            return Some(v[p.len()..].to_vec());
+        }
+    }
+    None
+}
+fn sdb_is_duplicate_desc(spaceless: &[u8], method_lower: &[u8]) -> bool {
+    // desc = lower(ltrim(spaceless,'*'))
+    let mut d = spaceless;
+    while d.first() == Some(&b'*') {
+        d = &d[1..];
+    }
+    let dl = d.to_ascii_lowercase();
+    if dl == method_lower {
+        return true;
+    }
+    match (sdb_getter_setter_noun(&dl), sdb_getter_setter_noun(method_lower)) {
+        (Some(a), Some(b)) => a == b,
+        _ => false,
+    }
+}
+// remove articles a/an/the (word-bounded, case-insensitive), like `\b(?:a|an|the)\b` -> ""
+fn sdb_drop_articles(line: &[u8]) -> Vec<u8> {
+    let lo = line.to_ascii_lowercase();
+    let mut out = Vec::with_capacity(line.len());
+    let mut i = 0;
+    while i < line.len() {
+        let before_ok = i == 0 || !sdb_word_byte(lo[i - 1]);
+        let mut matched = 0usize;
+        if before_ok {
+            for art in [b"the".as_slice(), b"an".as_slice(), b"a".as_slice()] {
+                if lo[i..].starts_with(art) {
+                    let end = i + art.len();
+                    if end >= line.len() || !sdb_word_byte(lo[end]) {
+                        matched = art.len();
+                        break;
+                    }
+                }
+            }
+        }
+        if matched > 0 {
+            i += matched;
+        } else {
+            out.push(line[i]);
+            i += 1;
+        }
+    }
+    out
+}
+
+fn sdb_drop_third_person_s(line: &[u8]) -> Vec<u8> {
+    // ^([\s*]*\w+?)s\b -> $1  (remove a trailing 's' of the first word)
+    let mut p = 0;
+    while p < line.len() && (sdb_is_space(line[p]) || line[p] == b'*') {
+        p += 1;
+    }
+    // \w+? non-greedy then s\b: find smallest word end where next is 's' and then boundary
+    let word_start = p;
+    let mut k = word_start;
+    while k < line.len() && sdb_word_byte(line[k]) {
+        k += 1;
+    }
+    // word runs word_start..k; need last char 's' and preceding at least one word char
+    if k > word_start + 1 && line[k - 1] == b's' {
+        // boundary after 's' already holds (k is non-word or end)
+        let mut out = Vec::with_capacity(line.len() - 1);
+        out.extend_from_slice(&line[..k - 1]);
+        out.extend_from_slice(&line[k..]);
+        return out;
+    }
+    line.to_vec()
+}
+fn sdb_remove_space_nl(line: &[u8]) -> Vec<u8> {
+    line.iter().copied().filter(|&c| !sdb_is_space(c)).collect()
+}
+
+fn remove_method_name_duplicate_description(s: &mut Stream) -> bool {
+    if !sdb_stream_has_kw(s, b"function") || !sdb_stream_has_comment(s) {
+        return false;
+    }
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if !matches!(s.kind(i), Kind::DocComment | Kind::Comment) {
+            continue;
+        }
+        let method = match sdb_method_name_after(s, i) {
+            Some(m) => m,
+            None => continue,
+        };
+        let method_lower = method.to_ascii_lowercase();
+        let content = s.bytes(i).to_vec();
+        let lines = sdb_split_nl(&content);
+        let mut kept: Vec<Vec<u8>> = Vec::new();
+        let mut ch = false;
+        for line in &lines {
+            let mut l = sdb_drop_articles(line);
+            l = sdb_drop_third_person_s(&l);
+            let mut spaceless = sdb_remove_space_nl(&l);
+            while matches!(spaceless.last(), Some(&b'.') | Some(&b'!')) {
+                spaceless.pop();
+            }
+            if sdb_is_duplicate_desc(&spaceless, &method_lower) {
+                ch = true;
+                continue;
+            }
+            kept.push(line.clone());
+        }
+        if ch {
+            s.set_owned(i, sdb_join_nl(&kept));
+            s.set_kind(i, Kind::DocComment);
+            changed = true;
+        }
+    }
+    changed
+}
+
+// --- RemoveEventSubscriberDescription ---
+fn sdb_next_function_index(s: &Stream, comment_idx: usize) -> Option<usize> {
+    let mut i = comment_idx + 1;
+    while i < s.len() {
+        if s.kind(i) == Kind::Keyword && s.bytes(i).eq_ignore_ascii_case(b"function") {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+fn sdb_is_public_between(s: &Stream, comment_idx: usize, fn_idx: usize) -> bool {
+    let mut i = comment_idx + 1;
+    while i < fn_idx {
+        if s.kind(i) == Kind::Keyword {
+            let lo = s.bytes(i).to_ascii_lowercase();
+            if lo == b"private" || lo == b"protected" {
+                return false;
+            }
+        }
+        i += 1;
+    }
+    true
+}
+fn sdb_is_event_desc_line(line: &[u8], method: &[u8]) -> bool {
+    let words = sdb_resolve_words(line);
+    let mut has_event = false;
+    let mut desc: Vec<Vec<u8>> = Vec::new();
+    for w in words {
+        if w == b"event" {
+            has_event = true;
+        } else {
+            desc.push(w);
+        }
+    }
+    if !has_event || desc.is_empty() {
+        return false;
+    }
+    let mut mwords: Vec<Vec<u8>> = sdb_resolve_words(method)
+        .into_iter()
+        .filter(|w| w.as_slice() != b"on")
+        .collect();
+    desc.sort();
+    mwords.sort();
+    desc == mwords
+}
+
+fn remove_event_subscriber_description(s: &mut Stream) -> bool {
+    if !sdb_stream_has_kw(s, b"function") || !sdb_stream_has_comment(s) {
+        return false;
+    }
+    let mut changed = false;
+    let mut i = s.len();
+    while i > 0 {
+        i -= 1;
+        if !matches!(s.kind(i), Kind::DocComment | Kind::Comment) {
+            continue;
+        }
+        let fn_idx = match sdb_next_function_index(s, i) {
+            Some(f) => f,
+            None => continue,
+        };
+        if !sdb_is_public_between(s, i, fn_idx) {
+            continue;
+        }
+        let method = match sdb_method_name_after(s, i) {
+            Some(m) => m,
+            None => continue,
+        };
+        let content = s.bytes(i).to_vec();
+        let lines = sdb_split_nl(&content);
+        let mut kept: Vec<Vec<u8>> = Vec::new();
+        let mut ch = false;
+        for line in &lines {
+            if sdb_is_event_desc_line(line, &method) {
+                ch = true;
+                continue;
+            }
+            kept.push(line.clone());
+        }
+        if !ch {
+            continue;
+        }
+        let joined_all: Vec<u8> = kept.concat();
+        let empty = joined_all
+            .iter()
+            .all(|&c| matches!(c, b'/' | b'*') || sdb_is_space(c));
+        if empty {
+            s.remove_at(i);
+        } else {
+            s.set_owned(i, sdb_join_nl(&kept));
+            s.set_kind(i, Kind::DocComment);
+        }
+        changed = true;
+    }
+    changed
+}
+
+
+// Symplify StandaloneLineInMultilineArray - associative arrays one item per line
+fn standalone_array_item_info(s: &Stream, open: usize, close_idx: usize) -> (usize, bool) {
+    let mut count = 1usize;
+    let mut depth = 0i32;
+    let mut first_arrow_checked = false;
+    let mut first_is_array = false;
+    let mut j = open + 1;
+    while j < close_idx {
+        if s.kind(j) == Kind::Punct {
+            match s.bytes(j) {
+                b"(" | b"[" | b"{" => depth += 1,
+                b")" | b"]" | b"}" => depth -= 1,
+                b"," => {
+                    if depth == 0 && sig_next(s, j) != Some(close_idx) {
+                        count += 1;
+                    }
+                }
+                b"=>" => {
+                    if depth == 0 && !first_arrow_checked {
+                        first_arrow_checked = true;
+                        if let Some(v) = sig_next(s, j) {
+                            if s.kind(v) == Kind::Punct && s.bytes(v) == b"[" {
+                                first_is_array = true;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        j += 1;
+    }
+    (count, first_is_array)
+}
+
+fn standalone_array_should_skip(s: &Stream, open: usize, close_idx: usize) -> bool {
+    if !array_has_top_level_arrow(s, open, close_idx) {
+        return true;
+    }
+    let (count, first_is_array) = standalone_array_item_info(s, open, close_idx);
+    if count == 1 && !first_is_array {
+        match sig_prev(s, open) {
+            None => return false,
+            Some(prev) => return s.bytes(prev) != b"=>",
+        }
+    }
+    false
+}
+
+fn standalone_line_in_multiline_array(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut open = 0;
+    while open < s.len() {
+        if s.kind(open) == Kind::Punct && s.bytes(open) == b"[" && is_array_literal_open(s, open) {
+            if let Some(close_idx) = match_forward(s, open) {
+                if sig_next(s, open) != Some(close_idx) {
+                    if standalone_array_should_skip(s, open, close_idx) {
+                        return changed;
+                    }
+                    if reflow_paren(s, open, close_idx) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        open += 1;
+    }
+    changed
+}
+
+
+// ---- NoSuperfluousElseif (byte-identical to the ecs-go fixer) ----
+
+fn nse_is_elseif(s: &Stream, i: usize) -> bool {
+    if kw_is(s, i, b"elseif") {
+        return true;
+    }
+    if kw_is(s, i, b"else") {
+        if let Some(n) = sig_next(s, i) {
+            return kw_is(s, n, b"if");
+        }
+    }
+    false
+}
+
+// scan back before idx for the first token matching pred
+fn nse_prev_of<F: Fn(&Stream, usize) -> bool>(s: &Stream, idx: usize, pred: F) -> Option<usize> {
+    let mut j = idx as isize - 1;
+    while j >= 0 {
+        if pred(s, j as usize) {
+            return Some(j as usize);
+        }
+        j -= 1;
+    }
+    None
+}
+
+fn nse_is_terminator(s: &Stream, i: usize) -> bool {
+    if s.kind(i) == Kind::CloseTag {
+        return true;
+    }
+    if is_punct_val(s, i, b";") {
+        return true;
+    }
+    s.kind(i) == Kind::Keyword
+        && matches!(
+            s.bytes(i).to_ascii_lowercase().as_slice(),
+            b"break" | b"continue" | b"exit" | b"die" | b"goto" | b"if" | b"return" | b"throw"
+        )
+}
+
+fn nse_is_if_else_elseif(s: &Stream, i: usize) -> bool {
+    s.kind(i) == Kind::Keyword
+        && matches!(s.bytes(i).to_ascii_lowercase().as_slice(), b"if" | b"else" | b"elseif")
+}
+
+fn nse_is_paren_semi_colon(s: &Stream, i: usize) -> bool {
+    is_punct_val(s, i, b")") || is_punct_val(s, i, b";") || is_punct_val(s, i, b":")
+}
+
+fn nse_get_previous_block(s: &Stream, index: usize) -> (Option<usize>, Option<usize>) {
+    let close_idx = sig_prev(s, index);
+    let mut previous = close_idx;
+    if let Some(c) = close_idx {
+        if is_punct_val(s, c, b"}") {
+            previous = match_backward(s, c);
+        }
+    }
+    let previous = match previous {
+        Some(p) => p,
+        None => return (None, close_idx),
+    };
+    let open = match nse_prev_of(s, previous, nse_is_if_else_elseif) {
+        Some(o) => o,
+        None => return (None, close_idx),
+    };
+    if kw_is(s, open, b"if") {
+        if let Some(ec) = sig_prev(s, open) {
+            if kw_is(s, ec, b"else") {
+                return (Some(ec), close_idx);
+            }
+        }
+    }
+    (Some(open), close_idx)
+}
+
+fn nse_is_in_conditional(s: &Stream, index: usize, lower_limit: usize) -> bool {
+    let candidate = match nse_prev_of(s, index, nse_is_paren_semi_colon) {
+        Some(c) => c,
+        None => return false,
+    };
+    if is_punct_val(s, candidate, b":") {
+        return true;
+    }
+    if !is_punct_val(s, candidate, b")") {
+        return false;
+    }
+    let open = match match_backward(s, candidate) {
+        Some(o) => o,
+        None => return false,
+    };
+    matches!(sig_prev(s, open), Some(p) if p > lower_limit)
+}
+
+fn nse_is_in_condition_without_braces(s: &Stream, mut index: usize, lower_limit: usize) -> bool {
+    while index > lower_limit {
+        let k = s.kind(index);
+        if k == Kind::Comment || k == Kind::DocComment || k == Kind::Whitespace {
+            index = match sig_prev(s, index) {
+                Some(p) => p,
+                None => return false,
+            };
+        }
+        if s.kind(index) == Kind::Keyword {
+            match s.bytes(index).to_ascii_lowercase().as_slice() {
+                b"if" | b"elseif" | b"else" => return true,
+                _ => {}
+            }
+        }
+        if is_punct_val(s, index, b";") {
+            return false;
+        }
+        if is_punct_val(s, index, b"{") {
+            index = match sig_prev(s, index) {
+                Some(p) => p,
+                None => return false,
+            };
+            if kw_is(s, index, b"do") {
+                if index == 0 {
+                    return false;
+                }
+                index -= 1;
+                continue;
+            }
+            if !is_punct_val(s, index, b")") {
+                return false;
+            }
+            index = match match_backward(s, index) {
+                Some(p) => p,
+                None => return false,
+            };
+            index = match sig_prev(s, index) {
+                Some(p) => p,
+                None => return false,
+            };
+            if kw_is(s, index, b"if") || kw_is(s, index, b"elseif") {
+                return false;
+            }
+        } else if is_punct_val(s, index, b")") {
+            index = match match_backward(s, index) {
+                Some(p) => p,
+                None => return false,
+            };
+            index = match sig_prev(s, index) {
+                Some(p) => p,
+                None => return false,
+            };
+        } else {
+            if index == 0 {
+                return false;
+            }
+            index -= 1;
+        }
+    }
+    false
+}
+
+fn nse_is_superfluous_else(s: &Stream, index: usize) -> bool {
+    let mut previous_block_start = index;
+    loop {
+        let (pbs, pbe) = nse_get_previous_block(s, previous_block_start);
+        let (pbs, pbe) = match (pbs, pbe) {
+            (Some(a), Some(b)) => (a, b),
+            _ => return false,
+        };
+        previous_block_start = pbs;
+
+        let mut previous = pbe;
+        if is_punct_val(s, previous, b"}") {
+            previous = match sig_prev(s, previous) {
+                Some(p) => p,
+                None => return false,
+            };
+        }
+        if !is_punct_val(s, previous, b";") {
+            return false;
+        }
+        if matches!(sig_prev(s, previous), Some(p) if is_punct_val(s, p, b"{")) {
+            return false;
+        }
+
+        let candidate = match nse_prev_of(s, previous, nse_is_terminator) {
+            Some(c) => c,
+            None => return false,
+        };
+        if is_punct_val(s, candidate, b";") || s.kind(candidate) == Kind::CloseTag || kw_is(s, candidate, b"if") {
+            return false;
+        }
+        if kw_is(s, candidate, b"throw") {
+            match sig_prev(s, candidate) {
+                Some(pi) if is_punct_val(s, pi, b";") || is_punct_val(s, pi, b"{") => {}
+                _ => return false,
+            }
+        }
+        if nse_is_in_conditional(s, candidate, previous_block_start)
+            || nse_is_in_condition_without_braces(s, candidate, previous_block_start)
+        {
+            return false;
+        }
+
+        if kw_is(s, previous_block_start, b"if") {
+            break;
+        }
+    }
+    true
+}
+
+fn nse_trailing_indent(ws: &[u8]) -> Option<Vec<u8>> {
+    let mut last = None;
+    for (i, &c) in ws.iter().enumerate() {
+        if c == b'\n' || c == b'\r' {
+            last = Some(i);
+        }
+    }
+    let li = last?;
+    let start = if ws[li] == b'\n' && li > 0 && ws[li - 1] == b'\r' { li - 1 } else { li };
+    Some(ws[start..].to_vec())
+}
+
+fn nse_convert_elseif_to_if(s: &mut Stream, index: usize) {
+    let mut index = index;
+    if kw_is(s, index, b"else") {
+        let before = index as isize - 1;
+        let after = index + 1;
+        if before >= 0
+            && s.kind(before as usize) == Kind::Whitespace
+            && after < s.len()
+            && s.kind(after) == Kind::Whitespace
+        {
+            let mut merged = s.bytes(before as usize).to_vec();
+            merged.extend_from_slice(s.bytes(after));
+            s.set_owned(before as usize, merged);
+            s.remove_at(after);
+        }
+        s.remove_at(index);
+    } else {
+        s.set_kind(index, Kind::Keyword);
+        s.set_owned(index, b"if".to_vec());
+    }
+
+    let mut whitespace: Vec<u8> = Vec::new();
+    let mut previous = index as isize - 1;
+    while previous > 0 {
+        let p = previous as usize;
+        if s.kind(p) == Kind::Whitespace {
+            if let Some(m) = nse_trailing_indent(s.bytes(p)) {
+                whitespace = m;
+                break;
+            }
+        }
+        previous -= 1;
+    }
+    if whitespace.is_empty() {
+        return;
+    }
+    if index == 0 {
+        return;
+    }
+    let prev = index - 1;
+    if s.kind(prev) != Kind::Whitespace {
+        s.insert_owned(index, Kind::Whitespace, whitespace);
+    } else if !s.bytes(prev).iter().any(|&c| c == b'\r' || c == b'\n') {
+        s.set_owned(prev, whitespace);
+    }
+    let _ = &mut index;
+}
+
+fn no_superfluous_elseif(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        if nse_is_elseif(s, i) && nse_is_superfluous_else(s, i) {
+            nse_convert_elseif_to_if(s, i);
+            changed = true;
+        }
+        i += 1;
+    }
+    changed
+}
+
+
+// --- OrderedInterfaces + OrderedTraits (ClassNotation) ---
+
+fn replace_range_owned(s: &mut Stream, start: usize, end: usize, repl: Vec<(Kind, Vec<u8>)>) {
+    for _ in start..=end {
+        s.remove_at(start);
+    }
+    let mut off = 0;
+    for (k, v) in repl {
+        s.insert_owned(start + off, k, v);
+        off += 1;
+    }
+}
+
+fn ordered_interfaces(s: &mut Stream) -> bool {
+    let mut changed = false;
+    let mut i = 0;
+    while i < s.len() {
+        let mut is_clause = false;
+        if kw_is(s, i, b"implements") {
+            is_clause = true;
+        } else if kw_is(s, i, b"extends") {
+            if let Some(name) = sig_prev(s, i) {
+                if let Some(iface) = sig_prev(s, name) {
+                    if kw_is(s, iface, b"interface") {
+                        is_clause = true;
+                    }
+                }
+            }
+        }
+        if !is_clause {
+            i += 1;
+            continue;
+        }
+        let start = i + 1;
+        let brace = match next_punct_of_kind(s, start, &[b"{"]) {
+            Some(b) => b,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let end = match sig_prev(s, brace) {
+            Some(e) => e,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        if end < start {
+            i += 1;
+            continue;
+        }
+        let groups = interface_groups(s, start, end);
+        if groups.len() <= 1 {
+            i += 1;
+            continue;
+        }
+        let mut items: Vec<(Vec<(Kind, Vec<u8>)>, String, usize)> = Vec::with_capacity(groups.len());
+        for (gi, g) in groups.into_iter().enumerate() {
+            let key = interface_sort_key(&g);
+            items.push((g, key, gi));
+        }
+        items.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+        let mut reordered = false;
+        for (gi, it) in items.iter().enumerate() {
+            if it.2 != gi {
+                reordered = true;
+                break;
+            }
+        }
+        if !reordered {
+            i += 1;
+            continue;
+        }
+        let mut repl: Vec<(Kind, Vec<u8>)> = Vec::new();
+        for (gi, it) in items.iter().enumerate() {
+            if gi > 0 {
+                repl.push((Kind::Punct, b",".to_vec()));
+            }
+            repl.extend(it.0.iter().cloned());
+        }
+        let repl_len = repl.len();
+        replace_range_owned(s, start, end, repl);
+        changed = true;
+        i = start + repl_len;
+    }
+    changed
+}
+
+fn interface_groups(s: &Stream, start: usize, end: usize) -> Vec<Vec<(Kind, Vec<u8>)>> {
+    let mut groups: Vec<Vec<(Kind, Vec<u8>)>> = Vec::new();
+    let mut cur: Vec<(Kind, Vec<u8>)> = Vec::new();
+    let mut i = start;
+    while i <= end && i < s.len() {
+        if is_punct_val(s, i, b",") {
+            groups.push(std::mem::take(&mut cur));
+            i += 1;
+            continue;
+        }
+        cur.push((s.kind(i), s.bytes(i).to_vec()));
+        i += 1;
+    }
+    groups.push(cur);
+    groups
+}
+
+fn interface_sort_key(group: &[(Kind, Vec<u8>)]) -> String {
+    let mut b: Vec<u8> = Vec::new();
+    let mut started = false;
+    for (k, v) in group {
+        if !started {
+            if matches!(k, Kind::Whitespace | Kind::Comment | Kind::DocComment) {
+                continue;
+            }
+            started = true;
+        }
+        if matches!(k, Kind::Whitespace | Kind::Comment | Kind::DocComment) {
+            break;
+        }
+        for &c in v.iter() {
+            if c == b'\\' {
+                b.push(b' ');
+            } else {
+                b.push(c);
+            }
+        }
+    }
+    String::from_utf8_lossy(&b).into_owned()
+}
+
+fn ordered_traits(s: &mut Stream) -> bool {
+    let mut groups: Vec<Vec<(usize, usize)>> = Vec::new();
+    let mut cur: Vec<(usize, usize)> = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        match s.kind(i) {
+            Kind::Whitespace | Kind::Comment | Kind::DocComment => {
+                i += 1;
+                continue;
+            }
+            _ => {}
+        }
+        if !(kw_is(s, i, b"use") && is_trait_use(s, i)) {
+            if !cur.is_empty() {
+                groups.push(std::mem::take(&mut cur));
+            }
+            i += 1;
+            continue;
+        }
+        let mut end = match next_punct_of_kind(s, i, &[b";", b"{"]) {
+            Some(e) => e,
+            None => break,
+        };
+        if is_punct_val(s, end, b"{") {
+            end = match match_forward(s, end) {
+                Some(e) => e,
+                None => break,
+            };
+        }
+        cur.push((i, end));
+        i = end + 1;
+    }
+    if !cur.is_empty() {
+        groups.push(cur);
+    }
+
+    let mut changed = false;
+    for gi in (0..groups.len()).rev() {
+        let g = groups[gi].clone();
+        let mut slices: Vec<Vec<(Kind, Vec<u8>)>> = Vec::with_capacity(g.len());
+        let mut names: Vec<String> = Vec::with_capacity(g.len());
+        for &(st, en) in g.iter() {
+            let mut toks: Vec<(Kind, Vec<u8>)> = Vec::with_capacity(en - st + 1);
+            for j in st..=en {
+                toks.push((s.kind(j), s.bytes(j).to_vec()));
+            }
+            let toks = sort_traits_in_statement(toks);
+            names.push(trait_name(&toks));
+            slices.push(toks);
+        }
+        let mut order: Vec<usize> = (0..g.len()).collect();
+        order.sort_by(|&a, &b| names[a].to_lowercase().cmp(&names[b].to_lowercase()));
+        let mut reordered = false;
+        for k in 0..order.len() {
+            if order[k] != k {
+                reordered = true;
+                break;
+            }
+        }
+        if !reordered {
+            let mut within = false;
+            for (k, &(st, en)) in g.iter().enumerate() {
+                if !same_tokens(&slices[k], s, st, en) {
+                    within = true;
+                    break;
+                }
+            }
+            if !within {
+                continue;
+            }
+        }
+        for k in (0..g.len()).rev() {
+            let (st, en) = g[k];
+            replace_range_owned(s, st, en, slices[order[k]].clone());
+        }
+        changed = true;
+    }
+    changed
+}
+
+fn same_tokens(toks: &[(Kind, Vec<u8>)], s: &Stream, start: usize, end: usize) -> bool {
+    if toks.len() != end - start + 1 {
+        return false;
+    }
+    for (k, (kind, v)) in toks.iter().enumerate() {
+        let o = start + k;
+        if s.kind(o) != *kind || s.bytes(o) != v.as_slice() {
+            return false;
+        }
+    }
+    true
+}
+
+fn is_trait_use(s: &Stream, i: usize) -> bool {
+    let n = match sig_next(s, i) {
+        Some(n) => n,
+        None => return false,
+    };
+    if s.kind(n) != Kind::Ident && !is_punct_val(s, n, b"\\") {
+        return false;
+    }
+    let mut depth = 0;
+    let mut j = i as isize - 1;
+    while j >= 0 {
+        let ju = j as usize;
+        if s.kind(ju) != Kind::Punct {
+            j -= 1;
+            continue;
+        }
+        match s.bytes(ju) {
+            b"}" => depth += 1,
+            b"{" => {
+                if depth == 0 {
+                    return brace_is_classy(s, ju);
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+        j -= 1;
+    }
+    false
+}
+
+fn brace_is_classy(s: &Stream, brace: usize) -> bool {
+    let mut jopt = sig_prev(s, brace);
+    while let Some(j) = jopt {
+        match s.kind(j) {
+            Kind::Keyword => {
+                let lb = s.bytes(j).to_ascii_lowercase();
+                match lb.as_slice() {
+                    b"class" | b"trait" | b"enum" => return true,
+                    b"extends" | b"implements" | b"abstract" | b"final" | b"readonly" => {}
+                    _ => return false,
+                }
+            }
+            Kind::Ident => {}
+            Kind::Punct => {
+                let v = s.bytes(j);
+                if v != b"," && v != b"\\" {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+        jopt = sig_prev(s, j);
+    }
+    false
+}
+
+fn trait_name(toks: &[(Kind, Vec<u8>)]) -> String {
+    let mut b: Vec<u8> = Vec::new();
+    for (k, v) in toks {
+        if *k == Kind::Punct && (v.as_slice() == b";" || v.as_slice() == b"{" || v.as_slice() == b",") {
+            break;
+        }
+        if *k == Kind::Ident || (*k == Kind::Punct && v.as_slice() == b"\\") {
+            b.extend_from_slice(v);
+        }
+    }
+    let out = String::from_utf8_lossy(&b).into_owned();
+    out.trim_start_matches('\\').to_string()
+}
+
+fn sort_traits_in_statement(toks: Vec<(Kind, Vec<u8>)>) -> Vec<(Kind, Vec<u8>)> {
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    let mut rs: isize = -1;
+    for (idx, (k, v)) in toks.iter().enumerate() {
+        let is_name = *k == Kind::Ident || (*k == Kind::Punct && v.as_slice() == b"\\");
+        if is_name {
+            if rs < 0 {
+                rs = idx as isize;
+            }
+            continue;
+        }
+        if *k == Kind::Punct && (v.as_slice() == b"," || v.as_slice() == b";" || v.as_slice() == b"{") {
+            if rs >= 0 {
+                runs.push((rs as usize, idx - 1));
+                rs = -1;
+            }
+            if v.as_slice() == b"{" {
+                break;
+            }
+        }
+    }
+    if runs.len() <= 1 {
+        return toks;
+    }
+    let mut keys: Vec<String> = Vec::with_capacity(runs.len());
+    for &(a, b) in runs.iter() {
+        let mut buf: Vec<u8> = Vec::new();
+        for j in a..=b {
+            buf.extend_from_slice(&toks[j].1);
+        }
+        let skey = String::from_utf8_lossy(&buf).into_owned();
+        keys.push(skey.trim_start_matches('\\').to_string());
+    }
+    let mut order: Vec<usize> = (0..runs.len()).collect();
+    order.sort_by(|&a, &b| keys[a].to_lowercase().cmp(&keys[b].to_lowercase()));
+    let mut same = true;
+    for k in 0..order.len() {
+        if order[k] != k {
+            same = false;
+            break;
+        }
+    }
+    if same {
+        return toks;
+    }
+    let mut res: Vec<(Kind, Vec<u8>)> = Vec::new();
+    let mut prev = 0usize;
+    for (k, &(rstart, _rend)) in runs.iter().enumerate() {
+        res.extend_from_slice(&toks[prev..rstart]);
+        let (sstart, send) = runs[order[k]];
+        res.extend_from_slice(&toks[sstart..=send]);
+        prev = runs[k].1 + 1;
+    }
+    res.extend_from_slice(&toks[prev..]);
+    res
+}
+
+
+// ===== PHPUnit fixers (byte-identical to the go implementations) =====
+
+fn ends_with_test_name(name: &[u8], iface: bool) -> bool {
+    if name.ends_with(b"Test") || name.ends_with(b"TestCase") {
+        return true;
+    }
+    if iface && (name.ends_with(b"TestInterface") || name.ends_with(b"TestCaseInterface")) {
+        return true;
+    }
+    false
+}
+
+fn is_phpunit_class(s: &Stream, index: usize) -> bool {
+    let mut extends = false;
+    let mut j = index + 1;
+    while j < s.len() {
+        if is_punct_val(s, j, b"{") {
+            break;
+        }
+        if kw_is(s, j, b"extends") {
+            extends = true;
+            break;
+        }
+        j += 1;
+    }
+    if !extends {
+        return false;
+    }
+    if let Some(name) = sig_next(s, index) {
+        if s.kind(name) == Kind::Ident && ends_with_test_name(s.bytes(name), false) {
+            return true;
+        }
+    }
+    let mut j = index + 1;
+    while j < s.len() {
+        if is_punct_val(s, j, b"{") {
+            break;
+        }
+        if s.kind(j) == Kind::Ident && ends_with_test_name(s.bytes(j), true) {
+            return true;
+        }
+        j += 1;
+    }
+    false
+}
+
+fn phpunit_test_classes(s: &Stream) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < s.len() {
+        if kw_is(s, i, b"class") && is_phpunit_class(s, i) {
+            if let Some(open) = next_punct_of_kind(s, i, &[b"{"]) {
+                if let Some(end) = match_forward(s, open) {
+                    out.push((open, end));
+                }
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+fn pu_is_method(s: &Stream, index: usize) -> bool {
+    if !kw_is(s, index, b"function") {
+        return false;
+    }
+    matches!(sig_next(s, index), Some(n) if s.kind(n) == Kind::Ident)
+}
+
+fn pu_is_modifier_kw(v: &[u8]) -> bool {
+    matches!(
+        v.to_ascii_lowercase().as_slice(),
+        b"public" | b"protected" | b"private" | b"final" | b"abstract" | b"readonly" | b"static"
+    )
+}
+
+fn pu_doc_block_index(s: &Stream, index: usize) -> Option<usize> {
+    let mut idx = index;
+    loop {
+        let p = get_prev_non_whitespace(s, idx)?;
+        match s.kind(p) {
+            Kind::Comment => {
+                idx = p;
+                continue;
+            }
+            Kind::Keyword if pu_is_modifier_kw(s.bytes(p)) => {
+                idx = p;
+                continue;
+            }
+            _ => return Some(p),
+        }
+    }
+}
+
+fn camel_case_to_underscore(str_: &[u8]) -> Vec<u8> {
+    let is_upper = |c: u8| c.is_ascii_uppercase();
+    let mut out = Vec::with_capacity(str_.len() + 4);
+    for i in 0..str_.len() {
+        let c = str_[i];
+        if i > 0 && str_[i - 1] != b'_' {
+            let has_next = i + 1 < str_.len();
+            let next = if has_next { str_[i + 1] } else { 0 };
+            let cond_a = is_upper(c) && has_next && !is_upper(next);
+            let cond_b = !is_upper(str_[i - 1]) && is_upper(c);
+            if cond_a || cond_b {
+                out.push(b'_');
+            }
+        }
+        out.push(c);
+    }
+    out.make_ascii_lowercase();
+    out
+}
+
+fn pu_test_attr(v: &[u8]) -> bool {
+    if !v.starts_with(b"#[") {
+        return false;
+    }
+    let inner = &v[2..v.len().saturating_sub(1).max(2)];
+    for part in inner.split(|&c| c == b',') {
+        let mut part = part;
+        if let Some(pos) = part.iter().position(|&c| c == b'(') {
+            part = &part[..pos];
+        }
+        let part = trim_ascii(part);
+        let short = match part.iter().rposition(|&c| c == b'\\') {
+            Some(p) => &part[p + 1..],
+            None => part,
+        };
+        if short == b"Test" {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_test_attribute_present(s: &Stream, index: usize) -> bool {
+    let mut p = get_prev_non_whitespace(s, index);
+    while let Some(pi) = p {
+        match s.kind(pi) {
+            Kind::Comment => {
+                if pu_test_attr(s.bytes(pi)) {
+                    return true;
+                }
+                p = get_prev_non_whitespace(s, pi);
+            }
+            Kind::Keyword if pu_is_modifier_kw(s.bytes(pi)) => {
+                p = get_prev_non_whitespace(s, pi);
+            }
+            _ => break,
+        }
+    }
+    false
+}
+
+fn is_test_method(s: &Stream, index: usize) -> bool {
+    if !pu_is_method(s, index) {
+        return false;
+    }
+    let name_idx = match sig_next(s, index) {
+        Some(n) => n,
+        None => return false,
+    };
+    if s.bytes(name_idx).starts_with(b"test") {
+        return true;
+    }
+    if is_test_attribute_present(s, index) {
+        return true;
+    }
+    match pu_doc_block_index(s, index) {
+        Some(d) if s.kind(d) == Kind::DocComment => {
+            windows_contains(s.bytes(d), b"@test")
+        }
+        _ => false,
+    }
+}
+
+fn windows_contains(hay: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() || needle.len() > hay.len() {
+        return needle.is_empty();
+    }
+    hay.windows(needle.len()).any(|w| w == needle)
+}
+
+fn update_depends_doc(s: &mut Stream, doc_idx: usize) -> bool {
+    let content = s.bytes(doc_idx).to_vec();
+    if !windows_contains(&content, b"@depends") {
+        return false;
+    }
+    let mut changed = false;
+    let mut out: Vec<u8> = Vec::with_capacity(content.len());
+    for (li, line) in split_keep(&content, b'\n').iter().enumerate() {
+        if li > 0 {
+            out.push(b'\n');
+        }
+        if let Some(idx) = find_sub(line, b"@depends") {
+            let after = idx + b"@depends".len();
+            let mut j = after;
+            while j < line.len() && (line[j] == b' ' || line[j] == b'\t') {
+                j += 1;
+            }
+            let mut k = j;
+            while k < line.len()
+                && line[k] != b' '
+                && line[k] != b'\t'
+                && line[k] != b'\r'
+                && line[k] != b'\n'
+            {
+                k += 1;
+            }
+            let refname = &line[j..k];
+            if !refname.is_empty() {
+                let newref = camel_case_to_underscore(refname);
+                if newref != refname {
+                    out.extend_from_slice(&line[..j]);
+                    out.extend_from_slice(&newref);
+                    out.extend_from_slice(&line[k..]);
+                    changed = true;
+                    continue;
+                }
+            }
+        }
+        out.extend_from_slice(line);
+    }
+    if changed {
+        s.set_owned(doc_idx, out);
+    }
+    changed
+}
+
+fn split_keep(content: &[u8], sep: u8) -> Vec<Vec<u8>> {
+    content.split(|&c| c == sep).map(|p| p.to_vec()).collect()
+}
+
+fn find_sub(hay: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || needle.len() > hay.len() {
+        return None;
+    }
+    hay.windows(needle.len()).position(|w| w == needle)
+}
+
+fn method_casing_class(s: &mut Stream, start: usize, end: usize) -> bool {
+    let mut changed = false;
+    let mut existing: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
+    let mut i = end;
+    while i > start + 1 {
+        i -= 1;
+        if !pu_is_method(s, i) {
+            continue;
+        }
+        if let Some(n) = sig_next(s, i) {
+            existing.insert(s.bytes(n).to_ascii_lowercase());
+        }
+    }
+    let mut i = end;
+    while i > start + 1 {
+        i -= 1;
+        if !is_test_method(s, i) {
+            continue;
+        }
+        let name_idx = match sig_next(s, i) {
+            Some(n) => n,
+            None => continue,
+        };
+        let name = s.bytes(name_idx).to_vec();
+        let name_lower = name.to_ascii_lowercase();
+        let new_name = camel_case_to_underscore(&name);
+        let new_lower = new_name.to_ascii_lowercase();
+        if existing.contains(&new_lower) && name_lower != new_lower {
+            continue;
+        }
+        existing.insert(new_lower);
+        if new_name != name {
+            s.set_owned(name_idx, new_name);
+            changed = true;
+        }
+        if let Some(d) = pu_doc_block_index(s, i) {
+            if s.kind(d) == Kind::DocComment && update_depends_doc(s, d) {
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+fn phpunit_method_casing(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for (start, end) in phpunit_test_classes(s) {
+        if method_casing_class(s, start, end) {
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn method_visibility_index(s: &Stream, fn_idx: usize) -> Option<usize> {
+    let mut p = get_prev_non_whitespace(s, fn_idx);
+    while let Some(pi) = p {
+        if s.kind(pi) == Kind::Keyword {
+            match s.bytes(pi).to_ascii_lowercase().as_slice() {
+                b"public" | b"protected" | b"private" => return Some(pi),
+                b"final" | b"abstract" | b"readonly" | b"static" => {
+                    p = get_prev_non_whitespace(s, pi);
+                    continue;
+                }
+                _ => break,
+            }
+        }
+        if s.kind(pi) == Kind::Comment {
+            p = get_prev_non_whitespace(s, pi);
+            continue;
+        }
+        break;
+    }
+    None
+}
+
+fn setup_teardown_class(s: &mut Stream, start: usize, end: usize) -> bool {
+    let mut changed = false;
+    let mut counter = 0;
+    let mut end = end;
+    let mut i = start + 1;
+    while i < end && i < s.len() {
+        if counter == 2 {
+            break;
+        }
+        if is_punct_val(s, i, b"{") {
+            if let Some(e) = match_forward(s, i) {
+                if e > i {
+                    i = e;
+                }
+            }
+            i += 1;
+            continue;
+        }
+        if !kw_is(s, i, b"function") {
+            i += 1;
+            continue;
+        }
+        let name_idx = match sig_next(s, i) {
+            Some(n) => n,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+        let fnl = s.bytes(name_idx).to_ascii_lowercase();
+        if fnl != b"setup" && fnl != b"teardown" {
+            i += 1;
+            continue;
+        }
+        counter += 1;
+        if let Some(vis) = method_visibility_index(s, i) {
+            if s.bytes(vis).eq_ignore_ascii_case(b"public") {
+                s.set_owned(vis, b"protected".to_vec());
+                changed = true;
+            }
+            i += 1;
+            continue;
+        }
+        s.insert_owned(i, Kind::Whitespace, b" ".to_vec());
+        s.insert_owned(i, Kind::Keyword, b"protected".to_vec());
+        changed = true;
+        end += 2;
+        i += 1;
+    }
+    changed
+}
+
+fn phpunit_setup_teardown_visibility(s: &mut Stream) -> bool {
+    let mut changed = false;
+    for (start, end) in phpunit_test_classes(s) {
+        if setup_teardown_class(s, start, end) {
+            changed = true;
+        }
+    }
+    changed
 }
