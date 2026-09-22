@@ -241,17 +241,26 @@ func phpAlignParseMethodTag(indent, tag, line string, pos int) *alignMatch {
 	if sigParen < 0 {
 		return nil
 	}
-	// signature start: after hint + \s+. Find the last top-level ws before the signature name.
-	hintEnd, _ := phpAlignScanType(line, p)
-	hint := strings.TrimSpace(line[p:hintEnd])
-	q := hintEnd
-	for q < len(line) && phpAlignIsWS(line[q]) {
-		q++
-	}
-	if q >= len(line) {
+	if p > sigParen {
 		return nil
 	}
-	signature := strings.TrimRight(line[q:sigParen+1], " \t")
+	// signature start: after hint + \s+. Find the last top-level ws before the signature name.
+	hintEnd, _ := phpAlignScanType(line, p)
+	var hint, signature string
+	if hintEnd > sigParen {
+		// no return type: the scanned run is the name+signature itself
+		signature = strings.TrimRight(line[p:sigParen+1], " \t")
+	} else {
+		hint = strings.TrimSpace(line[p:hintEnd])
+		q := hintEnd
+		for q < len(line) && phpAlignIsWS(line[q]) {
+			q++
+		}
+		if q > sigParen {
+			return nil
+		}
+		signature = strings.TrimRight(line[q:sigParen+1], " \t")
+	}
 	if !strings.HasSuffix(signature, ")") {
 		return nil
 	}

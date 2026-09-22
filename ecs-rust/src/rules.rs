@@ -418,12 +418,6 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= remove_dead_var_this(s);
     changed |= remove_param_name_reference(s);
     changed |= switched_type_and_name(s);
-    changed |= blank_line_between_import_groups(s);
-    changed |= no_blank_line_between_imports(s);
-    changed |= phpdoc_trim_consecutive_blank_line_separation(s);
-    changed |= phpdoc_align(s);
-    changed |= no_whitespace_in_blank_line(s);
-    changed |= single_blank_line_at_eof(s);
     changed |= double_asterisk_inline_var(s);
     changed |= fix_tag_typo(s);
     changed |= type_to_var_tag(s);
@@ -433,6 +427,12 @@ pub fn fix(s: &mut Stream) -> bool {
     changed |= remove_superfluous_return_name(s);
     changed |= remove_superfluous_var_name(s);
     changed |= fix_param_name_typo(s);
+    changed |= blank_line_between_import_groups(s);
+    changed |= phpdoc_trim_consecutive_blank_line_separation(s);
+    changed |= phpdoc_align(s);
+    changed |= no_blank_line_between_imports(s);
+    changed |= no_whitespace_in_blank_line(s);
+    changed |= single_blank_line_at_eof(s);
     changed
 }
 
@@ -10480,21 +10480,33 @@ fn pa_parse_method_tag(indent: &[u8], tag: &[u8], line: &[u8], pos: usize) -> Op
         Some(x) => x,
         None => return None,
     };
-    let (hint_end, _balanced) = pa_scan_type(line, p);
-    let mut hint = pa_trim_space(&line[p..hint_end]);
-    let mut q = hint_end;
-    while q < line.len() && pa_is_ws(line[q]) {
-        q += 1;
-    }
-    if q >= line.len() {
+    if p > sig_paren {
         return None;
     }
-    // strings.TrimRight(line[q:sigParen+1], " \t")
+    let (hint_end, _balanced) = pa_scan_type(line, p);
+    let mut hint: Vec<u8>;
+    let start;
+    if hint_end > sig_paren {
+        // no return type: the scanned run is the name+signature itself
+        hint = Vec::new();
+        start = p;
+    } else {
+        hint = pa_trim_space(&line[p..hint_end]);
+        let mut q = hint_end;
+        while q < line.len() && pa_is_ws(line[q]) {
+            q += 1;
+        }
+        if q > sig_paren {
+            return None;
+        }
+        start = q;
+    }
+    // strings.TrimRight(line[start:sigParen+1], " \t")
     let mut se = sig_paren + 1;
-    while se > q && (line[se - 1] == b' ' || line[se - 1] == b'\t') {
+    while se > start && (line[se - 1] == b' ' || line[se - 1] == b'\t') {
         se -= 1;
     }
-    let signature = line[q..se].to_vec();
+    let signature = line[start..se].to_vec();
     if !signature.ends_with(b")") {
         return None;
     }
