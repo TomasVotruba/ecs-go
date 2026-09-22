@@ -79,8 +79,8 @@ With no config file, every fixer runs. CLI path arguments override `paths`.
 ## Performance
 
 The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
-(in `ecs-rust/`) over the same rule subset (the 209 fixers both ports implement)
-on real codebases and compares wall time. All three run `--fix` in parallel
+(in `ecs-rust/`) over the same psr12 + common default set on real codebases and
+compares wall time. All three run `--fix` in parallel
 across every core; Go and Rust also produce byte-for-byte identical output. Mean
 of 10 runs on the CI `ubuntu-latest` runner (4 vCPU):
 
