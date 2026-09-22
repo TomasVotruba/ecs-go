@@ -86,8 +86,8 @@ of 10 runs on the CI `ubuntu-latest` runner (4 vCPU):
 
 | codebase | .php files | ecs (PHP) | ecs-go | ecs-rust |
 |---|---:|---:|---:|---:|
-| laravel/framework (src) | 1703 | 37.646s | 3.926s | 0.647s |
-| symfony/symfony (src) | 11887 | 111.387s | 4.997s | 3.951s |
+| laravel/framework (src) | 1703 | 49.846s | 4.661s | 0.833s |
+| symfony/symfony (src) | 11889 | 172.584s | 7.030s | 5.040s |
 
 Both compiled tools are far faster than the original PHP ECS - roughly 10-60x -
 and ecs-rust leads ecs-go on this runner, by up to ~6x on the smaller tree, where
