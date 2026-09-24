@@ -135,7 +135,7 @@ func reflowParen(s *tokens.Stream, open, closeIdx int) bool {
 		changed = true
 	}
 	for _, c := range slices.Backward(commas) {
-		if editSlotAfter(s, c, argNL) {
+		if editSlotAfter(s, c, argNLAfterComma(s, c, base)) {
 			changed = true
 		}
 	}
@@ -203,6 +203,23 @@ func lineIndentBefore(s *tokens.Stream, idx int) string {
 		}
 	}
 	return ""
+}
+
+// argNLAfterComma returns the newline+indent to place after a top-level comma
+// in a multiline argument list. A blank line an author left between two
+// arguments is preserved (ECS keeps blank lines in a multiline argument list and
+// only normalizes the indentation), so a comma whose following whitespace holds a
+// blank line keeps that blank rather than collapsing to a single newline.
+func argNLAfterComma(s *tokens.Stream, comma int, base string) string {
+	if comma+1 < s.Len() {
+		ws := s.At(comma + 1)
+		if ws.Kind == token.Whitespace {
+			if newlines := strings.Count(ws.Value, "\n"); newlines >= 2 {
+				return strings.Repeat("\n", newlines) + base + "    "
+			}
+		}
+	}
+	return "\n" + base + "    "
 }
 
 // editSlotAfter sets the whitespace immediately after token idx to val.
