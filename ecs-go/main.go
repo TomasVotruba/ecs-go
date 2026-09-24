@@ -110,23 +110,23 @@ func loadConfig(configPath string) (*config.Config, error) {
 // rules resolved to ecs-go fixers and everything that could not, so a turbo run
 // is never silently narrower than the ECS config it stands in for.
 func reportECSResolution(w io.Writer, resolution *config.ECSResolution) {
-	fmt.Fprintf(w, "turbo: mapped %d of %d ECS rules to ecs-go fixers\n", resolution.Mapped, resolution.Total)
+	_, _ = fmt.Fprintf(w, "turbo: mapped %d of %d ECS rules to ecs-go fixers\n", resolution.Mapped, resolution.Total)
 	if len(resolution.Unsupported) > 0 {
-		fmt.Fprintf(w, "  %d unsupported (no ecs-go fixer), skipped:\n", len(resolution.Unsupported))
+		_, _ = fmt.Fprintf(w, "  %d unsupported (no ecs-go fixer), skipped:\n", len(resolution.Unsupported))
 		for _, class := range resolution.Unsupported {
-			fmt.Fprintf(w, "    - %s\n", class)
+			_, _ = fmt.Fprintf(w, "    - %s\n", class)
 		}
 	}
 	if len(resolution.ConfigIgnored) > 0 {
-		fmt.Fprintf(w, "  %d configured rule(s) applied with ecs-go's built-in behaviour (config not modelled):\n", len(resolution.ConfigIgnored))
+		_, _ = fmt.Fprintf(w, "  %d configured rule(s) applied with ecs-go's built-in behaviour (config not modelled):\n", len(resolution.ConfigIgnored))
 		for _, class := range resolution.ConfigIgnored {
-			fmt.Fprintf(w, "    - %s\n", class)
+			_, _ = fmt.Fprintf(w, "    - %s\n", class)
 		}
 	}
 	if len(resolution.PerPathSkips) > 0 {
-		fmt.Fprintln(w, "  per-path rule skips applied project-wide (not yet honoured per path):")
+		_, _ = fmt.Fprintln(w, "  per-path rule skips applied project-wide (not yet honoured per path):")
 		for _, class := range resolution.PerPathSkips {
-			fmt.Fprintf(w, "    - %s\n", class)
+			_, _ = fmt.Fprintf(w, "    - %s\n", class)
 		}
 	}
 }
