@@ -38,6 +38,28 @@ func csbIsControl(t token.Token) bool {
 	return t.Kind == token.Keyword && csbControlKeywords[strings.ToLower(t.Value)]
 }
 
+// csbIsConstantName reports whether the token at index is a class or global
+// constant name - a keyword-spelled identifier declared with `const`, optionally
+// preceded by a type (e.g. "const IF", "const string IF"). Scanning back over the
+// type tokens, a `const` keyword marks it as a name rather than a control word.
+func csbIsConstantName(s *tokens.Stream, index int) bool {
+	i := prevSignificantIndex(s, index)
+	for i != -1 {
+		t := s.At(i)
+		if t.Kind == token.Keyword && strings.EqualFold(t.Value, "const") {
+			return true
+		}
+		// allow the optional type between `const` and the name (int, ?Foo, A|B, \Ns\C)
+		if t.Kind == token.Ident || t.Kind == token.Keyword ||
+			(t.Kind == token.Punct && (t.Value == "?" || t.Value == "|" || t.Value == `\`)) {
+			i = prevSignificantIndex(s, i)
+			continue
+		}
+		return false
+	}
+	return false
+}
+
 func csbIsKeyword(t token.Token, word string) bool {
 	return t.Kind == token.Keyword && strings.EqualFold(t.Value, word)
 }
@@ -51,6 +73,13 @@ func (f ControlStructureBraces) Fix(s *tokens.Stream) bool {
 	for index := s.Len() - 1; index >= 0; index-- {
 		tok := s.At(index)
 		if !csbIsControl(tok) {
+			continue
+		}
+
+		// a keyword-spelled constant name (e.g. "const string IF = ...") is an
+		// identifier, not a control structure - the lexer still tags it as a
+		// keyword, so skip it here rather than wrap it in braces
+		if csbIsConstantName(s, index) {
 			continue
 		}
 
