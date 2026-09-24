@@ -76,6 +76,16 @@ Drop an `ecs-go.json` in your project root (auto-loaded, or point at one with
 
 With no config file, every fixer runs. CLI path arguments override `paths`.
 
+### Turbo mode: consuming an ECS config
+
+`ecs-go --ecs-config <file>` reads the JSON that ECS's `ecs dump-config` produces
+(its resolved paths, rules and skips) and runs ecs-go over it. Because every
+ecs-go fixer is named by its PHP-CS-Fixer class, the ECS rules map straight onto
+ecs-go fixers by class name. Any rule ecs-go has no fixer for is reported and
+skipped, so a turbo run is never silently narrower than the ECS config. Rule
+configuration is not modelled yet - a configured rule runs with ecs-go's built-in
+behaviour, which is noted in the report.
+
 ## Performance
 
 The `Performance` CI workflow runs the original PHP ECS, ecs-go, and a Rust port
