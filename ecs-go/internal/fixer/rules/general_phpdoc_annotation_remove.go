@@ -8,9 +8,9 @@ import (
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Phpdoc/GeneralPhpdocAnnotationRemoveFixer.php
 //
-// GeneralPhpdocAnnotationRemove removes the configured phpdoc annotations. The
-// annotation list is configuration-driven and empty by default (as ECS's
-// psr12+common leaves it), so with the default set it is a no-op.
+// GeneralPhpdocAnnotationRemove removes the configured phpdoc annotations. ECS's
+// psr12+common (via SetList::DOCBLOCK) configures it to strip author, package,
+// group and category, so those are the default set here.
 type GeneralPhpdocAnnotationRemove struct{}
 
 func (GeneralPhpdocAnnotationRemove) Name() string {
@@ -21,9 +21,9 @@ func (GeneralPhpdocAnnotationRemove) SourceURL() string {
 	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/Phpdoc/GeneralPhpdocAnnotationRemoveFixer.php"
 }
 
-// generalPhpdocAnnotationsToRemove is the configured annotation set. ECS's
-// psr12+common configures none, so it stays empty (no-op).
-var generalPhpdocAnnotationsToRemove []string
+// generalPhpdocAnnotationsToRemove is the configured annotation set, matching
+// ECS's psr12+common (SetList::DOCBLOCK).
+var generalPhpdocAnnotationsToRemove = []string{"author", "package", "group", "category"}
 
 func (GeneralPhpdocAnnotationRemove) Fix(s *tokens.Stream) bool {
 	if len(generalPhpdocAnnotationsToRemove) == 0 {
