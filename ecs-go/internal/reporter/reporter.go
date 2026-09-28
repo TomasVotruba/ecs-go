@@ -9,14 +9,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
-	"unsafe"
 
 	"ecs-go/internal/runner"
 )
-
-const tiocgwinsz = 0x5413 // linux TIOCGWINSZ
 
 type formatter struct {
 	w     io.Writer
@@ -197,18 +193,4 @@ func plural(n int) string {
 		return ""
 	}
 	return "s"
-}
-
-func winsize(file *os.File) (int, bool) {
-	ws := struct{ Row, Col, X, Y uint16 }{}
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		file.Fd(),
-		uintptr(tiocgwinsz),
-		uintptr(unsafe.Pointer(&ws)),
-	)
-	if errno != 0 {
-		return 0, false
-	}
-	return int(ws.Col), true
 }
