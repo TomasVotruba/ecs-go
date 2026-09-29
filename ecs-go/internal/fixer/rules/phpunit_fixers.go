@@ -146,20 +146,25 @@ func camelCaseToUnderscore(str string) string {
 	return strings.ToLower(string(out))
 }
 
-// underscoreToCamelCase mirrors PhpUnitMethodCasingFixer's camel_case mode: split
-// on "_", keep the first part, ucfirst the rest. Already-camelCase names (no
-// underscores) are returned unchanged.
+// underscoreToCamelCase mirrors PhpUnitMethodCasingFixer's camel_case mode:
+// ucfirst each "_"-separated part, drop the underscores, then lcfirst the result.
+// Already-camelCase names (no underscores) are returned unchanged.
 func underscoreToCamelCase(str string) string {
-	parts := strings.Split(str, "_")
 	var result strings.Builder
-	result.WriteString(parts[0])
-	for _, part := range parts[1:] {
+	for i, part := range strings.Split(str, "_") {
 		if part == "" {
 			continue
 		}
-		result.WriteString(strings.ToUpper(part[:1]) + part[1:])
+		if i > 0 {
+			part = strings.ToUpper(part[:1]) + part[1:]
+		}
+		result.WriteString(part)
 	}
-	return result.String()
+	out := result.String()
+	if out == "" {
+		return out
+	}
+	return strings.ToLower(out[:1]) + out[1:]
 }
 
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/PhpUnit/PhpUnitMethodCasingFixer.php

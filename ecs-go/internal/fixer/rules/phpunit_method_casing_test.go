@@ -29,3 +29,17 @@ func TestPhpUnitMethodCasingCamelCaseConvertsSnakeNames(t *testing.T) {
 		t.Fatalf("changed=%v got=%q want=%q", changed, got, want)
 	}
 }
+
+func TestUnderscoreToCamelCaseMatchesPhpCsFixer(t *testing.T) {
+	cases := map[string]string{
+		"test_known_thing": "testKnownThing",
+		"testKnownThing":   "testKnownThing",
+		"Test_known":       "testKnown",
+		"_test_known":      "testKnown",
+	}
+	for in, want := range cases {
+		if got := underscoreToCamelCase(in); got != want {
+			t.Errorf("underscoreToCamelCase(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
