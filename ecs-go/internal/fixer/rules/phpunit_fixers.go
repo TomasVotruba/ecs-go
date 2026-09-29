@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"ecs-go/internal/fixer"
 	"ecs-go/internal/token"
 	"ecs-go/internal/tokens"
 )
@@ -145,11 +146,30 @@ func camelCaseToUnderscore(str string) string {
 	return strings.ToLower(string(out))
 }
 
+// underscoreToCamelCase mirrors PhpUnitMethodCasingFixer's camel_case mode: split
+// on "_", keep the first part, ucfirst the rest. Already-camelCase names (no
+// underscores) are returned unchanged.
+func underscoreToCamelCase(str string) string {
+	parts := strings.Split(str, "_")
+	var result strings.Builder
+	result.WriteString(parts[0])
+	for _, part := range parts[1:] {
+		if part == "" {
+			continue
+		}
+		result.WriteString(strings.ToUpper(part[:1]) + part[1:])
+	}
+	return result.String()
+}
+
 // PHP-CS-Fixer: https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/PhpUnit/PhpUnitMethodCasingFixer.php
 //
-// PhpUnitMethodCasing enforces snake_case (the ECS laravel config) for PHPUnit
-// test method names.
-type PhpUnitMethodCasing struct{}
+// PhpUnitMethodCasing normalizes PHPUnit test method names. The "case" option
+// mirrors PHP-CS-Fixer: camel_case or snake_case (the default, as in the ECS
+// laravel config).
+type PhpUnitMethodCasing struct {
+	camelCase bool
+}
 
 func (PhpUnitMethodCasing) Name() string {
 	return `PhpCsFixer\Fixer\PhpUnit\PhpUnitMethodCasingFixer`
@@ -159,17 +179,30 @@ func (PhpUnitMethodCasing) SourceURL() string {
 	return "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/blob/master/src/Fixer/PhpUnit/PhpUnitMethodCasingFixer.php"
 }
 
-func (PhpUnitMethodCasing) Fix(s *tokens.Stream) bool {
+// WithConfig reads the "case" option ("camel_case" or "snake_case"); anything
+// else keeps the snake_case default.
+func (f PhpUnitMethodCasing) WithConfig(config map[string]any) fixer.Fixer {
+	if c, ok := config["case"].(string); ok {
+		f.camelCase = c == "camel_case"
+	}
+	return f
+}
+
+func (f PhpUnitMethodCasing) Fix(s *tokens.Stream) bool {
+	rename := camelCaseToUnderscore
+	if f.camelCase {
+		rename = underscoreToCamelCase
+	}
 	changed := false
 	for _, cls := range phpUnitTestClasses(s) {
-		if methodCasingClass(s, cls[0], cls[1]) {
+		if methodCasingClass(s, cls[0], cls[1], rename) {
 			changed = true
 		}
 	}
 	return changed
 }
 
-func methodCasingClass(s *tokens.Stream, start, end int) bool {
+func methodCasingClass(s *tokens.Stream, start, end int, rename func(string) string) bool {
 	changed := false
 	existing := map[string]bool{}
 	for i := end - 1; i > start; i-- {
@@ -190,7 +223,7 @@ func methodCasingClass(s *tokens.Stream, start, end int) bool {
 		}
 		name := s.At(nameIdx).Value
 		nameLower := strings.ToLower(name)
-		newName := camelCaseToUnderscore(name)
+		newName := rename(name)
 		newLower := strings.ToLower(newName)
 		if existing[newLower] && nameLower != newLower {
 			continue
@@ -202,7 +235,7 @@ func methodCasingClass(s *tokens.Stream, start, end int) bool {
 		}
 		docIdx := puDocBlockIndex(s, i)
 		if docIdx >= 0 && s.At(docIdx).Kind == token.DocComment {
-			if updateDependsDoc(s, docIdx) {
+			if updateDependsDoc(s, docIdx, rename) {
 				changed = true
 			}
 		}
@@ -272,7 +305,7 @@ func phpUnitTestAttrRe(v string) bool {
 }
 
 // updateDependsDoc rewrites @depends method references to the new casing.
-func updateDependsDoc(s *tokens.Stream, docIdx int) bool {
+func updateDependsDoc(s *tokens.Stream, docIdx int, rename func(string) string) bool {
 	content := s.At(docIdx).Value
 	if !strings.Contains(content, "@depends") {
 		return false
@@ -300,7 +333,7 @@ func updateDependsDoc(s *tokens.Stream, docIdx int) bool {
 		if ref == "" {
 			continue
 		}
-		newRef := camelCaseToUnderscore(ref)
+		newRef := rename(ref)
 		if newRef != ref {
 			lines[i] = line[:idx+len("@depends")] + ws + newRef + rest[k:]
 			changed = true

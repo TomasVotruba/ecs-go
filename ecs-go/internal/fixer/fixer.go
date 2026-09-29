@@ -51,6 +51,13 @@ type Fixer interface {
 	Fix(s *tokens.Stream) bool
 }
 
+// Configurable is an optional interface for fixers that accept ECS rule options.
+// WithConfig returns a copy configured from the ECS dump-config "config" map;
+// the receiver is left unchanged.
+type Configurable interface {
+	WithConfig(config map[string]any) Fixer
+}
+
 // SourceURLFor derives the canonical PHP-CS-Fixer source URL from a fixer Name
 // (an FQCN like `PhpCsFixer\Fixer\Semicolon\SpaceAfterSemicolonFixer`).
 func SourceURLFor(name string) string {
