@@ -33,6 +33,10 @@ jobs:
                   # full rector-src tree; .php.inc fixtures are skipped by the *.php find below
                   mkdir -p /tmp/sample
                   cp -r /tmp/rector/src /tmp/rector/rules /tmp/rector/tests /tmp/sample/
+                  # PHP-CS-Fixer's LowercaseKeywordsFixer lowercases keyword-named typed
+                  # constants ("const int PUBLIC" -> "public"), breaking the code; ecs-go
+                  # keeps them, so skip the file until fixed upstream
+                  rm -f /tmp/sample/src/ValueObject/Visibility.php
                   cp -r /tmp/sample /tmp/ours
                   cp -r /tmp/sample /tmp/ecs
 

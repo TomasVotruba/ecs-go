@@ -6376,7 +6376,8 @@ fn reflow_paren(s: &mut Stream, open: usize, close_idx: usize) -> bool {
         changed = true;
     }
     for &c in commas.iter().rev() {
-        if edit_slot_after(s, c, &arg_nl) {
+        let nl = arg_nl_after_comma(s, c, &base);
+        if edit_slot_after(s, c, &nl) {
             changed = true;
         }
     }
@@ -6384,6 +6385,22 @@ fn reflow_paren(s: &mut Stream, open: usize, close_idx: usize) -> bool {
         changed = true;
     }
     changed
+}
+
+// arg_nl_after_comma keeps a blank line an author left between two multiline
+// arguments (ECS only normalizes the indentation), otherwise a single newline
+fn arg_nl_after_comma(s: &Stream, comma: usize, base: &[u8]) -> Vec<u8> {
+    let mut newlines = 1;
+    if comma + 1 < s.len() && s.kind(comma + 1) == Kind::Whitespace {
+        let count = s.bytes(comma + 1).iter().filter(|&&c| c == b'\n').count();
+        if count >= 2 {
+            newlines = count;
+        }
+    }
+    let mut nl = vec![b'\n'; newlines];
+    nl.extend_from_slice(base);
+    nl.extend_from_slice(b"    ");
+    nl
 }
 
 fn yoda_op(v: &[u8]) -> bool {
@@ -12173,6 +12190,24 @@ fn csb_is_control(s: &Stream, i: usize) -> bool {
     CSB_CONTROL.iter().any(|w| b.eq_ignore_ascii_case(w))
 }
 
+// csb_is_constant_name reports whether the token at index is a constant name
+// declared with `const`, optionally preceded by a type ("const IF", "const string IF")
+fn csb_is_constant_name(s: &Stream, index: usize) -> bool {
+    let mut i = prev_significant_index(s, index);
+    while let Some(p) = i {
+        if kw_eq(s, p, b"const") {
+            return true;
+        }
+        let is_type_token = matches!(s.kind(p), Kind::Ident | Kind::Keyword)
+            || (s.kind(p) == Kind::Punct && matches!(s.bytes(p), b"?" | b"|" | b"\\"));
+        if !is_type_token {
+            return false;
+        }
+        i = prev_significant_index(s, p);
+    }
+    false
+}
+
 fn csb_is_punct(s: &Stream, i: usize, v: &[u8]) -> bool {
     s.kind(i) == Kind::Punct && s.bytes(i) == v
 }
@@ -12284,6 +12319,12 @@ fn control_structure_braces(s: &mut Stream) -> bool {
     while index > 0 {
         index -= 1;
         if !csb_is_control(s, index) {
+            continue;
+        }
+
+        // a keyword-spelled constant name (e.g. "const string IF = ...") is an
+        // identifier, not a control structure
+        if csb_is_constant_name(s, index) {
             continue;
         }
 
@@ -15552,9 +15593,28 @@ fn phpdoc_tag_type(s: &mut Stream) -> bool {
     })
 }
 
-fn general_phpdoc_annotation_remove(_s: &mut Stream) -> bool {
-    // ECS's psr12+common configures no annotations to remove: no-op
-    false
+// ECS's psr12+common (via SetList::DOCBLOCK) strips these annotations
+const GENERAL_PHPDOC_ANNOTATIONS_TO_REMOVE: &[&[u8]] = &[b"author", b"package", b"group", b"category"];
+
+fn general_phpdoc_annotation_remove(s: &mut Stream) -> bool {
+    apply_to_docblocks(s, |d| {
+        let before = d.inner.len();
+        d.inner.retain(|l| !general_phpdoc_line_has_tag(&l.content, GENERAL_PHPDOC_ANNOTATIONS_TO_REMOVE));
+        d.inner.len() != before
+    })
+}
+
+fn general_phpdoc_line_has_tag(content: &[u8], tags: &[&[u8]]) -> bool {
+    let trimmed = trim_left_space(content);
+    if trimmed.first() != Some(&b'@') {
+        return false;
+    }
+    let mut j = 1;
+    while j < trimmed.len() && (trimmed[j].is_ascii_alphanumeric() || trimmed[j] == b'_' || trimmed[j] == b'-') {
+        j += 1;
+    }
+    let name = &trimmed[1..j];
+    !name.is_empty() && tags.iter().any(|t| name.eq_ignore_ascii_case(t))
 }
 
 fn method_chaining_indentation(s: &mut Stream) -> bool {
